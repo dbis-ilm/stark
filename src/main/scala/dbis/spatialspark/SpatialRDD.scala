@@ -11,15 +11,44 @@ import scala.reflect.ClassTag
 import org.apache.spark.SparkContext
 import com.vividsolutions.jts.geom.Envelope
 import org.apache.spark.rdd.MapPartitionsRDD
+import com.vividsolutions.jts.geom.Geometry
+
+import scala.collection.JavaConversions._
+
+object Operation extends Enumeration {
+  type Operation = Value
+  val INTERSECT, KNN = Value
+  
+}
+
+class ExtendedRDD[X] private (rdd: RDD[X]) {
+  def makeSpatial[Y: ClassTag](f: X => Y): SpatialRDD[Y] = ???
+}
+
+object ExtendedRDD {
+  
+  implicit def convertSpatial[X](rdd: RDD[X]): ExtendedRDD[X] = new ExtendedRDD[X](rdd)
+  
+}
+
+/*
+ * SEE UnionRDD for some useful implementation ideas
+ * - they create their own Partition type and instances thereof in getPartitions
+ * - in compute the partition is casted to this type 
+ */
+
+import Operation._
 
 class SpatialRDD[T:ClassTag](
     @transient private var _sc: SparkContext,
     @transient private var deps: Seq[Dependency[_]]
   ) extends RDD[T](_sc, deps) {
   
-  val rtree = new com.vividsolutions.jts.index.strtree.STRtree(3)
+  private val rtree = new com.vividsolutions.jts.index.strtree.STRtree(3)
   
-  
+  private var op: Option[Operation] = None
+  private var searchGeom: Option[Geometry] = None
+  private var k: Int = -1
   
   def this(@transient oneParent: RDD[_]) =
     this(oneParent.context , List(new OneToOneDependency(oneParent)))
@@ -29,7 +58,26 @@ class SpatialRDD[T:ClassTag](
    * Implemented by subclasses to compute a given partition.
    */
   @DeveloperApi
-  def compute(split: Partition, context: TaskContext): Iterator[T] = ???
+  def compute(split: Partition, context: TaskContext): Iterator[T] = {
+    
+    /* Actually this cannot happen, can it?
+     * In case there is no operation set, simply pass the input split
+     */
+    if(op.isEmpty) 
+      throw new IllegalStateException("No operation set")
+      
+    val o = op.get
+    val qry = searchGeom.get
+    
+    val result = op match {
+      case INTERSECT => 
+        val res = rtree.query(qry.getEnvelopeInternal)
+        res.map{ obj => obj.asInstanceOf[T]}.toIterator
+      case _ => ???
+    }
+    
+    result
+  }
   
 
   /**
@@ -53,11 +101,18 @@ class SpatialRDD[T:ClassTag](
   @transient override val partitioner: Option[Partitioner] = None
   
   
-  //
-  
-  def intersect(searchGeom: com.vividsolutions.jts.geom.Geometry): SpatialRDD[T] = {
-    ???
+  def intersect(searchGeom: Geometry): SpatialRDD[T] = {
+    op = Some(Operation.INTERSECT)
+    this.searchGeom = Some(searchGeom)
+    this
   } 
+  
+  def kNN(ref: Geometry, k: Int): SpatialRDD[T] = {
+    op = Some(Operation.KNN)
+    this.searchGeom = Some(ref)
+    this.k = k
+    this
+  }
   
   
 }

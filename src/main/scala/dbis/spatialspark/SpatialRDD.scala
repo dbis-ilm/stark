@@ -15,19 +15,16 @@ import com.vividsolutions.jts.geom.Geometry
 
 import scala.collection.JavaConversions._
 
-object Operation extends Enumeration {
-  type Operation = Value
-  val INTERSECT, KNN = Value
-  
-}
 
 class ExtendedRDD[X] private (rdd: RDD[X]) {
-  def makeSpatial[Y: ClassTag](f: X => Y): SpatialRDD[Y] = ???
+  def makeSpatial[Y <: Geometry : ClassTag](f: X => Y): SpatialRDD[Y] = new SpatialRDD(rdd.map(f))
 }
 
 object ExtendedRDD {
   
-  implicit def convertSpatial[X](rdd: RDD[X]): ExtendedRDD[X] = new ExtendedRDD[X](rdd)
+  implicit def convertExtended[X](rdd: RDD[X]): ExtendedRDD[X] = new ExtendedRDD[X](rdd)
+  
+  implicit def convertSpatial[X <: Geometry : ClassTag](rdd: RDD[X]): SpatialRDD[X] = new SpatialRDD[X](rdd) 
   
 }
 
@@ -37,60 +34,38 @@ object ExtendedRDD {
  * - in compute the partition is casted to this type 
  */
 
-import Operation._
 
-class SpatialRDD[T:ClassTag](
-    @transient private var _sc: SparkContext,
-    @transient private var deps: Seq[Dependency[_]]
-  ) extends RDD[T](_sc, deps) {
+class SpatialRDD[T <: Geometry :ClassTag](
+//    @transient private var _sc: SparkContext,
+//    @transient private var deps: Seq[Dependency[_]]
+    prev: RDD[T]
+  ) extends RDD[T](prev) {
   
-  private val rtree = new com.vividsolutions.jts.index.strtree.STRtree(3)
+//  private val rtree = new com.vividsolutions.jts.index.strtree.STRtree(3)
+  println("bllaaaaaaaaa")
   
-  private var op: Option[Operation] = None
-  private var searchGeom: Option[Geometry] = None
-  private var k: Int = -1
-  
-  def this(@transient oneParent: RDD[_]) =
-    this(oneParent.context , List(new OneToOneDependency(oneParent)))
+//  def this(@transient oneParent: RDD[_]) =
+//    this(oneParent.context , List(new OneToOneDependency(oneParent)))
   
   /**
    * :: DeveloperApi ::
    * Implemented by subclasses to compute a given partition.
    */
   @DeveloperApi
-  def compute(split: Partition, context: TaskContext): Iterator[T] = {
-    
-    /* Actually this cannot happen, can it?
-     * In case there is no operation set, simply pass the input split
-     */
-    if(op.isEmpty) 
-      throw new IllegalStateException("No operation set")
-      
-    val o = op.get
-    val qry = searchGeom.get
-    
-    val result = op match {
-      case INTERSECT => 
-        val res = rtree.query(qry.getEnvelopeInternal)
-        res.map{ obj => obj.asInstanceOf[T]}.toIterator
-      case _ => ???
-    }
-    
-    result
-  }
+  def compute(split: Partition, context: TaskContext): Iterator[T] = firstParent[T].iterator(split, context)
   
 
   /**
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  protected def getPartitions: Array[Partition] = ???
+  protected def getPartitions: Array[Partition] = firstParent.partitions
 
   /**
    * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  override protected def getDependencies: Seq[Dependency[_]] = deps
+  override protected def getDependencies: Seq[Dependency[_]] = Seq(new OneToOneDependency(prev))
 
   /**
    * Optionally overridden by subclasses to specify placement preferences.
@@ -99,20 +74,9 @@ class SpatialRDD[T:ClassTag](
 
   /** Optionally overridden by subclasses to specify how they are partitioned. */
   @transient override val partitioner: Option[Partitioner] = None
+
+  def intersect(qry: T): IntersectionSpatialRDD[T] = new IntersectionSpatialRDD(qry, this)
   
-  
-  def intersect(searchGeom: Geometry): SpatialRDD[T] = {
-    op = Some(Operation.INTERSECT)
-    this.searchGeom = Some(searchGeom)
-    this
-  } 
-  
-  def kNN(ref: Geometry, k: Int): SpatialRDD[T] = {
-    op = Some(Operation.KNN)
-    this.searchGeom = Some(ref)
-    this.k = k
-    this
-  }
-  
+  def kNN(qry: T, k: Int): KNNSpatialRDD[T] = new KNNSpatialRDD(qry, k, this)
   
 }

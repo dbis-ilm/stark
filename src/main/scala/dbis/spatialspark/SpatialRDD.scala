@@ -12,8 +12,8 @@ import org.apache.spark.SparkContext
 import com.vividsolutions.jts.geom.Envelope
 import org.apache.spark.rdd.MapPartitionsRDD
 import com.vividsolutions.jts.geom.Geometry
-
 import scala.collection.JavaConversions._
+
 
 
 class ExtendedRDD[X] private (rdd: RDD[X]) {
@@ -41,8 +41,9 @@ class SpatialRDD[T <: Geometry :ClassTag](
     prev: RDD[T]
   ) extends RDD[T](prev) {
   
-//  private val rtree = new com.vividsolutions.jts.index.strtree.STRtree(3)
+  
   println("bllaaaaaaaaa")
+  
   
 //  def this(@transient oneParent: RDD[_]) =
 //    this(oneParent.context , List(new OneToOneDependency(oneParent)))
@@ -80,3 +81,28 @@ class SpatialRDD[T <: Geometry :ClassTag](
   def kNN(qry: T, k: Int): KNNSpatialRDD[T] = new KNNSpatialRDD(qry, k, this)
   
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

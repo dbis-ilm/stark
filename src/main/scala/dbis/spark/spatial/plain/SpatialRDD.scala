@@ -1,4 +1,4 @@
-package dbis.spatialspark
+package dbis.spark.spatial.plain
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
@@ -8,13 +8,8 @@ import org.apache.spark.Dependency
 import org.apache.spark.Partitioner
 import org.apache.spark.OneToOneDependency
 import scala.reflect.ClassTag
-import org.apache.spark.SparkContext
-import com.vividsolutions.jts.geom.Envelope
-import org.apache.spark.rdd.MapPartitionsRDD
 import com.vividsolutions.jts.geom.Geometry
 import scala.collection.JavaConversions._
-
-
 
 class ExtendedRDD[X] private (rdd: RDD[X]) {
   def makeSpatial[Y <: Geometry : ClassTag](f: X => Y): SpatialRDD[Y] = new SpatialRDD(rdd.map(f))

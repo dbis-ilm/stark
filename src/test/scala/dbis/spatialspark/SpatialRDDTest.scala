@@ -3,6 +3,8 @@ package dbis.spatialspark
 import org.apache.spark.SparkContext
 import com.vividsolutions.jts.geom.Point
 import ExtendedRDD._
+import dbis.spark.spatial.plain.ExtendedRDD;
+
 import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.SparkConf
 import scala.collection.mutable.Queue

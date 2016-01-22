@@ -1,4 +1,4 @@
-package dbis.spatialspark
+package dbis.spark.spatial.plain
 
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
@@ -8,7 +8,6 @@ import org.apache.spark.TaskContext
 import org.apache.spark.Dependency
 import org.apache.spark.OneToOneDependency
 import org.apache.spark.Partitioner
-import scala.collection.mutable.ListBuffer
 
 class KNNSpatialRDD[T <: Geometry : ClassTag](qry: T, k: Int, prev: SpatialRDD[T]) extends SpatialRDD[T](prev) {
   

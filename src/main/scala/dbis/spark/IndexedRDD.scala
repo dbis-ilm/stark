@@ -5,12 +5,16 @@ import scala.reflect.ClassTag
 import org.apache.spark.SparkContext
 import org.apache.spark.Dependency
 import org.apache.spark.OneToOneDependency
+import org.apache.spark.ShuffleDependency
+import org.apache.spark.Partitioner
 
 abstract class IndexedRDD[K: ClassTag, V: ClassTag](
-    @transient private var _sc: SparkContext,
-    @transient private var _deps: Seq[Dependency[(K,V)]]
-  ) extends RDD[(K,V)](_sc, _deps) {
+    oneParent: RDD[(K,V)], 
+    parti: Partitioner
+  ) extends RDD[(K,V)](oneParent.context, Seq(new ShuffleDependency[K,V,V](oneParent, parti))) {
   
-  def this(oneParent: RDD[(K,V)]) = this(oneParent.context, Seq(new OneToOneDependency(oneParent)))
+
+  @transient override val partitioner: Option[Partitioner] = Some(parti)
+  
   
 }

@@ -8,25 +8,28 @@ import org.apache.spark.TaskContext
 import org.apache.spark.Dependency
 import org.apache.spark.OneToOneDependency
 import org.apache.spark.Partitioner
+import org.apache.spark.rdd.RDD
 
-class KNNSpatialRDD[T <: Geometry : ClassTag](qry: T, k: Int, prev: SpatialRDD[T]) extends SpatialRDD[T](prev) {
+class KNNSpatialRDD[T <: Geometry : ClassTag, V: ClassTag](
+    qry: T, k: Int, 
+    private val prev: RDD[(T,V)]
+  ) extends SpatialRDD(prev) {
   
  /**
    * :: DeveloperApi ::
    * Implemented by subclasses to compute a given partition.
    */
   @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[T] = {
-    firstParent[T]
-      .iterator(split, context)
-      .map { e => 
-        val d = qry.distance(e)
-        (e,d)
+  override def compute(split: Partition, context: TaskContext): Iterator[(T,V)] = {
+    iterator(split, context)
+      .map { case (g,v) => 
+        val d = qry.distance(g)
+        (g,v,d)
       }
       .toList
-      .sortWith(_._2 < _._2)
+      .sortWith(_._3 < _._3)
       .take(k)
-      .map(_._1)
+      .map{ case (g,v,d) => (g,v)}
       .toIterator
   }
   
@@ -35,7 +38,7 @@ class KNNSpatialRDD[T <: Geometry : ClassTag](qry: T, k: Int, prev: SpatialRDD[T
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  override protected def getPartitions: Array[Partition] = firstParent.partitions
+  override protected def getPartitions: Array[Partition] = prev.partitions
 
   /**
    * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only

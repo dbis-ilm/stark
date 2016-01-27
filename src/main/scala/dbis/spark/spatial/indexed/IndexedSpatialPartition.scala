@@ -5,8 +5,8 @@ import scala.reflect.ClassTag
 import com.vividsolutions.jts.geom.Geometry
 
 class IndexedSpatialPartition[G <: Geometry : ClassTag, D: ClassTag](
-    val rddId: Long, 
-    val slice: Int, 
-    val theIndex: RTree[G,D]) extends IndexedPartition(rddId, slice, theIndex) {
+    private val _partitionId: Int, 
+    private val _theIndex: RTree[G,D]) extends IndexedPartition(_partitionId, _theIndex) {
   
+  def this(partitionId: Int) = this(partitionId, new RTree[G,D](10))
 }

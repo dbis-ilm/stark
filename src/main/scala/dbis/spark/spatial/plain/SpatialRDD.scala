@@ -14,23 +14,24 @@ import org.apache.spark.Logging
 import dbis.spark.spatial.indexed.IntersectionIndexedSpatialRDD
 import dbis.spark.spatial.indexed.IndexedSpatialRDD
 
-
+/**
+ * A base class for spatial RDD without indexing
+ * 
+ * @param prev The parent RDD
+ */
 abstract class SpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     prev: RDD[(G,V)]
   ) extends RDD[(G,V)](prev) {
   
   
   /**
-   * Implemented by subclasses to return the set of partitions in this RDD. This method will only
-   * be called once, so it is safe to implement a time-consuming computation in it.
+   * We do not repartition our data.
    */
   override protected def getPartitions: Array[Partition] = prev.partitions
 
-
-  /** Optionally overridden by subclasses to specify how they are partitioned. */
-  @transient override val partitioner: Option[Partitioner] = None
-  
-
+  /**
+   * Compute an intersection of the elements in this RDD with the given geometry
+   */
   def intersect(qry: G): IntersectionSpatialRDD[G,V] = new IntersectionSpatialRDD(qry, this)
   
   def kNN(qry: G, k: Int): KNNSpatialRDD[G,V] = new KNNSpatialRDD(qry, k, this)

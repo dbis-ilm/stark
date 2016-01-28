@@ -15,7 +15,7 @@ object SpatialRDDTest {
 	def main(args: Array[String]) {
 
 	  val conf = new SparkConf
-		val sc = new SparkContext("local", "test", conf)
+		val sc = new SparkContext("local[8]", "test", conf)
 
 
 		val points = Array("POINT(0 0)", "POINT(2 2)", "POINT(7 7)").reverse
@@ -23,12 +23,6 @@ object SpatialRDDTest {
 		
 		
 		val rand = new Random
-		
-		val nums = (0 until 1 * 10 * 10)
-		            .map { i => (rand.nextInt(20) , rand.nextInt(20), i)}
-//		            .map { i => (rand.nextDouble() * 100 , rand.nextDouble() * 100, i)}
-	              .map { case (x,y,i) => (s"POINT($x $y)",i)}
-	  
 		
 
 //		val rdd = sc.parallelize(points,1)
@@ -39,8 +33,10 @@ object SpatialRDDTest {
 //	              .kNN(qry, 1)
 		
 		
-		val rdd = sc.parallelize(nums)
-		
+		val rdd = sc.parallelize((0 until 1 * 1000 * 1000))
+//		            .map { i => (rand.nextInt(20) , rand.nextInt(20), i)}
+		            .map { i => (rand.nextDouble() * 100 , rand.nextDouble() * 100, i)}
+	              .map { case (x,y,i) => (s"POINT($x $y)",i)}
 		
 		val r = rdd.map{ case (p,i) => (new WKTReader().read(p), i) }.index.intersect(qry)
 		

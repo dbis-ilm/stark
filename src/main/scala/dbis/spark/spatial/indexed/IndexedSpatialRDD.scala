@@ -24,8 +24,11 @@ abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
   override protected def getPartitions: Array[Partition] = {
-    val parti = partitioner.get
-    Array.tabulate(parti.numPartitions)(idx => new IndexedSpatialPartition[G,V](idx, new RTree(5)))
+    val parti = partitioner.get.asInstanceOf[SpatialGridPartitioner[G,V]]
+    Array.tabulate(parti.numPartitions){ idx =>
+      val bounds = parti.getCellBounds(idx)
+      new IndexedSpatialPartition[G,V](idx, bounds, new RTree(5))
+    }
   }
 
   

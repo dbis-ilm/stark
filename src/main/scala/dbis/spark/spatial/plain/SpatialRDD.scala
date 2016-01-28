@@ -46,7 +46,7 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   
   def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
   
-  def index = new IndexedSpatialRDDFunctions(rdd)
+  def index = new IndexedSpatialRDDFunctions(rdd) 
 }
 
 class IndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](

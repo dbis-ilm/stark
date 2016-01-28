@@ -16,22 +16,18 @@ import org.apache.spark.deploy.SparkSubmit
 
 abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     @transient private val oneParent: RDD[(G,V)]
-  ) extends IndexedRDD[G,V](oneParent, new RTreePartitioner(10, oneParent)) {
+    // TODO: make partitions per dimension configurable
+  ) extends IndexedRDD[G,V](oneParent, new SpatialGridPartitioner(2, oneParent)) {
 
   /**
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  protected def getPartitions: Array[Partition] = {
-    val part = partitioner match {
-      case None => println("create new"); new RTreePartitioner(10, oneParent)
-      case Some(p) => println(s"resuse $p"); p
-    }
-    Array.tabulate(part.numPartitions)(idx => new IndexedSpatialPartition[G,V](idx))
+  override protected def getPartitions: Array[Partition] = {
+    val parti = partitioner.get
+    Array.tabulate(parti.numPartitions)(idx => new IndexedSpatialPartition[G,V](idx, new RTree(5)))
   }
 
-
-  /** Optionally overridden by subclasses to specify how they are partitioned. */
   
   def intersect(qry: G): IndexedSpatialRDD[G,V] = new IntersectionIndexedSpatialRDD(qry, this)
   

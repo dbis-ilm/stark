@@ -13,6 +13,10 @@ import scala.collection.JavaConversions._
 import org.apache.spark.Logging
 import dbis.spark.spatial.indexed.IntersectionIndexedSpatialRDD
 import dbis.spark.spatial.indexed.IndexedSpatialRDD
+import dbis.spark.spatial.indexed.SpatialPartitioner
+import dbis.spark.spatial.indexed.SpatialPartitioner
+import dbis.spark.spatial.indexed.SpatialGridPartitioner
+import org.apache.spark.rdd.ShuffledRDD
 
 /**
  * A base class for spatial RDD without indexing
@@ -47,15 +51,20 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   
   def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
   
-  def index = new IndexedSpatialRDDFunctions(rdd) 
+  def index(ppD: Int): IndexedSpatialRDDFunctions[G,V] = index(new SpatialGridPartitioner(ppD, rdd))
+  
+  def index(partitioner: SpatialPartitioner) = new IndexedSpatialRDDFunctions(partitioner, rdd)
+  
+  def grid(ppD: Int) = new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(ppD, rdd))
 }
 
 class IndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
+    partitioner: SpatialPartitioner,
     rdd: RDD[(G,V)]
   ) extends Logging with Serializable {
   
 
-  def intersect(qry: G): IndexedSpatialRDD[G,V] = new IntersectionIndexedSpatialRDD(qry, rdd)
+  def intersect(qry: G): IndexedSpatialRDD[G,V] = new IntersectionIndexedSpatialRDD(qry, partitioner, rdd)
   
   def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
 }

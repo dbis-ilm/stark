@@ -15,9 +15,10 @@ import org.apache.spark.deploy.SparkSubmit
 
 
 abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+    @transient private val _partitioner: SpatialPartitioner,
     @transient private val oneParent: RDD[(G,V)]
     // TODO: make partitions per dimension configurable
-  ) extends IndexedRDD[G,V](oneParent, new SpatialGridPartitioner(2, oneParent)) {
+  ) extends IndexedRDD[G,V](oneParent, _partitioner) {
 
   /**
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only
@@ -32,7 +33,7 @@ abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
   }
 
   
-  def intersect(qry: G): IndexedSpatialRDD[G,V] = new IntersectionIndexedSpatialRDD(qry, this)
+  def intersect(qry: G): IndexedSpatialRDD[G,V] = new IntersectionIndexedSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner], this)
   
 //  def kNN(qry: T, k: Int): KNNIndexedSpatialRDD[T] = new KNNIndexedSpatialRDD(qry, k, this)
 }

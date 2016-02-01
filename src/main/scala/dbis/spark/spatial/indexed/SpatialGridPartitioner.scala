@@ -23,7 +23,7 @@ import com.vividsolutions.jts.geom.Envelope
 class SpatialGridPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     partitionsPerDimension: Int, 
     rdd: RDD[_ <: Product2[G,V]], 
-    dimensions: Int = 2) extends Partitioner {
+    dimensions: Int = 2) extends SpatialPartitioner {
   
   require(dimensions == 2, "Only 2 dimensions supported currently")
   

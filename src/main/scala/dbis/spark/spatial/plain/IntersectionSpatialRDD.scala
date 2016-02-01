@@ -12,7 +12,7 @@ import org.apache.spark.rdd.RDD
 
 class IntersectionSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     qry: G, 
-    private val prev: RDD[(G,V)]
+    @transient private val prev: RDD[(G,V)]
   ) extends SpatialRDD(prev) {
   
   
@@ -22,7 +22,7 @@ class IntersectionSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
    */
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = {
-    prev.iterator(split, context).filter { case (g,v) => qry.intersects(g) }    
+    firstParent[(G,V)].iterator(split, context).filter { case (g,v) => qry.intersects(g) }    
   }
   
   

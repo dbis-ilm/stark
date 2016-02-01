@@ -14,6 +14,7 @@ import scala.util.Random
 import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
+import java.io.FileWriter
 
 /**
  * An RDD representing a spatial intersection using an internal R-Tree
@@ -23,8 +24,9 @@ import org.apache.spark.SparkEnv
  */
 class IntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     qry: G,
+    @transient private val _partitioner: SpatialPartitioner,
     @transient private val prev: RDD[(G,V)]
-  ) extends IndexedSpatialRDD(prev) {
+  ) extends IndexedSpatialRDD(_partitioner, prev) {
   
   /**
    * :: DeveloperApi ::
@@ -61,11 +63,21 @@ class IntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
        */
       indexTree.insert(geom, (geom,data))
     }
+    indexTree.build()
+    
+    
     
     // now query the index
     val result = indexTree.query(qry)
     
-    result
+    /* The result of a r-tree query are all elements that 
+     * intersect with the MBB of the query region. Thus, 
+     * for all result elements we need to check if they
+     * really intersect with the actual geometry
+     */
+    val res = result.filter{ case (g,v) => qry.intersects(g) }
+    
+    res
   }
   
 }

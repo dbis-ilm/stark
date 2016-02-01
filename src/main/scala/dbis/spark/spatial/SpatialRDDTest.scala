@@ -51,9 +51,9 @@ object SpatialRDDTest {
 	               .filter { arr => arr(7).matches("POINT\\(\\d+\\.?\\d* \\d+\\.?\\d*\\)")}
 	               .map { arr => (new WKTReader().read(arr(7)), arr(0)) }
 	               // choose one (or none) of the three below
-//	               .index(3)   // create index on the fly
-	               .grid(3)      // apply partitioning (but no indexing)
-//	               .bla(3)     // partition and "persitable" index creation
+//	               .liveIndex(3)   // create index on the fly
+//	               .grid(3)      // apply partitioning (but no indexing)
+	               .index(3)     // partition and "persitable" index creation
 	               .intersect(bayern)
 //	               .map { case (geom, v) => v }
 	               .count()

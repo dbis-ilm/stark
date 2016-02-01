@@ -11,8 +11,8 @@ import org.apache.spark.annotation.DeveloperApi
 import dbis.spark.spatial.indexed.RTree
 import dbis.spark.spatial.indexed.RTree
 
-class MyRDD[G <: Geometry : ClassTag, D: ClassTag](
-    qry: G,
+class PersistedIndexedSpatialRDD[G <: Geometry : ClassTag, D: ClassTag](
+    qry: G, 
     @transient private val prev: RDD[RTree[G,(G,D)]]
   ) extends RDD[(G,D)](prev) {
   

@@ -1,7 +1,7 @@
 package dbis.spark.spatial
 
 import org.apache.spark.SparkContext
-import dbis.spark.spatial.indexed.IndexedSpatialRDD
+import dbis.spark.spatial.indexed.live.IndexedSpatialRDD
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 

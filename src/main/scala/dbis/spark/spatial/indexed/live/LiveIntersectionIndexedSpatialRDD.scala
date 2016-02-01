@@ -1,20 +1,13 @@
-package dbis.spark.spatial.indexed
+package dbis.spark.spatial.indexed.live
 
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.OneToOneDependency
-import org.apache.spark.Dependency
-import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
-import org.apache.spark.rdd.ShuffledRDD
-import scala.util.Random
-import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
-import java.io.FileWriter
 import dbis.spark.spatial.SpatialGridPartition
 import dbis.spark.spatial.SpatialPartitioner
 
@@ -24,9 +17,9 @@ import dbis.spark.spatial.SpatialPartitioner
  * @param qry The query geometry
  * @param prev The parent RDD 
  */
-class IntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
-    qry: G,
-    @transient private val _partitioner: SpatialPartitioner,
+class LiveIntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+    qry: G, 
+    @transient private val _partitioner: SpatialPartitioner, 
     @transient private val prev: RDD[(G,V)]
   ) extends IndexedSpatialRDD(_partitioner, prev) {
   

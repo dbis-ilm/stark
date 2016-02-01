@@ -5,6 +5,8 @@ import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.SparkConf
 import dbis.spark.spatial.SpatialRDD._
 import scala.io.Source
+import dbis.spark.spatial.indexed.RTree
+import com.vividsolutions.jts.geom.Geometry
 
 
 object SpatialRDDTest {
@@ -43,15 +45,36 @@ object SpatialRDDTest {
 		
 		
 		val start = System.currentTimeMillis()
+		
 		val res = sc.textFile(dataFile)
 		             .map { line => line.split(",")}
 	               .filter { arr => arr(7).matches("POINT\\(\\d+\\.?\\d* \\d+\\.?\\d*\\)")}
 	               .map { arr => (new WKTReader().read(arr(7)), arr(0)) }
-	               .index(3)
-//	               .grid(3)
+	               // choose one (or none) of the three below
+//	               .index(3)   // create index on the fly
+	               .grid(3)      // apply partitioning (but no indexing)
+//	               .bla(3)     // partition and "persitable" index creation
 	               .intersect(bayern)
-	               .map { case (geom, v) => v }
+//	               .map { case (geom, v) => v }
 	               .count()
+
+	      // create and persist index         
+////	  val res = sc.textFile(dataFile)
+////		             .map { line => line.split(",")}
+////	               .filter { arr => arr(7).matches("POINT\\(\\d+\\.?\\d* \\d+\\.?\\d*\\)")}
+////	               .map { arr => (new WKTReader().read(arr(7)), arr(0)) }
+//////	               .index(3)
+//////	               .grid(3)
+////	               .bla(3)
+////	               .saveAsObjectFile("/user/stha1in/rtree")
+
+	               
+	    // load persisted index objects		
+//		val res = sc.objectFile[RTree[Geometry, (Geometry, String)]]("/user/stha1in/rtree")
+//		            .intersect(bayern)
+//		            .count()
+	               
+	               
 	               
 	  val end = System.currentTimeMillis()	               
 	  println(s"${end - start} ms")
@@ -59,6 +82,9 @@ object SpatialRDDTest {
 	  println(res)             
 		
 		
+	  
+	  
+	  
 		
 		sc.stop()
 	  

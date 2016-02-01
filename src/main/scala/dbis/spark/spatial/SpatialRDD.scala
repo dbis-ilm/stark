@@ -18,6 +18,10 @@ import org.apache.spark.rdd.ShuffledRDD
 import dbis.spark.spatial.plain.IntersectionSpatialRDD
 import dbis.spark.spatial.plain.KNNSpatialRDD
 import dbis.spark.spatial.indexed.persistent.MyRDD
+import org.apache.spark.rdd.MapPartitionsRDD
+import dbis.spark.spatial.indexed.RTree
+import dbis.spark.spatial.indexed.RTree
+import dbis.spark.spatial.indexed.RTree
 
 /**
  * A base class for spatial RDD without indexing
@@ -58,7 +62,17 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   
   def grid(ppD: Int) = new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(ppD, rdd))
   
-//  def bla(ppD: Int) = new MyRDD[G,V](new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(ppD, rdd)))
+  def bla(ppD: Int) = {
+    
+    grid(ppD).mapPartitionsWithIndex { (idx,iter) => 
+      val tree = new RTree[G,(G,V)](10)
+      
+      iter.foreach{ case (g,v) => tree.insert(g, (g,v)) }
+//      println(s"partition: $idx  --> index size: ${tree.size()}")
+      List(tree).toIterator
+    }
+    
+  }
 }
 
 class IndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
@@ -69,14 +83,23 @@ class IndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
 
   def intersect(qry: G): IndexedSpatialRDD[G,V] = new IntersectionIndexedSpatialRDD(qry, partitioner, rdd)
   
-  def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
+//  def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
 }
 
+
+class MyRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
+    rdd: RDD[RTree[G, (G,V)]]) {
+  
+  def intersect(qry: G) = new MyRDD(qry, rdd)
+  
+}
 
 
 object SpatialRDD {
   
   implicit def convertSpatial[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[(G, V)]): SpatialRDDFunctions[G,V] = new SpatialRDDFunctions[G,V](rdd)
+  
+  implicit def convertMy[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new MyRDDFunctions(rdd)
   
 //  implicit def convertIndexedSpatial[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[(G,V)]): IndexedSpatialRDDFunctions[G,V] = new IndexedSpatialRDDFunctions[G,V](rdd)
   

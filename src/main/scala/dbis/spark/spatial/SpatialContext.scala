@@ -1,4 +1,4 @@
-package dbis.spark
+package dbis.spark.spatial
 
 import org.apache.spark.SparkContext
 import dbis.spark.spatial.indexed.IndexedSpatialRDD

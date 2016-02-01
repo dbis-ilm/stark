@@ -1,4 +1,4 @@
-package dbis.spark.spatial.plain
+package dbis.spark.spatial
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
@@ -13,10 +13,11 @@ import scala.collection.JavaConversions._
 import org.apache.spark.Logging
 import dbis.spark.spatial.indexed.IntersectionIndexedSpatialRDD
 import dbis.spark.spatial.indexed.IndexedSpatialRDD
-import dbis.spark.spatial.indexed.SpatialPartitioner
-import dbis.spark.spatial.indexed.SpatialPartitioner
 import dbis.spark.spatial.indexed.SpatialGridPartitioner
 import org.apache.spark.rdd.ShuffledRDD
+import dbis.spark.spatial.plain.IntersectionSpatialRDD
+import dbis.spark.spatial.plain.KNNSpatialRDD
+import dbis.spark.spatial.indexed.persistent.MyRDD
 
 /**
  * A base class for spatial RDD without indexing
@@ -24,14 +25,14 @@ import org.apache.spark.rdd.ShuffledRDD
  * @param prev The parent RDD
  */
 abstract class SpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
-    prev: RDD[(G,V)]
+    @transient private val prev: RDD[(G,V)]
   ) extends RDD[(G,V)](prev) {
   
   
   /**
    * We do not repartition our data.
    */
-  override protected def getPartitions: Array[Partition] = prev.partitions
+  override protected def getPartitions: Array[Partition] = firstParent[(G,V)].partitions
 
   /**
    * Compute an intersection of the elements in this RDD with the given geometry
@@ -56,6 +57,8 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   def index(partitioner: SpatialPartitioner) = new IndexedSpatialRDDFunctions(partitioner, rdd)
   
   def grid(ppD: Int) = new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(ppD, rdd))
+  
+//  def bla(ppD: Int) = new MyRDD[G,V](new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(ppD, rdd)))
 }
 
 class IndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](

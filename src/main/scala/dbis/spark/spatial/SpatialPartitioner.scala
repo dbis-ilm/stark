@@ -1,4 +1,4 @@
-package dbis.spark.spatial.indexed
+package dbis.spark.spatial
 
 import org.apache.spark.Partitioner
 

@@ -15,6 +15,8 @@ import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
 import java.io.FileWriter
+import dbis.spark.spatial.SpatialGridPartition
+import dbis.spark.spatial.SpatialPartitioner
 
 /**
  * An RDD representing a spatial intersection using an internal R-Tree
@@ -34,7 +36,7 @@ class IntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
    */
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = {
-    val part = split.asInstanceOf[IndexedSpatialPartition[G,(G,V)]]
+    val part = split.asInstanceOf[SpatialGridPartition[G,(G,V)]]
 
     /* check if the query geometry overlaps with the bounds of this partition
      * if not, the partition does not contain potential query results

@@ -9,6 +9,7 @@ import org.apache.spark.OneToOneDependency
 import org.apache.spark.Dependency
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
+import dbis.spark.spatial.SpatialRDD
 
 class IntersectionSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     qry: G, 

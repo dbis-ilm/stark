@@ -2,7 +2,6 @@ package dbis.spark.spatial.indexed
 
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
-import dbis.spark.IndexedRDD
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Dependency
@@ -12,12 +11,13 @@ import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.Partitioner
 import org.apache.spark.deploy.SparkSubmit
+import dbis.spark.spatial.SpatialPartitioner
+import dbis.spark.spatial.SpatialGridPartition
 
 
 abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     @transient private val _partitioner: SpatialPartitioner,
     @transient private val oneParent: RDD[(G,V)]
-    // TODO: make partitions per dimension configurable
   ) extends IndexedRDD[G,V](oneParent, _partitioner) {
 
   /**
@@ -28,7 +28,7 @@ abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     val parti = partitioner.get.asInstanceOf[SpatialGridPartitioner[G,V]]
     Array.tabulate(parti.numPartitions){ idx =>
       val bounds = parti.getCellBounds(idx)
-      new IndexedSpatialPartition[G,V](idx, bounds, new RTree(5))
+      new SpatialGridPartition[G,V](idx, bounds, new RTree(5))
     }
   }
 

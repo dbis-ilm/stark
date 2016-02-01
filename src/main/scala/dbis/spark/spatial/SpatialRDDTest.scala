@@ -3,7 +3,7 @@ package dbis.spark.spatial
 import org.apache.spark.SparkContext
 import com.vividsolutions.jts.io.WKTReader
 import org.apache.spark.SparkConf
-import dbis.spark.spatial.plain.SpatialRDD._
+import dbis.spark.spatial.SpatialRDD._
 import scala.io.Source
 
 

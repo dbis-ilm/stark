@@ -6,6 +6,7 @@ import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Envelope
+import dbis.spark.spatial.SpatialPartitioner
 
 
 /**

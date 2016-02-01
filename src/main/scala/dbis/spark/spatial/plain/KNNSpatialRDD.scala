@@ -9,6 +9,7 @@ import org.apache.spark.Dependency
 import org.apache.spark.OneToOneDependency
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
+import dbis.spark.spatial.SpatialRDD
 
 class KNNSpatialRDD[T <: Geometry : ClassTag, V: ClassTag](
     qry: T, k: Int, 
@@ -21,7 +22,7 @@ class KNNSpatialRDD[T <: Geometry : ClassTag, V: ClassTag](
    */
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[(T,V)] = {
-    iterator(split, context)
+    firstParent[(T,V)].iterator(split, context)
       .map { case (g,v) => 
         val d = qry.distance(g)
         (g,v,d)

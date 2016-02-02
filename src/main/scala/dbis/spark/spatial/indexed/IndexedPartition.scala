@@ -1,4 +1,4 @@
-package dbis.spark.spatial.indexed.live
+package dbis.spark.spatial.indexed
 
 import org.apache.spark.Partition
 

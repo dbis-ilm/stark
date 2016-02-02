@@ -1,6 +1,5 @@
-package dbis.spark.spatial.indexed
+package dbis.spark.spatial
 
-import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag

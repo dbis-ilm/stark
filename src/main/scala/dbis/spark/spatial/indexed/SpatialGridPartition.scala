@@ -1,10 +1,8 @@
-package dbis.spark.spatial
+package dbis.spark.spatial.indexed
 
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
-import dbis.spark.spatial.indexed.RTree
-import dbis.spark.spatial.indexed.SpatialGridPartitioner.RectRange
-import dbis.spark.spatial.indexed.live.IndexedPartition
+import dbis.spark.spatial.SpatialGridPartitioner.RectRange
 
 class SpatialGridPartition[G <: Geometry : ClassTag,  D: ClassTag](
     private val _partitionId: Int, 

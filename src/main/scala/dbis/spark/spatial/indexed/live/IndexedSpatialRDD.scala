@@ -5,9 +5,9 @@ import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Partition
 import dbis.spark.spatial.SpatialPartitioner
-import dbis.spark.spatial.SpatialGridPartition
+import dbis.spark.spatial.indexed.SpatialGridPartition
 import dbis.spark.spatial.indexed.RTree
-import dbis.spark.spatial.indexed.SpatialGridPartitioner
+import dbis.spark.spatial.SpatialGridPartitioner
 
 
 abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](

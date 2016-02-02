@@ -8,7 +8,7 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
-import dbis.spark.spatial.SpatialGridPartition
+import dbis.spark.spatial.indexed.SpatialGridPartition
 import dbis.spark.spatial.SpatialPartitioner
 
 /**

@@ -13,7 +13,6 @@ import scala.collection.JavaConversions._
 import org.apache.spark.Logging
 import dbis.spark.spatial.indexed.live.LiveIntersectionIndexedSpatialRDD
 import dbis.spark.spatial.indexed.live.IndexedSpatialRDD
-import dbis.spark.spatial.SpatialGridPartitioner
 import org.apache.spark.rdd.ShuffledRDD
 import dbis.spark.spatial.plain.IntersectionSpatialRDD
 import dbis.spark.spatial.plain.KNNSpatialRDD

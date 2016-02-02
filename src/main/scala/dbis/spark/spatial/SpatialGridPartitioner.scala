@@ -5,7 +5,6 @@ import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Envelope
-import dbis.spark.spatial.SpatialPartitioner
 
 
 /**
@@ -36,7 +35,7 @@ class SpatialGridPartitioner[G <: Geometry : ClassTag, V: ClassTag](
    * 
    * TODO: Currently 2-dimensional only
    */
-  private val (minX, maxX, minY, maxY, xLength, yLength) = {
+  protected[this] val (minX, maxX, minY, maxY) = {
     
     val coords = rdd.map{ case (g,v) =>
       val env = g.getEnvelopeInternal
@@ -49,12 +48,11 @@ class SpatialGridPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     val minY = coords.map(_._3).min()
     val maxY = coords.map(_._4).max() + 1 // +1 to also include points that lie on the maxY value
     
-    
-    val xLength = (maxX - minX) / partitionsPerDimension 
-    val yLength = (maxY - minY) / partitionsPerDimension
-    
-    (minX, maxX, minY, maxY, xLength, yLength)
+    (minX, maxX, minY, maxY)
   }
+  
+  protected[this] val xLength = (maxX - minX) / partitionsPerDimension
+  protected[this] val yLength = (maxY - minY) / partitionsPerDimension
   
   protected[spatial] def getCellBounds(id: Int): RectRange = {
     
@@ -117,6 +115,8 @@ class SpatialGridPartitioner[G <: Geometry : ClassTag, V: ClassTag](
 // Helper classes
 object SpatialGridPartitioner {
 
+  implicit def makePoint(t: (Double, Double)): Point = Point(t._1, t._2) 
+  
   protected[spatial] case class Point(x: Double, y: Double) {
     protected[spatial] def this(p: com.vividsolutions.jts.geom.Point) = this(p.getX, p.getY)
     protected[spatial] def this(g: Geometry) = this(g.getCentroid)
@@ -132,5 +132,5 @@ object SpatialGridPartitioner {
     }
       
     
-  } 
+  }
 }

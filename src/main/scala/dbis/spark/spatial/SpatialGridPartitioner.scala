@@ -126,11 +126,19 @@ object SpatialGridPartitioner {
     
     def contains(p: Point): Boolean = p.x >= ll.x && p.y >= ll.y && p.x < ur.x && p.y < ur.y
     
+    def contains(rect: RectRange): Boolean = ll.x <= rect.ll.x && ll.y <= rect.ll.y && ur.x >= rect.ur.x && ur.y >= rect.ur.y
+    
     def toEnvelope: Envelope = {
       val s = s"""POLYGON ((${ll.x} ${ll.y}, ${ur.x} ${ll.y}, ${ur.x} ${ur.y}, ${ll.x} ${ur.y}, ${ll.x} ${ll.y}))"""
       new WKTReader().read(s).getEnvelopeInternal 
     }
-      
+    
+    def area = (ur.x - ll.x) * (ur.y - ur.y)
+  }
+  
+  protected[spatial] object RectRange {
+    
+    protected[spatial] def apply(ll: Point, ur: Point) = new RectRange(-1, ll, ur)
     
   }
 }

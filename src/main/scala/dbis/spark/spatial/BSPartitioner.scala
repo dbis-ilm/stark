@@ -158,6 +158,32 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     resultPartitions.toList.zipWithIndex
   }
   
+  lazy val partitionStats = {
+    
+    val numParts = bounds.size
+    
+    val partCounts = cells.view.flatMap { case (cell, count) =>
+      bounds.view.map(_._1).filter { p => p.contains(cell) }.map { p => (p, count) }        
+    }.groupBy(_._1).map { case (part, arr) => (part, arr.map(_._2).sum) }      
+    
+    
+    val avgPoints = partCounts.map(_._2).sum / partCounts.size
+    val maxPoints = partCounts.maxBy{case (part, count) => count}
+    val minPoints = partCounts.minBy{case (part, count) => count}
+    
+    val variance = partCounts.map { case (part, count) => Math.pow( count - avgPoints, 2) }.sum
+    
+    val area = bounds.view.map(_._1.area).sum
+    val avgArea = area / numParts
+    val partAreas = partCounts.map { case (part,_) => (part, part.area) }
+    val maxArea = partAreas.maxBy{ case (part, area) => area }
+    val minArea = partAreas.minBy{ case (part, area) => area }
+    
+    val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
+    
+    PartitionStats(numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea) 
+  }
+  
   override def numPartitions: Int = bounds.size
   
   override def getPartition(key: Any): Int = {

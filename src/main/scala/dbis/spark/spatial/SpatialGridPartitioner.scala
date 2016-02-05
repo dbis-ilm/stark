@@ -133,7 +133,7 @@ object SpatialGridPartitioner {
       new WKTReader().read(s).getEnvelopeInternal 
     }
     
-    def area = (ur.x - ll.x) * (ur.y - ur.y)
+    def area = (ur.x - ll.x) * (ur.y - ll.y)
   }
   
   protected[spatial] object RectRange {

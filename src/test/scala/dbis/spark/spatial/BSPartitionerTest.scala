@@ -176,9 +176,29 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       
     
     }
-    
-    
   }
+  
+  "The partition statistics" should "have correct values" in {
+    val rdd = createRDD()
+    val parti = new BSPartitioner(rdd, 1, 1)
+    
+    val stats = parti.partitionStats
+    
+    withClue("numParts") { stats.numPartitions shouldBe 4 }
+    withClue("avgPoints") { stats.avgPoints shouldBe 5.0/4.0}
+    withClue("maxPoints") { stats.maxPoints should contain only ((RectRange(Point(2,2), Point(3,3)),2)) }
+    withClue("minPoints") { stats.minPoints should contain only ((RectRange(Point(2,3), Point(3,5)),1),
+                                                                 (RectRange(Point(3,2), Point(5,3)),1), 
+                                                                 (RectRange(Point(3,3), Point(5,5)),1) )}
+    
+    withClue("variance") { stats.numPointsVariance shouldBe 0.75 }
+    
+    withClue("area") { stats.area shouldBe 9.0}
+    withClue("avg area") { stats.avgArea shouldBe 9.0/4}
+    withClue("minArea") { stats.minArea should contain only ((RectRange(Point(2,2), Point(3,3)),1.0)) }
+    withClue("maxArea") { stats.maxArea should contain only ((RectRange(Point(3,3), Point(5,5)),4.0))}
+    
+  } 
   
   
 }

@@ -8,3 +8,5 @@ libraryDependencies ++= Seq(
    "fm.void.jetm" % "jetm" % "1.2.3",
    "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test" withSources()
 )
+
+parallelExecution in Test := false

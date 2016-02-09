@@ -117,6 +117,7 @@ object SpatialGridPartitioner {
 
   implicit def makePoint(t: (Double, Double)): Point = Point(t._1, t._2) 
   
+  
   protected[spatial] case class Point(x: Double, y: Double) {
     protected[spatial] def this(p: com.vividsolutions.jts.geom.Point) = this(p.getX, p.getY)
     protected[spatial] def this(g: Geometry) = this(g.getCentroid)
@@ -133,7 +134,10 @@ object SpatialGridPartitioner {
       new WKTReader().read(s).getEnvelopeInternal 
     }
     
-    def area = (ur.x - ll.x) * (ur.y - ur.y)
+    lazy val area = lengths.reduceLeft(_ * _)
+
+    
+    lazy val lengths = Array(ur.x - ll.x, ur.y - ll.y)
   }
   
   protected[spatial] object RectRange {

@@ -5,27 +5,30 @@ import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import scala.collection.mutable.Queue
 import scala.collection.mutable.ListBuffer
-import dbis.spark.spatial.SpatialGridPartitioner.RectRange
-import SpatialGridPartitioner.Point
 import etm.core.monitor.EtmMonitor
+import dbis.spatial.{NPoint,NRectRange}
+import dbis.spatial.partitioner.BSP
 
-case class PartitionStats(numPartitions: Int, 
-    avgPoints: Double,    
-    maxPoints: (RectRange, Int),
-    minPoints: (RectRange, Int),
-    numPointsVariance: Double,
-    area: Double,
-    avgArea: Double,
-    maxArea: (RectRange, Double),
-    minArea: (RectRange, Double)
-  )
-
+/**
+ * A cost based binary space partitioner based on the paper
+ * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
+ * by He, Tan, Luo, Feng, Fan 
+ * 
+ * @param rdd The RDD to partition
+ * @param sideLength side length of a quadratic cell - defines granularity
+ * @param maxCostPerPartition Maximum cost a partition should have - here: number of elements  
+ */
 class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[_ <: Product2[G,V]],
     sideLength: Double,
     maxCostPerPartition: Double = 1.0) extends SpatialPartitioner {
   
-  protected[spatial] val (minX, maxX, minY, maxY) = {
+  
+  /** 
+   * The lower left and uppper right corner points
+   * of the data space in the RDD
+   */
+  protected[spatial] lazy val (minX, maxX, minY, maxY) = {
     
     val coords = rdd.map{ case (g,v) =>
       val env = g.getEnvelopeInternal
@@ -43,10 +46,16 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     (minX, maxX, minY, maxY)
   }
   
+  
   val numXCells = Math.ceil((maxX - minX) / sideLength).toInt
   val numYCells = Math.ceil((maxY - minY) / sideLength).toInt
+
   
-  protected[spatial] def getCellBounds(id: Int): RectRange = {
+  /**
+   * Compute the bounds of a cell with the given ID
+   * @param id The ID of the cell to compute the bounds for
+   */
+  protected[spatial] def getCellBounds(id: Int): NRectRange = {
 //    require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
       
     val dy = id / numYCells
@@ -58,9 +67,15 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     val urx = llx + sideLength
     val ury = lly + sideLength
       
-    RectRange(id, Point(llx, lly), Point(urx, ury))
+    NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
   }
   
+  /**
+   * The cells which contain elements and the number of elements
+   * 
+   * We iterate over all elements in the RDD, determine to which
+   * cell it belongs and then simple aggregate by cell
+   */
   protected[spatial] val cells = rdd.map { case (g,v) =>  
       val p = g.getCentroid
       
@@ -71,120 +86,14 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
       val y = (newY.toInt / sideLength).toInt
       
       val cellId = y * numXCells + x
-    
+      
       (getCellBounds(cellId),1)
-    }.reduceByKey( _ + _).collect()
+    }.reduceByKey(_+_).collect()
 
-    
-  protected[spatial] def costEstimation(part: RectRange): Double =
-    cells.filter { case (cell, cnt) => part.contains(cell) }.map(_._2).sum
-      
-  protected[spatial] def lengths(part: RectRange): (Double, Double) = (part.ur.x - part.ll.x , part.ur.y - part.ll.y)  
-    
-  protected[spatial] def costBasedSplit(part: RectRange): (RectRange, RectRange) = {
-    var minCostDiff = Double.PositiveInfinity
-    
-    var parts: (RectRange, RectRange) = (RectRange(-1, Point(0,0),Point(0,0)), RectRange(-1,Point(0,0),Point(0,0))) 
-    
-    val (xLength, yLength) = lengths(part)
-    
-    val xCells = Math.ceil(xLength / sideLength).toInt
-    val yCells = Math.ceil(yLength / sideLength).toInt
-    
-    // x splits
-    for(i <- (1 until xCells)) {
-      val p1 = RectRange(-1, 
-                  part.ll,
-                  Point( part.ll.x + i * sideLength, part.ur.y)
-                )
-      
-      val p2 = RectRange(-1,
-                  Point( part.ll.x + i * sideLength, part.ll.y),
-                  part.ur
-                )
-                
-      val p1Cost = costEstimation(p1)
-      val p2Cost = costEstimation(p2)
-      
-      val diff = Math.abs( p1Cost - p2Cost )
-      if(diff < minCostDiff) {
-        minCostDiff = diff
-        parts = (p1,p2)
-      }
-    }
   
-    // y splits
-    for(i <- (1 until yCells)) {
-      val p1 = RectRange(-1, 
-                  part.ll,
-                  Point( part.ur.x, part.ll.y + i * sideLength)
-                )
-      
-      val p2 = RectRange(-1,
-                  Point( part.ll.x, part.ll.y + i * sideLength),
-                  part.ur
-                )
-                
-      val p1Cost = costEstimation(p1)
-      val p2Cost = costEstimation(p2)
-      
-      val diff = Math.abs( p1Cost - p2Cost )
-      if(diff < minCostDiff) {
-        minCostDiff = diff
-        parts = (p1,p2)
-      }
-    }
+  protected[spatial] val bsp = new BSP(Array(minX, minY), Array(maxX, maxY), cells, sideLength, maxCostPerPartition)  
     
-    parts
-  }
-  
-  protected[spatial] lazy val bounds = {
-    import SpatialGridPartitioner._  
-    val queue = Queue(RectRange(0, Point(minX, minY), Point(maxX, maxY)))
-
-    val resultPartitions = ListBuffer.empty[RectRange]
-    
-    while(queue.nonEmpty) {
-      val part = queue.dequeue()
-      
-      val (lx, ly) = lengths(part)
-      if((costEstimation(part) > maxCostPerPartition) && (lx > sideLength || ly > sideLength) ) {
-        val (p1, p2) = costBasedSplit(part)
-        queue.enqueue(p1, p2)
-      } else
-        resultPartitions += part
-    }
-    
-    resultPartitions.toList.zipWithIndex
-  }
-  
-  lazy val partitionStats = {
-    
-    val numParts = bounds.size
-    
-    val partCounts = cells.view.flatMap { case (cell, count) =>
-      bounds.view.map(_._1).filter { p => p.contains(cell) }.map { p => (p, count) }        
-    }.groupBy(_._1).map { case (part, arr) => (part, arr.map(_._2).sum) }      
-    
-    
-    val avgPoints = partCounts.map(_._2).sum / partCounts.size
-    val maxPoints = partCounts.maxBy{case (part, count) => count}
-    val minPoints = partCounts.minBy{case (part, count) => count}
-    
-    val variance = partCounts.map { case (part, count) => Math.pow( count - avgPoints, 2) }.sum
-    
-    val area = bounds.view.map(_._1.area).sum
-    val avgArea = area / numParts
-    val partAreas = partCounts.map { case (part,_) => (part, part.area) }
-    val maxArea = partAreas.maxBy{ case (part, area) => area }
-    val minArea = partAreas.minBy{ case (part, area) => area }
-    
-    val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
-    
-    PartitionStats(numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea) 
-  }
-  
-  override def numPartitions: Int = bounds.size
+  override def numPartitions: Int = bsp.partitions.size
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
@@ -192,9 +101,9 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
      * However, this should not happen, because the partitioner is specially for a given RDD
      * which by definition is immutable. 
      */
-    val part = bounds.filter{ case (r,idx) =>
+    val part = bsp.partitions.filter{ case (r,idx) =>
       val c = g.getCentroid
-      r.contains(SpatialGridPartitioner.Point(c.getX, c.getY)) 
+      r.contains(NPoint(c.getX, c.getY)) 
     }.head
     
     part._2

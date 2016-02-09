@@ -8,15 +8,16 @@ import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Geometry
 import org.apache.spark.rdd.RDD
 import org.scalatest.BeforeAndAfterAll
-import dbis.spark.spatial.SpatialGridPartitioner.Point
-import dbis.spark.spatial.SpatialGridPartitioner.RectRange
+import dbis.spatial.NPoint
+import dbis.spatial.NRectRange
+import scala.collection.mutable.Map
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   private var sc: SparkContext = _
   
   override def beforeAll() {
-    val conf = new SparkConf().setMaster("local").setAppName("paritioner_test")
+    val conf = new SparkConf().setMaster("local").setAppName("paritioner_test2")
     sc = new SparkContext(conf)
   }
   
@@ -65,102 +66,25 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     val parti = new BSPartitioner(rdd, 1, 1)
     
+    println(s"${parti.cells.mkString("\n")}")
+    
     parti.cells.size shouldBe 4
   }
   
-  it should "create correct number cell counts" in {
+  it should "create correct cell histogram" in {
     
     val rdd = createRDD()
     
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val shouldSizes = Array(2,1,1,1)
-    
-    (0 until parti.cells.size).foreach { i =>
-      withClue(s"unexepected count in for cell #$i (cell id: ${parti.cells(i)._1.id}) :") { 
-        parti.cells(i)._2 shouldBe shouldSizes(i) 
-      }  
-    }    
-  }
-  
-  it should "compute the correct cell bounds" in {
-    val rdd = createRDD()
     val parti = new BSPartitioner(rdd, 1, 1)
 
-    val expLL = Array(Point(2,2), Point(4,2), Point(2,4), Point(4,4) )
-    val expUR = Array(Point(3,3), Point(5,3), Point(3,5), Point(5,5) )
+    val shouldSizes = Array(
+      (NRectRange(NPoint(2,2), NPoint(3,3)), 2),
+      (NRectRange(NPoint(2,4), NPoint(3,5)), 1),
+      (NRectRange(NPoint(4,4), NPoint(5,5)), 1),
+      (NRectRange(NPoint(4,2), NPoint(5,3)), 1)
+    ) 
     
-    (0 until parti.cells.size).foreach { i =>
-      val ll = parti.cells(i)._1.ll
-      val ur = parti.cells(i)._1.ur
-      
-      withClue(s"unexepected ll point for cell #$i (cell id: ${parti.cells(i)._1.id}") {
-        ll shouldBe expLL(i)
-      }
-      
-      withClue(s"unexepected UR point for cell #$i (cell id: ${parti.cells(i)._1.id}") {
-        ur shouldBe expUR(i)
-      }
-    }
-  }
-  
-  it should "compute the correct partition costs" in {
-    val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val part1 = RectRange(Point(2,2), Point(3,5))
-    val part2 = RectRange(Point(3,2), Point(5,5))
-    val part3 = RectRange(Point(1,1), Point(4,4))
-    
-    parti.costEstimation(part1) shouldBe 3
-    parti.costEstimation(part2) shouldBe 2
-    parti.costEstimation(part3) shouldBe 2
-    
-  }
-  
-  it should "split a partition correctly" in {
-    val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val part = RectRange(Point(2,2), Point(5,5))
-    
-    val (p1,p2) = parti.costBasedSplit(part)
-    
-    withClue("split 1") { p1 shouldBe RectRange(Point(2,2), Point(3,5)) }
-    withClue("split 2") { p2 shouldBe RectRange(Point(3,2), Point(5,5)) }
-  }
-  
-  it should "split a partition correctly - by Y" in {
-    val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val part = RectRange(Point(2,2), Point(3,5))
-    
-    val (p1,p2) = parti.costBasedSplit(part)
-    
-    withClue("split 1") { p1 shouldBe RectRange(Point(2,2), Point(3,3)) }
-    withClue("split 2") { p2 shouldBe RectRange(Point(2,3), Point(3,5)) }
-  }
-  
-  it should "return the number of partitions" in {
-    val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val parts = parti.bounds
-    
-    parts.size shouldBe 4    
-  }
-  
-  it should "find the correct partitioning" in  {
-    val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val parts = parti.bounds
-    
-    parts(0)._1 shouldBe RectRange(Point(2,2), Point(3,3))
-    parts(1)._1 shouldBe RectRange(Point(2,3), Point(3,5))
-    parts(2)._1 shouldBe RectRange(Point(3,2), Point(5,3))
-    parts(3)._1 shouldBe RectRange(Point(3,3), Point(5,5))
+    parti.cells should contain only (shouldSizes:_*)
   }
   
   it should "return the correct partition id" in {
@@ -173,12 +97,6 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       val pId = parti.getPartition(g)
       
       pId shouldBe partIds(id.toInt)
-      
-    
     }
-    
-    
   }
-  
-  
 }

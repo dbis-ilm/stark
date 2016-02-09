@@ -6,6 +6,8 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable.Queue
 import scala.collection.mutable.ListBuffer
 import etm.core.monitor.EtmMonitor
+import dbis.spatial.{NPoint,NRectRange}
+import dbis.spatial.partitioner.BSP
 
 /**
  * A cost based binary space partitioner based on the paper
@@ -84,14 +86,14 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
       val y = (newY.toInt / sideLength).toInt
       
       val cellId = y * numXCells + x
-    
+      
       (getCellBounds(cellId),1)
-    }.reduceByKey( _ + _).collect()
+    }.reduceByKey(_+_).collect()
 
   
-  protected[spatial] val algo = new BSP(Array(minX, minY), Array(maxX, maxY), cells, sideLength, maxCostPerPartition)  
+  protected[spatial] val bsp = new BSP(Array(minX, minY), Array(maxX, maxY), cells, sideLength, maxCostPerPartition)  
     
-  override def numPartitions: Int = algo.bounds.size
+  override def numPartitions: Int = bsp.partitions.size
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
@@ -99,7 +101,7 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
      * However, this should not happen, because the partitioner is specially for a given RDD
      * which by definition is immutable. 
      */
-    val part = algo.bounds.filter{ case (r,idx) =>
+    val part = bsp.partitions.filter{ case (r,idx) =>
       val c = g.getCentroid
       r.contains(NPoint(c.getX, c.getY)) 
     }.head

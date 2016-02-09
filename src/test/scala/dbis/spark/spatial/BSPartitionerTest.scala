@@ -8,6 +8,9 @@ import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Geometry
 import org.apache.spark.rdd.RDD
 import org.scalatest.BeforeAndAfterAll
+import dbis.spatial.NPoint
+import dbis.spatial.NRectRange
+import scala.collection.mutable.Map
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
@@ -63,46 +66,37 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     val parti = new BSPartitioner(rdd, 1, 1)
     
+    println(s"${parti.cells.mkString("\n")}")
+    
     parti.cells.size shouldBe 4
   }
   
-  it should "create correct number cell counts" in {
+  it should "create correct cell histogram" in {
     
     val rdd = createRDD()
     
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    val shouldSizes = Array(2,1,1,1)
-    
-    (0 until parti.cells.size).foreach { i =>
-      withClue(s"unexepected count in for cell #$i (cell id: ${parti.cells(i)._1.id}) :") { 
-        parti.cells(i)._2 shouldBe shouldSizes(i) 
-      }  
-    }    
-  }
-  
-  it should "compute the correct cell bounds" in {
-    val rdd = createRDD()
     val parti = new BSPartitioner(rdd, 1, 1)
 
-    val expLL = Array(NPoint(2,2), NPoint(4,2), NPoint(2,4), NPoint(4,4) )
-    val expUR = Array(NPoint(3,3), NPoint(5,3), NPoint(3,5), NPoint(5,5) )
+    val shouldSizes = Array(
+      (NRectRange(NPoint(2,2), NPoint(3,3)), 2),
+      (NRectRange(NPoint(2,4), NPoint(3,5)), 1),
+      (NRectRange(NPoint(4,4), NPoint(5,5)), 1),
+      (NRectRange(NPoint(4,2), NPoint(5,3)), 1)
+    ) 
     
-    (0 until parti.cells.size).foreach { i =>
-      val ll = parti.cells(i)._1.ll
-      val ur = parti.cells(i)._1.ur
-      
-      withClue(s"unexepected ll point for cell #$i (cell id: ${parti.cells(i)._1.id}") {
-        ll.c should contain only (expLL(i).c:_*)
-      }
-      
-      withClue(s"unexepected UR point for cell #$i (cell id: ${parti.cells(i)._1.id})") {
-        ur.c should contain only (expUR(i).c:_*)
-      }
-    }
+    parti.cells should contain only (shouldSizes:_*)
   }
   
-  
-  
-  
+  it should "return the correct partition id" in {
+    val rdd = createRDD()
+    val parti = new BSPartitioner(rdd, 1, 1)
+    
+    val partIds = Array(0,0,1,2,3)
+    
+    rdd.collect().foreach{ case (g,id) => 
+      val pId = parti.getPartition(g)
+      
+      pId shouldBe partIds(id.toInt)
+    }
+  }
 }

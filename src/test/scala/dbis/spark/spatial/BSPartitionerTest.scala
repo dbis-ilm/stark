@@ -66,9 +66,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     val parti = new BSPartitioner(rdd, 1, 1)
     
-    println(s"${parti.cells.mkString("\n")}")
+    println(s"${parti.cellHistogram.mkString("\n")}")
     
-    parti.cells.size shouldBe 4
+    parti.cellHistogram.size shouldBe 4
   }
   
   it should "create correct cell histogram" in {
@@ -84,7 +84,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       (NRectRange(NPoint(4,2), NPoint(5,3)), 1)
     ) 
     
-    parti.cells should contain only (shouldSizes:_*)
+    parti.cellHistogram should contain only (shouldSizes:_*)
   }
   
   it should "return the correct partition id" in {

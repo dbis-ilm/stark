@@ -56,7 +56,7 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
    * @param id The ID of the cell to compute the bounds for
    */
   protected[spatial] def getCellBounds(id: Int): NRectRange = {
-//    require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
+    require(id >= 0 && id < (numXCells * numYCells), s"Invalid cell id (0 .. ${numXCells * numYCells}): $id")
       
     val dy = id / numYCells
     val dx = id % numXCells
@@ -76,7 +76,7 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simple aggregate by cell
    */
-  protected[spatial] val cells = rdd.map { case (g,v) =>  
+  protected[spatial] val cellHistogram = rdd.map { case (g,v) =>  
       val p = g.getCentroid
       
       val newX = p.getX - minX
@@ -88,16 +88,18 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
       val cellId = y * numXCells + x
       
       (getCellBounds(cellId),1)
-    }.reduceByKey(_+_).collect()
+    }
+    .reduceByKey(_+_)  // key is the cell as NRectRange, this groups all elements with the same cell and sums the 1's
+    .collect()         // store as an array
 
   
-  protected[spatial] val bsp = new BSP(Array(minX, minY), Array(maxX, maxY), cells, sideLength, maxCostPerPartition)  
+  protected[spatial] val bsp = new BSP(Array(minX, minY), Array(maxX, maxY), cellHistogram, sideLength, maxCostPerPartition)  
     
   override def numPartitions: Int = bsp.partitions.size
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
-    /* XXX: This will throw an error if the geometry is outside of our inital data space
+    /* XXX: This will throw an error if the geometry is outside of our initial data space
      * However, this should not happen, because the partitioner is specially for a given RDD
      * which by definition is immutable. 
      */

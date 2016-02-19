@@ -42,7 +42,10 @@ object SphereCoordinate {
     
     val angles = (0 until cartesian.size - 1).map { i =>
       
-      val tanPhi = math.sqrt(cartesian.view(i+1, cartesian.size).map(square(_)).sum) / cartesian(i)
+      val tanPhi = math.sqrt(
+          cartesian.view(i+1, cartesian.size)
+                    .map(square(_)).sum
+                  ) / cartesian(i)
       
       math.atan(tanPhi)
     }.toArray

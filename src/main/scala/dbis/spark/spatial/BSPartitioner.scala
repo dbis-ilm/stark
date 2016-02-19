@@ -97,16 +97,16 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
-    /* XXX: This will throw an error if the geometry is outside of our inital data space
+    /* XXX: This will throw an error if the geometry is outside of our initial data space
      * However, this should not happen, because the partitioner is specially for a given RDD
      * which by definition is immutable. 
      */
-    val part = bsp.partitions.filter{ case (r,idx) =>
+    val part = bsp.partitions.filter{ p =>
       val c = g.getCentroid
-      r.contains(NPoint(c.getX, c.getY)) 
+      p.contains(NPoint(c.getX, c.getY)) 
     }.head
     
-    part._2
+    part.id
     
   }
 }

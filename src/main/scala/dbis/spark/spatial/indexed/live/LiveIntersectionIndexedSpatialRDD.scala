@@ -10,6 +10,7 @@ import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
 import dbis.spark.spatial.indexed.SpatialGridPartition
 import dbis.spark.spatial.SpatialPartitioner
+import dbis.spark.spatial.Utils
 
 /**
  * An RDD representing a spatial intersection using an internal R-Tree
@@ -19,7 +20,7 @@ import dbis.spark.spatial.SpatialPartitioner
  */
 class LiveIntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     qry: G, 
-    @transient private val _partitioner: SpatialPartitioner, 
+    @transient private val _partitioner: SpatialPartitioner[G,V], 
     @transient private val prev: RDD[(G,V)]
   ) extends IndexedSpatialRDD(_partitioner, prev) {
   
@@ -36,7 +37,7 @@ class LiveIntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
      * Therefore, we don't need to build and query the index (which will produce
      * an empty result) 
      */
-    if(!qry.getEnvelopeInternal.intersects(part.bounds.toEnvelope)) {
+    if(!qry.getEnvelopeInternal.intersects(Utils.toEnvelope(part.bounds))) {
         // this is not the partition that holds data that might produce results
         logDebug(s"not our part: ${part.bounds}  vs $qry")
         return Iterator.empty
@@ -72,7 +73,7 @@ class LiveIntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
      */
     val res = result.filter{ case (g,v) => qry.intersects(g) }
     
-    res
+    res.iterator
   }
   
 }

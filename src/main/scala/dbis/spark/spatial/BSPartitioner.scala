@@ -8,6 +8,13 @@ import scala.collection.mutable.ListBuffer
 import etm.core.monitor.EtmMonitor
 import dbis.spatial.{NPoint,NRectRange}
 import dbis.spatial.partitioner.BSP
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.io.File
+import java.nio.file.OpenOption
+import java.nio.file.StandardOpenOption
+
+import scala.collection.JavaConverters._
 
 /**
  * A cost based binary space partitioner based on the paper
@@ -19,46 +26,20 @@ import dbis.spatial.partitioner.BSP
  * @param maxCostPerPartition Maximum cost a partition should have - here: number of elements  
  */
 class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
-    @transient private val rdd: RDD[_ <: Product2[G,V]],
+    @transient private val rdd: RDD[(G,V)],
     sideLength: Double,
-    maxCostPerPartition: Double = 1.0) extends SpatialPartitioner {
+    maxCostPerPartition: Double = 1.0) extends SpatialPartitioner(rdd) {
   
   
-  /** 
-   * The lower left and uppper right corner points
-   * of the data space in the RDD
-   */
-  protected[spatial] lazy val (minX, maxX, minY, maxY) = {
-    
-    val coords = rdd.map{ case (g,v) =>
-      val env = g.getEnvelopeInternal
-      (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
-    }.cache() // cache for re-use
-    
-    val minX = coords.map(_._1).min()
-    val maxX = coords.map(_._2).max() + 1 // +1 to also include points that lie on the maxX value
-    
-    val minY = coords.map(_._3).min()
-    val maxY = coords.map(_._4).max() + 1 // +1 to also include points that lie on the maxY value
-    
-//    println(s"$minX $minY  -- $maxX $maxY")
-    
-    (minX, maxX, minY, maxY)
-  }
-  
-  
-  val numXCells = Math.ceil((maxX - minX) / sideLength).toInt
-  val numYCells = Math.ceil((maxY - minY) / sideLength).toInt
-
+  protected[spatial] val numXCells = Math.ceil((maxX - minX) / sideLength).toInt
   
   /**
    * Compute the bounds of a cell with the given ID
    * @param id The ID of the cell to compute the bounds for
    */
   protected[spatial] def getCellBounds(id: Int): NRectRange = {
-//    require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
       
-    val dy = id / numYCells
+    val dy = id / numXCells
     val dx = id % numXCells
     
     val llx = dx * sideLength + minX
@@ -77,6 +58,7 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
    * cell it belongs and then simple aggregate by cell
    */
   protected[spatial] val cells = rdd.map { case (g,v) =>  
+  
       val p = g.getCentroid
       
       val newX = p.getX - minX
@@ -91,12 +73,37 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     }.reduceByKey(_+_).collect()
 
   
-  protected[spatial] val bsp = new BSP(Array(minX, minY), Array(maxX, maxY), cells, sideLength, maxCostPerPartition)  
+  protected[spatial] val bsp = new BSP(
+      NPoint(minX, minY), 
+      NPoint(maxX, maxY), 
+      cells, 
+      sideLength, 
+      maxCostPerPartition)  
+    
+  override def partitionBounds(idx: Int): NRectRange = bsp.partitions(idx)  
+  
+//  def printPartitions(fName: String) {
+//    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
+//    Files.write(new File(fName).toPath(), list, StandardOpenOption.CREATE, StandardOpenOption.WRITE) 
+//      
+//  } 
+//    
+//  def printHistogram(fName: String) {
+//    
+//    println(s"num in hist: ${cells.map(_._2).sum}")
+//    
+//    
+//    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
+//    Files.write(new File(fName).toPath(), list, StandardOpenOption.CREATE, StandardOpenOption.WRITE) 
+//      
+//  }   
     
   override def numPartitions: Int = bsp.partitions.size
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
+//    println(s"get partition for key $g")
+
     /* XXX: This will throw an error if the geometry is outside of our initial data space
      * However, this should not happen, because the partitioner is specially for a given RDD
      * which by definition is immutable. 
@@ -104,9 +111,18 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     val part = bsp.partitions.filter{ p =>
       val c = g.getCentroid
       p.contains(NPoint(c.getX, c.getY)) 
-    }.head
+    }.headOption
     
-    part.id
+    part match {
+      case None => 
+        println(bsp.partitions.mkString("\n"))
+        println(bsp.partitionStats)
+        throw new IllegalStateException("didum")
+      case Some(part) =>  
+        part.id
+      
+    }
+    
     
   }
 }

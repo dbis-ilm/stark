@@ -52,14 +52,6 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     parti.numXCells shouldBe 3
   }
   
-  it should "find the correct number of cells for Y dimension" in {
-    val rdd = createRDD()
-    
-    val parti = new BSPartitioner(rdd, 1, 1)
-    
-    parti.numYCells shouldBe 3
-  }
-  
   it should "create correct number of cells" in {
     
     val rdd = createRDD()
@@ -91,12 +83,17 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val rdd = createRDD()
     val parti = new BSPartitioner(rdd, 1, 1)
     
-    val partIds = Array(0,0,1,2,3)
+//    val partIds = Array(0,0,1,2,3)
+   
+    val parts = rdd.map{ case (g,v) => parti.getPartition(g) }.collect()
     
-    rdd.collect().foreach{ case (g,id) => 
-      val pId = parti.getPartition(g)
-      
-      pId shouldBe partIds(id.toInt)
-    }
+    parts should contain inOrderOnly(0,1,2,3)
+    
+    
+//    rdd.collect().foreach{ case (g,id) => 
+//      val pId = parti.getPartition(g)
+//      
+//      pId shouldBe partIds(id.toInt)
+//    }
   }
 }

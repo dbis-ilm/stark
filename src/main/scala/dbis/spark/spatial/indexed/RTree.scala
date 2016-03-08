@@ -11,7 +11,9 @@ import com.vividsolutions.jts.index.strtree.STRtree
  * 
  * @param capacity The number of elements in a node
  */
-class RTree[G <: Geometry : ClassTag, D: ClassTag ](@transient private val capacity: Int) extends STRtree(capacity)  {
+class RTree[G <: Geometry : ClassTag, D: ClassTag ](
+    @transient private val capacity: Int
+  ) extends STRtree(capacity)  {
 
   /**
    * Insert data into the tree
@@ -29,8 +31,10 @@ class RTree[G <: Geometry : ClassTag, D: ClassTag ](@transient private val capac
    * @param geom The geometry to compute intersection for
    * @returns Returns all elements of the tree that intersect with the query geometry  
    */
-  def query(geom: G): Iterator[D] = 
-    super.query(geom.getEnvelopeInternal).map(_.asInstanceOf[D]).toIterator
-  
+  def query(geom: G): List[D] = 
+    super.query(geom.getEnvelopeInternal).map(_.asInstanceOf[D]).toList
+ 
+  def contains(geom: G): Boolean = query(geom).nonEmpty
+    
 }
 

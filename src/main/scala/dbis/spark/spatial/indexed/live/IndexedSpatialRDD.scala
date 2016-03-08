@@ -11,7 +11,7 @@ import dbis.spark.spatial.SpatialGridPartitioner
 
 
 abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
-    @transient private val _partitioner: SpatialPartitioner,
+    @transient private val _partitioner: SpatialPartitioner[G,V],
     @transient private val oneParent: RDD[(G,V)]
   ) extends LiveIndexedRDD[G,V](oneParent, _partitioner) {
 
@@ -28,7 +28,7 @@ abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
   }
 
   
-  def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIntersectionIndexedSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner], this)
+  def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIntersectionIndexedSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner[G,V]], this)
   
 //  def kNN(qry: T, k: Int): KNNIndexedSpatialRDD[T] = new KNNIndexedSpatialRDD(qry, k, this)
 }

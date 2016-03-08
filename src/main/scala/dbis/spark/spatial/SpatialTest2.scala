@@ -8,6 +8,8 @@ import org.apache.spark.SparkContext
 import scala.io.Source
 import com.vividsolutions.jts.io.WKTReader
 
+import dbis.spark.spatial.SpatialRDD._
+
 object SpatialTest2 {
   
   var monitor: EtmMonitor = _
@@ -55,21 +57,33 @@ object SpatialTest2 {
 
 		try {
   		(0 until numRuns).foreach { i => 
-
   		  
-  		  val raw = sc.textFile(dataFile)
+  		  val raw = sc.textFile(dataFile, 8)
   	             .map { line => line.split(",")}
                  .filter { arr => arr(7).matches("POINT\\(\\d+\\.?\\d* \\d+\\.?\\d*\\)")}
                  .map { arr => (new WKTReader().read(arr(7)), arr(0)) }
+        
+        println(s"input size: ${raw.count()}")                 
                  
-        val parti = new BSPartitioner(raw, 10, 100)
+        val other = sc.parallelize(Seq(queryGeom), 1).map { g => (g, "Hallo Welt") }.keyBy(_._1)
 
-//        println(s"num partitions: ${parti.numPartitions}")
-//        (0 until parti.numPartitions).foreach { idx => println(parti.getCellBounds(idx))}
-                 
-      raw.partitionBy(parti)
-               .mapPartitionsWithIndex { case (idx, iter) => List((idx, iter.size)).toIterator }
-               .foreach(println)
+        val pIdx = monitor.createPoint("pidx")
+        try {
+        	val cnt = raw.keyBy(_._1).index(cost = 10, cellSize = 10).join(other).count()
+    			println(s"idx cnt: $cnt")
+        } finally { 
+        	pIdx.collect() 
+        }
+        
+        val plain = monitor.createPoint("plain")
+        try {
+        	val cnt = raw.join(other).count()
+        	println(s"plain cnt: $cnt")
+        } finally { 
+        	plain.collect() 
+        }
+        
+        
     		
   	  }	   
 		} finally {

@@ -154,7 +154,7 @@ object SpatialRDDTest {
 	             .map { line => line.split(",")}
                .filter { arr => arr(7).matches("POINT\\(\\d+\\.?\\d* \\d+\\.?\\d*\\)")}
                .map { arr => (new WKTReader().read(arr(7)), arr(0)) }
-               .index(3)      // persistable indexing
+               .indexFixedGrid(3)      // persistable indexing
                .intersect(queryGeom)
                .count()
 	  } finally {
@@ -170,7 +170,7 @@ object SpatialRDDTest {
 	             .map { line => line.split(",")}
                .filter { arr => arr(7).matches("POINT\\(\\d+\\.?\\d* \\d+\\.?\\d*\\)")}
                .map { arr => (new WKTReader().read(arr(7)), arr(0)) }
-               .index(3)
+               .indexFixedGrid(3)
                .saveAsObjectFile(resultFile)
 	  } finally {
 	    p.collect()

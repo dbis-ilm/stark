@@ -55,7 +55,7 @@ class IndexedSpatialJoinRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag]
     @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
     @transient val right: RDD[(G,V2)]
 //    part: SpatialPartitioner
-  )  extends SpatialRDD[G,Iterable[(V,V2)]](left.context, Nil) /*CoGroupedRDD(Seq(left, right), left.partitioner.get)*/ {
+  )  extends SpatialRDD[G,(V,V2)](left.context, Nil) /*CoGroupedRDD(Seq(left, right), left.partitioner.get)*/ {
   
   override def getDependencies: Seq[Dependency[_]] = Seq(
     new OneToOneDependency(left),
@@ -68,7 +68,7 @@ class IndexedSpatialJoinRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag]
       Array.tabulate(right.getNumPartitions)(j => new NarrowIndexJoinSplitDep(right, j, right.partitions(j))))
   }
   
-  override def compute(s: Partition, context: TaskContext): Iterator[(G,Iterable[(V,V2)])] = {
+  override def compute(s: Partition, context: TaskContext): Iterator[(G,(V,V2))] = {
     val split = s.asInstanceOf[JoinPartition]
     
     val left  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[RTree[G, (G,V)]]].toList
@@ -78,27 +78,34 @@ class IndexedSpatialJoinRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag]
      * aber das funktioneirt wahrscheinlich nicht mehr mit der Map --> was eigenes implementieren
      */
     
-    require(left.size == 1, "left should be only one partition (for index)")
+//    require(left.size == 1, "left should be only one partition (for index)")
+    logDebug(s"compute indexed spatial join with ${left.size} left input trees")
     
-    val map = createExternalMap
-
-    val idx = left.head
-
-   
-    for(rDep <- split.rightDeps) {
-      val right = rDep.rdd.iterator(rDep.split, context).asInstanceOf[Iterator[(G,V2)]]
-
-      val res = right.flatMap{ case (rg, rv) =>
-  		  idx.query(rg) // query R-Tree and get matching MBBs
-      		  .filter{ case (lg, _) => lg.intersects(rg)} // check if real geom also matches
-      		  .map { case (lg, lv) => (lg,(lv, rv))  }    // key is the left geom
+    val iters = ListBuffer.empty[Iterator[(G,Combiner)]] 
+      
+    for(idx <- left) {
+    
+      val map = createExternalMap
+     
+      for(rDep <- split.rightDeps) {
+        val right = rDep.rdd.iterator(rDep.split, context).asInstanceOf[Iterator[(G,V2)]]
+  
+        val res = right.flatMap{ case (rg, rv) =>
+    		  idx.query(rg) // query R-Tree and get matching MBBs
+        		  .filter{ case (lg, _) => lg.intersects(rg)} // check if real geom also matches
+        		  .map { case (lg, lv) => (lg,(lv, rv))  }    // key is the left geom
+        }
+        
+        map.insertAll(res)
       }
       
-      map.insertAll(res)
+      iters += map.iterator
     }
+
+    val f = iters.flatten.flatMap { case (g, l) => l.map { case (lv,rv) => (g,(lv, rv)) }}
     
-    
-    new InterruptibleIterator(context, map.iterator)
+    // return an interruptable iterator of all our produced iterators
+    new InterruptibleIterator(context, f.iterator)
   }
   
   type ValuePair = (V,V2)

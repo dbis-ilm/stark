@@ -26,6 +26,7 @@ import dbis.spark.spatial.indexed.persistent.IndexedSpatialJoinRDD
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import scala.collection.JavaConverters._
+import com.vividsolutions.jts.io.WKTReader
 
 /**
  * A base class for spatial RDD without indexing
@@ -60,7 +61,6 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends Logging with Serializable {
   
-
   def intersect(qry: G): RDD[(G,V)] = new IntersectionSpatialRDD(qry, rdd)
   
   def contains(qry: G): RDD[(G,V)] = new ContainsSpatialRDD(qry, rdd)
@@ -124,6 +124,7 @@ object SpatialRDD {
   
   implicit def convertMy[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new IndexedSpatialRDDFunctions(rdd)
   
+  implicit def stringToGeom(s: String): Geometry = new WKTReader().read(s)
   
 }
 

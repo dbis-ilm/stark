@@ -9,6 +9,8 @@ import scala.io.Source
 import com.vividsolutions.jts.io.WKTReader
 
 import dbis.spark.spatial.SpatialRDD._
+import dbis.spark.spatial.indexed.RTree
+import com.vividsolutions.jts.geom.Geometry
 
 object SpatialTest2 {
   
@@ -74,6 +76,19 @@ object SpatialTest2 {
         } finally { 
         	pIdx.collect() 
         }
+        
+        val idxStore = raw.keyBy(_._1).index(cost = 10, cellSize = 10)
+        val numParts = idxStore.getNumPartitions
+        idxStore.saveAsObjectFile("/tmp/idx_test")
+        
+        val pIdxLoad = monitor.createPoint("idxLoad")
+        try {
+        	val idx = sc.objectFile[RTree[Geometry, (Geometry, (Geometry, String))]]("/tmp/idx_test", numParts)
+        	val cnt = idx.join(other).count()
+    			println(s"idx load cnt: $cnt")
+        } finally { 
+        	pIdxLoad.collect() 
+        } 
         
         val plain = monitor.createPoint("plain")
         try {

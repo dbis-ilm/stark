@@ -92,7 +92,7 @@ object SpatialTest2 {
         
         val plain = monitor.createPoint("plain")
         try {
-        	val cnt = raw.join(other).count()
+        	val cnt = raw.join(other, (g1, g2) => g1.intersects(g2)).count()
         	println(s"plain cnt: $cnt")
         } finally { 
         	plain.collect() 

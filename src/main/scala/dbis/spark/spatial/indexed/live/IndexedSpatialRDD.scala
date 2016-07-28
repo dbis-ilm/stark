@@ -9,7 +9,12 @@ import dbis.spark.spatial.indexed.SpatialGridPartition
 import dbis.spark.spatial.indexed.RTree
 import dbis.spark.spatial.SpatialGridPartitioner
 
-
+/**
+ * An abstract RDD implementation that uses a live index 
+ * 
+ * @param _partitioner The partitioner to use for partitioning the underlying data
+ * @param oneParent The original RDD 
+ */
 abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     @transient private val _partitioner: SpatialPartitioner[G,V],
     @transient private val oneParent: RDD[(G,V)]
@@ -20,14 +25,25 @@ abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
   override protected def getPartitions: Array[Partition] = {
+    // the partitioner, since it has to be set in the constructor it's safe to call get here
     val parti = partitioner.get.asInstanceOf[SpatialGridPartitioner[G,V]]
+    
+    // create the partitions
     Array.tabulate(parti.numPartitions){ idx =>
       val bounds = parti.getCellBounds(idx)
       new SpatialGridPartition[G,V](idx, bounds, new RTree(5))
     }
   }
 
-  
+  /**
+   * Find all elements in this RDD that intersect with the given geometry.
+   * <br><br>
+   * Before the actual computation is performed, the elements in this RDD a put
+   * into an index structure - on the fly - which then is queried
+   *  
+   * @param qry The query geometry to intersect with the elements in this RDD
+   * @return Returns an RDD that contains all elements that intersect with the given query geometry 
+   */
   def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIntersectionIndexedSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner[G,V]], this)
   
 //  def kNN(qry: T, k: Int): KNNIndexedSpatialRDD[T] = new KNNIndexedSpatialRDD(qry, k, this)

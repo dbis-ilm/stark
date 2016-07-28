@@ -16,11 +16,11 @@ class PersistedIndexedIntersectionSpatialRDD[G <: Geometry : ClassTag, D: ClassT
     @transient private val prev: RDD[RTree[G,(G,D)]]
   ) extends RDD[(G,D)](prev) {
   
-  type T = RTree[G,(G,D)]
+  type Index = RTree[G,(G,D)]
   
   @DeveloperApi
   def compute(split: Partition, context: TaskContext): Iterator[(G,D)] = 
-    firstParent[T].iterator(split, context).flatMap { tree =>
+    firstParent[Index].iterator(split, context).flatMap { tree =>
       tree.query(qry).filter{ case (g,v) => qry.intersects(g)}
     }
 
@@ -28,7 +28,7 @@ class PersistedIndexedIntersectionSpatialRDD[G <: Geometry : ClassTag, D: ClassT
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  protected def getPartitions: Array[Partition] = firstParent[T].partitions
+  protected def getPartitions: Array[Partition] = firstParent[Index].partitions
   
   
 }

@@ -5,11 +5,10 @@ import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.spatial.NRectRange
-import org.apache.spark.Logging
 
 abstract class SpatialPartitioner[G <: Geometry : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
-  ) extends Partitioner with Logging {
+  ) extends Partitioner {
   
   private type MinMax = (Double, Double, Double, Double)
   

@@ -13,7 +13,8 @@ import dbis.spark.spatial.SpatialPartitioner
 import dbis.spark.spatial.Utils
 
 /**
- * An RDD representing a spatial intersection using an internal R-Tree
+ * An RDD representing a spatial intersection using an internal R-Tree,
+ * that is filled on the fly.
  * 
  * @param qry The query geometry
  * @param prev The parent RDD 

@@ -1,16 +1,17 @@
 package dbis.spark.spatial.plain
 
+import dbis.spark.spatial.SpatialRDD
 import scala.reflect.ClassTag
 import com.vividsolutions.jts.geom.Geometry
 import org.apache.spark.rdd.RDD
-import dbis.spark.spatial.SpatialRDD
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 
-class ContainsSpatialRDD[G <: Geometry : ClassTag, V : ClassTag](
+class ContainedBySpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
     qry: G,
     @transient private val prev: RDD[(G,V)]) extends SpatialRDD[G,V](prev) {
+  
   
   /**
    * :: DeveloperApi ::
@@ -18,7 +19,7 @@ class ContainsSpatialRDD[G <: Geometry : ClassTag, V : ClassTag](
    */
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = {
-    firstParent[(G,V)].iterator(split, context).filter { case (g,v) => g.contains(qry) }    
+    firstParent[(G,V)].iterator(split, context).filter { case (g,v) => qry.contains(g) }    
   }
   
 }

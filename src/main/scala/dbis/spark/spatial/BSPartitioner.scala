@@ -55,7 +55,7 @@ class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
    * The cells which contain elements and the number of elements
    * 
    * We iterate over all elements in the RDD, determine to which
-   * cell it belongs and then simple aggregate by cell
+   * cell it belongs and then simply aggregate by cell
    */
   protected[spatial] val cells = rdd.map { case (g,v) =>  
   

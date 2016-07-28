@@ -46,6 +46,10 @@ abstract class SpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
    */
   override protected def getPartitions: Array[Partition] = firstParent[(G,V)].partitions
 
+  //---------------------------------------------------------------------------------------
+  // LIVE
+  //---------------------------------------------------------------------------------------
+  
   /**
    * Compute an intersection of the elements in this RDD with the given geometry
    */
@@ -57,9 +61,15 @@ abstract class SpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
   
 }
 
+/**
+ * A helper class used in the implicit conversions
+ * 
+ * @param rdd The original RDD to treat as a spatial RDD
+ */
 class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends Logging with Serializable {
+  
   
   def intersect(qry: G): RDD[(G,V)] = new IntersectionSpatialRDD(qry, rdd)
   
@@ -67,6 +77,7 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   
   def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
   
+  // LIVE
   def liveIndex(ppD: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(new SpatialGridPartitioner(ppD, rdd))
   
   def liveIndex(partitioner: SpatialPartitioner[G,V]) = new LiveIndexedSpatialRDDFunctions(partitioner, rdd)
@@ -77,6 +88,9 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
     makeIdx(new ShuffledRDD[G,V,V](rdd, new BSPartitioner(rdd, cellSize, cost)))
 //    makeIdx(new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(5, rdd)))
   
+  /**
+   * Use a spatial Index for this (spatial) RDD
+   */
   private def makeIdx(rdd: RDD[(G,V)]) = rdd.mapPartitions( iter => { 
   
       val tree = new RTree[G,(G,V)](10)
@@ -89,10 +103,24 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   } , 
   true) // preserve partitioning
   
+  /**
+   * Use a Grid partitioner with a fixed number of paritions per dimension to partition
+   * the dataset.
+   * 
+   * @param ppD The number of partitions per Dimension
+   * @return Returns a shuffled RDD partitioned according to the given parameter
+   */
   def grid(ppD: Int) = new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner[G,V](ppD, rdd))
    
-  def join[V2 : ClassTag](other: RDD[(G, V2)]) = new JoinSpatialRDD(
-      new ShuffledRDD[G,V,V](rdd, new BSPartitioner[G,V](rdd, 10, 10)) , other)
+  /**
+   * Join this SpatialRDD with another (spatial) RDD.
+   * 
+   * @param other The other RDD to join with.
+   * @param pred The join predicate as a function
+   * @return Returns a RDD with the joined values
+   */
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = new JoinSpatialRDD(
+      new ShuffledRDD[G,V,V](rdd, new BSPartitioner[G,V](rdd, 10, 10)) , other, pred)
 }
 
 class LiveIndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](

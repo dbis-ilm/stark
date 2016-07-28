@@ -17,7 +17,8 @@ import org.apache.spark.InterruptibleIterator
 
 class JoinSpatialRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
-    @transient val right: RDD[(G,V2)]
+    @transient val right: RDD[(G,V2)],
+    predicate: (G,G) => Boolean
 //    part: SpatialPartitioner
   )  extends SpatialRDD[G,(V,V2)](left.context, Seq(new OneToOneDependency(left), 
                                                               new OneToOneDependency(right))) {
@@ -45,7 +46,7 @@ class JoinSpatialRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag](
     
     for((lg,lv) <- left) {
       val res = split.rightDeps.flatMap( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])
-                  .filter { case (rg, rv) => lg.intersects(rg) }
+                  .filter { case (rg, rv) => predicate(lg, rg) }
                   .map { case (rg, rv) => (lg,(lv, rv)) }
       
   		map.insertAll(res)

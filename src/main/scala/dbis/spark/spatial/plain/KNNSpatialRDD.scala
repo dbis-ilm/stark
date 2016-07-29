@@ -11,48 +11,30 @@ import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import dbis.spark.spatial.SpatialRDD
 
-class KNNSpatialRDD[T <: Geometry : ClassTag, V: ClassTag](
-    qry: T, k: Int, 
-    private val prev: RDD[(T,V)]
-  ) extends SpatialRDD(prev) {
+class KNNSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+    qry: G, k: Int, 
+    private val prev: RDD[(G,V)]
+  ) extends RDD[(G,Double,V)](prev) {
   
  /**
    * :: DeveloperApi ::
    * Implemented by subclasses to compute a given partition.
    */
   @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[(T,V)] = {
-    firstParent[(T,V)].iterator(split, context)
+  override def compute(split: Partition, context: TaskContext): Iterator[(G,Double,V)] = {
+    firstParent[(G,V)].iterator(split, context)
       .map { case (g,v) => 
         val d = qry.distance(g)
-        (g,v,d)
+        (g,d,v) // compute and return distance
       }
       .toList
-      .sortWith(_._3 < _._3)
-      .take(k)
-      .map{ case (g,v,d) => (g,v)}
-      .toIterator
+      .sortWith(_._2 < _._2) // on distance
+      .take(k) // take only the fist k 
+      .toIterator // remove the iterator
   }
   
-
   /**
-   * Implemented by subclasses to return the set of partitions in this RDD. This method will only
-   * be called once, so it is safe to implement a time-consuming computation in it.
+   * We do not repartition our data.
    */
-  override protected def getPartitions: Array[Partition] = prev.partitions
-
-  /**
-   * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only
-   * be called once, so it is safe to implement a time-consuming computation in it.
-   */
-  override protected def getDependencies: Seq[Dependency[_]] = Seq(new OneToOneDependency(prev))
-
-  /**
-   * Optionally overridden by subclasses to specify placement preferences.
-   */
-  override protected def getPreferredLocations(split: Partition): Seq[String] = Nil
-
-  /** Optionally overridden by subclasses to specify how they are partitioned. */
-  @transient override val partitioner: Option[Partitioner] = None
-  
+  override protected def getPartitions: Array[Partition] = firstParent[(G,V)].partitions
 }

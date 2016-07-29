@@ -91,7 +91,7 @@ object SpatialRDD {
    * @param rdd The RDD to convert
    * @return Returns a SpatialRDDFunctions object that contains spatial methods
    */
-	implicit def convertSpatialLive[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[(G, V)]): SpatialRDDFunctions[G,V] = new SpatialRDDFunctions[G,V](rdd)
+	implicit def convertSpatialPlain[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[(G, V)]): SpatialRDDFunctions[G,V] = new SpatialRDDFunctions[G,V](rdd)
 	
 	/** 
 	 * Convert an RDD to a SpatialRDD which uses persisted indexing.
@@ -127,9 +127,11 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
   
   def intersect(qry: G): RDD[(G,V)] = new IntersectionSpatialRDD(qry, rdd)
   
-  def contains(qry: G): RDD[(G,V)] = new ContainedBySpatialRDD(qry, rdd)
+  def containedBy(qry: G): RDD[(G,V)] = new ContainedBySpatialRDD(qry, rdd)
   
-  def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
+  def contains(qry: G): RDD[(G,V)] = new ContainsSpatialRDD(qry, rdd)
+  
+  def kNN(qry: G, k: Int): RDD[(G,Double,V)] = new KNNSpatialRDD(qry, k, rdd)
   
   // LIVE
   def liveIndex(ppD: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(new SpatialGridPartitioner(ppD, rdd))

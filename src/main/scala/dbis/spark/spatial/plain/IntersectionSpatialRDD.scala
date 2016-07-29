@@ -25,6 +25,4 @@ class IntersectionSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
   override def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = {
     firstParent[(G,V)].iterator(split, context).filter { case (g,v) => qry.intersects(g) }    
   }
-  
-  
 }

@@ -8,9 +8,9 @@ lazy val parti = project.in(file("spatialpartitioner"))
 
 libraryDependencies ++= Seq(
    "com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),
-   "org.apache.spark" % "spark-core_2.11" % "1.6.1" % "provided" withSources() withJavadoc(),
+   "org.apache.spark" % "spark-core_2.11" % "2.0.0" % "provided" withSources() withJavadoc(),
    "fm.void.jetm" % "jetm" % "1.2.3",
-   "org.scalatest" %% "scalatest" % "3.0.0-RC4" % "test" withSources()
+   "org.scalatest" %% "scalatest" % "3.0.0" % "test" withSources()
 )
 
 parallelExecution in Test := false

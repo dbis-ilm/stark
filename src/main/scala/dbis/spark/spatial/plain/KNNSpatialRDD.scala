@@ -1,6 +1,5 @@
 package dbis.spark.spatial.plain
 
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.Partition
@@ -10,8 +9,9 @@ import org.apache.spark.OneToOneDependency
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import dbis.spark.spatial.SpatialRDD
+import dbis.spark.SpatialObject
 
-class KNNSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+class KNNSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     qry: G, k: Int, 
     private val prev: RDD[(G,V)]
   ) extends RDD[(G,Double,V)](prev) {

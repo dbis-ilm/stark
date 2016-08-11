@@ -1,6 +1,5 @@
 package dbis.spark.spatial.indexed.live
 
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
@@ -11,6 +10,7 @@ import org.apache.spark.SparkEnv
 import dbis.spark.spatial.indexed.SpatialGridPartition
 import dbis.spark.spatial.SpatialPartitioner
 import dbis.spark.spatial.Utils
+import dbis.spark.SpatialObject
 
 /**
  * An RDD representing a spatial intersection using an internal R-Tree,
@@ -19,7 +19,7 @@ import dbis.spark.spatial.Utils
  * @param qry The query geometry
  * @param prev The parent RDD 
  */
-class LiveIntersectionIndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+class LiveIntersectionIndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     qry: G, 
     @transient private val _partitioner: SpatialPartitioner[G,V], 
     @transient private val prev: RDD[(G,V)]

@@ -2,15 +2,20 @@ package dbis.spark.spatial
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
+import org.scalatest.BeforeAndAfterAll
+
+import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
+
+import scala.collection.mutable.Map
+
 import com.vividsolutions.jts.io.WKTReader
-import com.vividsolutions.jts.geom.Geometry
-import org.apache.spark.rdd.RDD
-import org.scalatest.BeforeAndAfterAll
+
 import dbis.spatial.NPoint
 import dbis.spatial.NRectRange
-import scala.collection.mutable.Map
+
+import dbis.spark.SpatialObject
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
@@ -27,7 +32,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   
-  private def createRDD(points: Seq[String] = List("POINT(2 2)", "POINT(2.5 2.5)", "POINT(2 4)", "POINT(4 2)", "POINT(4 4)")): RDD[(Geometry, Long)] = 
+  private def createRDD(points: Seq[String] = List("POINT(2 2)", "POINT(2.5 2.5)", "POINT(2 4)", "POINT(4 2)", "POINT(4 4)")): RDD[(SpatialObject, Long)] = 
     sc.parallelize(points).zipWithIndex()
       .map { case (string, id) => (new WKTReader().read(string), id) 
   }
@@ -58,7 +63,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     val parti = new BSPartitioner(rdd, 1, 1)
     
-    println(s"${parti.cells.mkString("\n")}")
+//    println(s"${parti.cells.mkString("\n")}")
     
     parti.cells.size shouldBe 4
   }

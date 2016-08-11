@@ -6,7 +6,6 @@ import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
 import dbis.spark.spatial.SpatialRDD
-import com.vividsolutions.jts.geom.Geometry
 import org.apache.spark.Dependency
 import org.apache.spark.OneToOneDependency
 import dbis.spark.spatial.indexed.persistent.JoinPartition
@@ -14,8 +13,9 @@ import dbis.spark.spatial.indexed.persistent.NarrowIndexJoinSplitDep
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import scala.collection.mutable.ListBuffer
 import org.apache.spark.InterruptibleIterator
+import dbis.spark.SpatialObject
 
-class JoinSpatialRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag](
+class JoinSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
     @transient val right: RDD[(G,V2)],
     predicate: (G,G) => Boolean

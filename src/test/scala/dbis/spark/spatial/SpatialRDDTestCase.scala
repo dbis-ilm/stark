@@ -3,18 +3,23 @@ package dbis.spark.spatial
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
+
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
-import com.vividsolutions.jts.io.WKTReader
 
-import dbis.spark.spatial.SpatialRDD._
 import scala.io.Source
 import scala.reflect.io.File
-import java.nio.file.Files
-import java.nio.file.StandardOpenOption
+import scala.collection.JavaConverters._
+
+import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.io.WKTWriter
 
-import scala.collection.JavaConverters._
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
+
+import dbis.spark.spatial.SpatialRDD._
+import dbis.spark.SpatialObject
+import dbis.spark.SpatialObject._
 
 object SpatialRDDTestCase {
   
@@ -42,7 +47,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   def createRDD(file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',') = {
     sc.textFile(file, 2)
       .map { line => line.split(sep) }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), new WKTReader().read(arr(7))) }
+      .map { arr => (arr(0), arr(1).toInt, arr(2), new SpatialObject(new WKTReader().read(arr(7)))) }
       .keyBy( _._4)
   } 
   
@@ -71,7 +76,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q = new WKTReader().read("POINT (53.483437 -2.2040706)")
+	  val q: SpatialObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
 	  val foundGeoms = rdd.contains(q).collect()
 	  
 	  foundGeoms.size shouldBe 6
@@ -84,7 +89,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q = new WKTReader().read("POINT (53.483437 -2.2040706)")
+	  val q: SpatialObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
 	  // FIXME: problem: if we have two partitions, the compute method is executed twice
 	  // one execution per partition, hence, we will find twice the number of requested results
 	  val foundGeoms = rdd.kNN(q, 6).collect()

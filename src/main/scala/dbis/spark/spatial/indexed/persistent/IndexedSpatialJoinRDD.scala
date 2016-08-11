@@ -2,7 +2,6 @@ package dbis.spark.spatial.indexed.persistent
 
 import org.apache.spark.rdd.CoGroupedRDD
 import dbis.spark.spatial.SpatialRDD
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Partition
@@ -25,6 +24,7 @@ import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import scala.collection.mutable.ListBuffer
 import dbis.spark.spatial.SpatialGridPartitioner
 import dbis.spark.spatial.BSPartitioner
+import dbis.spark.SpatialObject
 
 
 protected[spatial] case class NarrowIndexJoinSplitDep(
@@ -51,7 +51,9 @@ protected[spatial] class JoinPartition(
   override def hashCode() = idx 
 }
 
-class IndexedSpatialJoinRDD[G <: Geometry : ClassTag, V: ClassTag, V2: ClassTag](
+
+
+class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
     @transient val right: RDD[(G,V2)]
 //    part: SpatialPartitioner

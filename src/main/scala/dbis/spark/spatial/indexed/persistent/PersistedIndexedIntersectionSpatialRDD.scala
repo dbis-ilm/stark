@@ -1,6 +1,5 @@
 package dbis.spark.spatial.indexed.persistent
 
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.spark.spatial.SpatialRDD
@@ -10,8 +9,9 @@ import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
 import dbis.spark.spatial.indexed.RTree
 import dbis.spark.spatial.indexed.RTree
+import dbis.spark.SpatialObject
 
-class PersistedIndexedIntersectionSpatialRDD[G <: Geometry : ClassTag, D: ClassTag](
+class PersistedIndexedIntersectionSpatialRDD[G <: SpatialObject : ClassTag, D: ClassTag](
     qry: G, 
     @transient private val prev: RDD[RTree[G,(G,D)]]
   ) extends RDD[(G,D)](prev) {

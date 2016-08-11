@@ -1,6 +1,5 @@
 package dbis.spark.spatial.indexed.live
 
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Partition
@@ -8,6 +7,7 @@ import dbis.spark.spatial.SpatialPartitioner
 import dbis.spark.spatial.indexed.SpatialGridPartition
 import dbis.spark.spatial.indexed.RTree
 import dbis.spark.spatial.SpatialGridPartitioner
+import dbis.spark.SpatialObject
 
 /**
  * An abstract RDD implementation that uses a live index 
@@ -15,7 +15,7 @@ import dbis.spark.spatial.SpatialGridPartitioner
  * @param _partitioner The partitioner to use for partitioning the underlying data
  * @param oneParent The original RDD 
  */
-abstract class IndexedSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+abstract class IndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     @transient private val _partitioner: SpatialPartitioner[G,V],
     @transient private val oneParent: RDD[(G,V)]
   ) extends LiveIndexedRDD[G,V](oneParent, _partitioner) {

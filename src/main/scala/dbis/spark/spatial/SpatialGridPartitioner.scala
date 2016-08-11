@@ -7,6 +7,7 @@ import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Envelope
 
 import dbis.spatial.{NPoint, NRectRange}
+import dbis.spark.SpatialObject
 
 /**
  * A grid partitioner that simply applies a grid to the data space.
@@ -20,7 +21,7 @@ import dbis.spatial.{NPoint, NRectRange}
  * @param rdd The [[org.apache.spark.RDD]] to partition
  * @param dimensions The dimensionality of the input data 
  */
-class SpatialGridPartitioner[G <: Geometry : ClassTag, V: ClassTag](
+class SpatialGridPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
     partitionsPerDimension: Int, 
     rdd: RDD[(G,V)], 
     dimensions: Int = 2) extends SpatialPartitioner(rdd) {

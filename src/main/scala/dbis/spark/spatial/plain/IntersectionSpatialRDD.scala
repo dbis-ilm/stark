@@ -1,6 +1,5 @@
 package dbis.spark.spatial.plain
 
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
@@ -10,8 +9,9 @@ import org.apache.spark.Dependency
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import dbis.spark.spatial.SpatialRDD
+import dbis.spark.SpatialObject
 
-class IntersectionSpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+class IntersectionSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     qry: G, 
     @transient private val prev: RDD[(G,V)]
   ) extends SpatialRDD(prev) {

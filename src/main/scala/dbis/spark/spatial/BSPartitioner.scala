@@ -1,6 +1,5 @@
 package dbis.spark.spatial
 
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import scala.collection.mutable.Queue
@@ -15,6 +14,7 @@ import java.nio.file.OpenOption
 import java.nio.file.StandardOpenOption
 
 import scala.collection.JavaConverters._
+import dbis.spark.SpatialObject
 
 /**
  * A cost based binary space partitioner based on the paper
@@ -25,7 +25,7 @@ import scala.collection.JavaConverters._
  * @param sideLength side length of a quadratic cell - defines granularity
  * @param maxCostPerPartition Maximum cost a partition should have - here: number of elements  
  */
-class BSPartitioner[G <: Geometry : ClassTag, V: ClassTag](
+class BSPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[(G,V)],
     sideLength: Double,
     maxCostPerPartition: Double = 1.0) extends SpatialPartitioner(rdd) {

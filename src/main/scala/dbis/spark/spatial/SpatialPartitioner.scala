@@ -5,8 +5,9 @@ import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.spatial.NRectRange
+import dbis.spark.SpatialObject
 
-abstract class SpatialPartitioner[G <: Geometry : ClassTag, V: ClassTag](
+abstract class SpatialPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends Partitioner {
   

@@ -2,13 +2,13 @@ package dbis.spark.spatial.plain
 
 import dbis.spark.spatial.SpatialRDD
 import scala.reflect.ClassTag
-import com.vividsolutions.jts.geom.Geometry
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
+import dbis.spark.SpatialObject
 
-class ContainedBySpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+class ContainedBySpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     qry: G,
     @transient private val prev: RDD[(G,V)]) extends SpatialRDD[G,V](prev) {
   

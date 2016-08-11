@@ -5,13 +5,14 @@ import com.vividsolutions.jts.index.strtree.AbstractNode
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
 import com.vividsolutions.jts.index.strtree.STRtree
+import dbis.spark.SpatialObject
 
 /**
  * A R-Tree abstraction based on VividSolution's ST R-Tree implementation
  * 
  * @param capacity The number of elements in a node
  */
-class RTree[G <: Geometry : ClassTag, D: ClassTag ](
+class RTree[G <: SpatialObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
   ) extends STRtree(capacity)  {
 

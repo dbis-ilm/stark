@@ -8,32 +8,36 @@ import org.apache.spark.TaskContext
 import org.apache.spark.Dependency
 import org.apache.spark.Partitioner
 import org.apache.spark.OneToOneDependency
+import org.apache.spark.rdd.ShuffledRDD
+import org.apache.spark.SparkContext
+
 import scala.reflect.ClassTag
-import com.vividsolutions.jts.geom.Geometry
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
+
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
+
 import dbis.spark.spatial.indexed.live.LiveIntersectionIndexedSpatialRDD
 import dbis.spark.spatial.indexed.live.IndexedSpatialRDD
-import org.apache.spark.rdd.ShuffledRDD
 import dbis.spark.spatial.plain.IntersectionSpatialRDD
 import dbis.spark.spatial.plain.KNNSpatialRDD
 import dbis.spark.spatial.indexed.persistent.PersistedIndexedIntersectionSpatialRDD
 import dbis.spark.spatial.indexed.RTree
 import dbis.spark.spatial.plain.ContainedBySpatialRDD
 import dbis.spark.spatial.plain.JoinSpatialRDD
-import org.apache.spark.SparkContext
 import dbis.spark.spatial.indexed.persistent.IndexedSpatialJoinRDD
-import java.nio.file.Files
-import java.nio.file.StandardOpenOption
-import scala.collection.JavaConverters._
-import com.vividsolutions.jts.io.WKTReader
 import dbis.spark.spatial.plain.ContainsSpatialRDD
+
+import dbis.spark.SpatialObject
+import com.vividsolutions.jts.io.WKTReader
 
 /**
  * A base class for spatial RDD without indexing
  * 
  * @param prev The parent RDD
  */
-abstract class SpatialRDD[G <: Geometry : ClassTag, V: ClassTag](
+abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     @transient private val _sc: SparkContext,
     @transient private val _deps: Seq[Dependency[_]]
   ) extends RDD[(G,V)](_sc, _deps) {
@@ -91,7 +95,7 @@ object SpatialRDD {
    * @param rdd The RDD to convert
    * @return Returns a SpatialRDDFunctions object that contains spatial methods
    */
-	implicit def convertSpatialPlain[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[(G, V)]): SpatialRDDFunctions[G,V] = new SpatialRDDFunctions[G,V](rdd)
+	implicit def convertSpatialPlain[G <: SpatialObject : ClassTag, V: ClassTag](rdd: RDD[(G, V)]): SpatialRDDFunctions[G,V] = new SpatialRDDFunctions[G,V](rdd)
 	
 	/** 
 	 * Convert an RDD to a SpatialRDD which uses persisted indexing.
@@ -99,7 +103,7 @@ object SpatialRDD {
 	 * @param rdd The RDD to convert
 	 * @return Returns a IndexedSpatialRDDFunctions object that contains spatial methods that use indexing
 	 */
-	implicit def convertSpatialPersistedIndexing[G <: Geometry : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new IndexedSpatialRDDFunctions(rdd)
+	implicit def convertSpatialPersistedIndexing[G <: SpatialObject : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new IndexedSpatialRDDFunctions(rdd)
 
 	/**
 	 * Convert a string into a geometry object. The String must be a valid WKT representation
@@ -107,7 +111,7 @@ object SpatialRDD {
 	 * @param s The WKT string
 	 * @return The geometry parsed from the given textual representation
 	 */
-	implicit def stringToGeom(s: String): Geometry = new WKTReader().read(s)
+	implicit def stringToGeom(s: String): SpatialObject = new SpatialObject(new WKTReader().read(s))
 			
 }
 
@@ -120,7 +124,7 @@ object SpatialRDD {
  * 
  * @param rdd The original RDD to treat as a spatial RDD
  */
-class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
+class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends Serializable {
   
@@ -184,7 +188,7 @@ class SpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
 // LIVE INDEXING
 //---------------------------------------------------------------------------------------
 
-class LiveIndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
+class LiveIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     partitioner: SpatialPartitioner[G,V], 
     rdd: RDD[(G,V)]
   ) extends Serializable {
@@ -199,7 +203,7 @@ class LiveIndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
 // PERSITED INDEX
 //---------------------------------------------------------------------------------------
 
-class IndexedSpatialRDDFunctions[G <: Geometry : ClassTag, V: ClassTag](
+class IndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) {
   
   def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)

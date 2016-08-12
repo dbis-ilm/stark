@@ -62,7 +62,7 @@ abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param qry The Geometry that should contains elements of this RDD
    * @return Returns an RDD containing the elements of this RDD that are completely contained by qry
    */
-  def containedBy(qry: G): ContainedBySpatialRDD[G,V] = new ContainedBySpatialRDD(qry, this)
+  def containedby(qry: G): ContainedBySpatialRDD[G,V] = new ContainedBySpatialRDD(qry, this)
   
   /**
    * Find all elements that contain the given geometry. 
@@ -131,7 +131,7 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
   
   def intersect(qry: G): RDD[(G,V)] = new IntersectionSpatialRDD(qry, rdd)
   
-  def containedBy(qry: G): RDD[(G,V)] = new ContainedBySpatialRDD(qry, rdd)
+  def containedby(qry: G): RDD[(G,V)] = new ContainedBySpatialRDD(qry, rdd)
   
   def contains(qry: G): RDD[(G,V)] = new ContainsSpatialRDD(qry, rdd)
   

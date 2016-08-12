@@ -66,7 +66,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "find all elements contained by a query" in { 
     val rdd = createRDD()
     
-    val foundPoints = rdd.containedBy(qry).collect()
+    val foundPoints = rdd.containedby(qry).collect()
     
     withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
   }

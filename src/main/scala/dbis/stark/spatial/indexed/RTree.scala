@@ -1,10 +1,12 @@
 package dbis.stark.spatial.indexed
 
 import scala.collection.JavaConversions._
+import scala.reflect.ClassTag
+
 import com.vividsolutions.jts.index.strtree.AbstractNode
 import com.vividsolutions.jts.geom.Geometry
-import scala.reflect.ClassTag
 import com.vividsolutions.jts.index.strtree.STRtree
+
 import dbis.stark.SpatialObject
 
 /**
@@ -34,8 +36,5 @@ class RTree[G <: SpatialObject : ClassTag, D: ClassTag ](
    */
   def query(geom: G): List[D] = 
     super.query(geom.getEnvelopeInternal).map(_.asInstanceOf[D]).toList
- 
-  def contains(geom: G): Boolean = query(geom).nonEmpty
-    
 }
 

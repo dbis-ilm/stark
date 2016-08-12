@@ -3,6 +3,7 @@ package dbis.stark
 import com.vividsolutions.jts.geom.Geometry
 
 import SpatialObject._
+import com.vividsolutions.jts.io.WKTReader
 
 /**
  * A SpatialObject represents some spatial geometry. It can also have
@@ -79,6 +80,7 @@ case class SpatialObject(private val g: GeoType, time: Option[TemporalExpression
 
 object SpatialObject {
   
+  def apply(wkt: String): SpatialObject = this(new WKTReader().read(wkt))
   def apply(g: GeoType): SpatialObject = this(g, None)
   def apply(g: GeoType, t: TemporalExpression): SpatialObject = this(g, Some(t))
   

@@ -6,8 +6,6 @@ package dbis.stark
 trait TemporalExpression extends BaseExpression[TemporalExpression] {
   
 
-  def isValidAt(t: TemporalExpression): Boolean
-  
   def intersects(t: TemporalExpression): Boolean
   
   def contains(t: TemporalExpression): Boolean
@@ -29,12 +27,5 @@ trait TemporalExpression extends BaseExpression[TemporalExpression] {
   def >(o: TemporalExpression): Boolean 
   
   def >=(o: TemporalExpression): Boolean
-  
-  
-  
-//  def ~(o: TemporalExpression): Interval
-  
-//  def ext_end(o: TemporalExpression): Interval = this ~ o
-  
   
 }

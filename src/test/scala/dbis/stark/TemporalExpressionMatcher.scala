@@ -7,32 +7,32 @@ import org.scalatest.matchers.BePropertyMatchResult
 
 trait TemporalExpressionMatchers {
 
-	class LTMatcher(expected: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	class LTMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
 		def apply(left: TemporalExpression) = BePropertyMatchResult(
-			left < expected,
-			s"not < $expected"
+			left < right,
+			s"not < $right"
 		)
 	}
 
 	
-	class GTMatcher(expected: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	class GTMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
 		def apply(left: TemporalExpression) = BePropertyMatchResult(
-			left > expected,
-			s"not > $expected"
+			left > right,
+			s"not > $right"
 		)
 	}
 	
-	class LEQMatcher(expected: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	class LEQMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
 		def apply(left: TemporalExpression) = BePropertyMatchResult(
-			left <= expected,
-			s"not <= $expected"
+			left <= right,
+			s"not <= $right"
 		)
 	}
 	
-	class GEQMatcher(expected: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	class GEQMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
 		def apply(left: TemporalExpression) = BePropertyMatchResult(
-			left >= expected,
-			s"not >= $expected"
+			left >= right,
+			s"not >= $right"
 		)
 	}
 
@@ -41,6 +41,32 @@ trait TemporalExpressionMatchers {
 	def gt(t: TemporalExpression) = new GTMatcher(t)
 	def leq(t: TemporalExpression) = new LEQMatcher(t)
 	def geq(t: TemporalExpression) = new GEQMatcher(t)
+	
+	
+	class IntersectsMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	  def apply(left: TemporalExpression) = BePropertyMatchResult(
+	    left.intersects(right),
+	    s"intersected with $right"
+	  )
+	}
+	
+	class ContainsMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	  def apply(left: TemporalExpression) = BePropertyMatchResult(
+	    left.contains(right),
+	    s"containing $right"
+	  )
+	}
+	
+	class ContainedByMatcher(right: TemporalExpression) extends BePropertyMatcher[TemporalExpression] {
+	  def apply(left: TemporalExpression) = BePropertyMatchResult(
+	    left.containedBy(right),
+	    s"contained by $right"
+	  )
+	}
+	
+	def contains(t: TemporalExpression) = new ContainsMatcher(t)
+	def containedBy(t: TemporalExpression) = new ContainedByMatcher(t)
+	def intersects(t: TemporalExpression) = new IntersectsMatcher(t)
 	
 }
 

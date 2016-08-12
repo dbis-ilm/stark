@@ -1,5 +1,11 @@
 package dbis.stark
 
+/**
+ * Represents an interval in time with a start and an optional end
+ * 
+ * @param _start The start point (inclusive)
+ * @param _end The optional end. 
+ */
 case class Interval(
     private val _start: Instant, 
     private val _end: Option[Instant]
@@ -8,27 +14,24 @@ case class Interval(
 //  require(_end.isEmpty || _start < _end.get, "Right Open Interval criteria not met! _start must be smaller than _end")
   require(_end.isEmpty || _start <= _end.get, "Start must be <= End")
   
-  def isValidAt(t: TemporalExpression): Boolean = this.intersects(t) 
+  def intersects(t: TemporalExpression): Boolean = 
+    (start <= t.start && (end.isEmpty || (end.isDefined && end.get >= t.start))) ||
+    (t.start <= start && (t.end.isEmpty || (t.end.isDefined && t.end.get >= start)))
   
-  def intersects(t: TemporalExpression): Boolean = ! (this < t || this > t)  
   
-  def contains(t: TemporalExpression): Boolean = t >= this && t <= this
+  def contains(t: TemporalExpression): Boolean = 
+    t.end.isDefined && (t.start >= start && (end.isEmpty || t.end.get <= end.get)) 
   
   def containedBy(t: TemporalExpression): Boolean = t contains this
   
   def center: Option[Instant] = end.map { end => Instant(start.value + ((end.value - start.value) / 2)) }
   
-  def length: Option[Long] = end.map { e => e.value - start.value - 1 }
+  def length: Option[Long] = end.map { e => e.value - start.value }
   
   def start = _start
   def end = _end
   
   
-  def ~(o: Interval): Interval = new Interval( 
-      Instant(Instant.min(start, o.start)), 
-      Instant(Instant.max(end, o.end) ) 
-    )
-
   override def <(o: TemporalExpression): Boolean = {
     end.isDefined && (start.value < o.start.value 
         && (o.end.isEmpty || end.get.value < o.end.get.value ))

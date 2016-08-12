@@ -111,7 +111,7 @@ object SpatialRDD {
 	 * @param s The WKT string
 	 * @return The geometry parsed from the given textual representation
 	 */
-	implicit def stringToGeom(s: String): SpatialObject = new SpatialObject(new WKTReader().read(s))
+	implicit def stringToGeom(s: String): SpatialObject = SpatialObject(new WKTReader().read(s))
 			
 }
 

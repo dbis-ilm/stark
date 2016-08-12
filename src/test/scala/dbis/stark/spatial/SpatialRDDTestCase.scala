@@ -47,7 +47,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   def createRDD(file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',') = {
     sc.textFile(file, 2)
       .map { line => line.split(sep) }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), new SpatialObject(new WKTReader().read(arr(7)))) }
+      .map { arr => (arr(0), arr(1).toInt, arr(2), SpatialObject(new WKTReader().read(arr(7)))) }
       .keyBy( _._4)
   } 
   

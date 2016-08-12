@@ -19,8 +19,6 @@ case class Instant(
   def start = this
   def end = Some(this)
   
-  def isValidAt(t: TemporalExpression): Boolean = this.intersects(t) 
-  
   def intersects(t: TemporalExpression): Boolean = ! (this < t || this > t)  
   
   def contains(t: TemporalExpression): Boolean = t >= this && t <= this

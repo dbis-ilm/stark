@@ -92,11 +92,6 @@ class InstantTest extends FlatSpec with Matchers {
     
   }
   
-  it should "be valid at its instant" in {
-    i2.isValidAt(i22) shouldBe true
-    i2.isValidAt(i1) shouldBe false
-  }
-  
   it should "intersect only with its self instant" in {
     i2.intersects(i22) shouldBe true
     i2.intersects(i0) shouldBe false

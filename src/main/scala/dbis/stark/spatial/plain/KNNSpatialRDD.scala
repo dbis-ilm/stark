@@ -14,21 +14,21 @@ import dbis.stark.SpatialObject
 class KNNSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     qry: G, k: Int, 
     private val prev: RDD[(G,V)]
-  ) extends RDD[(G,Double,V)](prev) {
+  ) extends RDD[(G,(Double, V))](prev) {
   
  /**
    * :: DeveloperApi ::
    * Implemented by subclasses to compute a given partition.
    */
   @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[(G,Double,V)] = {
+  override def compute(split: Partition, context: TaskContext): Iterator[(G,(Double,V))] = {
     firstParent[(G,V)].iterator(split, context)
       .map { case (g,v) => 
         val d = qry.distance(g)
-        (g,d,v) // compute and return distance
+        (g,(d,v)) // compute and return distance
       }
       .toList
-      .sortWith(_._2 < _._2) // on distance
+      .sortWith(_._2._1 < _._2._1) // on distance
       .take(k) // take only the fist k 
       .toIterator // remove the iterator
   }

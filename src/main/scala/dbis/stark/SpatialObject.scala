@@ -90,4 +90,12 @@ object SpatialObject {
   
   implicit def makeSpatialObject(g: GeoType): SpatialObject = SpatialObject(g)
   
+  /**
+	 * Convert a string into a geometry object. The String must be a valid WKT representation
+	 * 
+	 * @param s The WKT string
+	 * @return The geometry parsed from the given textual representation
+	 */
+	implicit def stringToGeom(s: String): SpatialObject = SpatialObject(s)
+  
 }

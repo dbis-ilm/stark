@@ -30,7 +30,7 @@ import dbis.stark.spatial.indexed.persistent.IndexedSpatialJoinRDD
 import dbis.stark.spatial.plain.ContainsSpatialRDD
 
 import dbis.stark.SpatialObject
-import com.vividsolutions.jts.io.WKTReader
+import dbis.stark.SpatialObject._
 
 /**
  * A base class for spatial RDD without indexing
@@ -62,7 +62,7 @@ abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param qry The Geometry that should contains elements of this RDD
    * @return Returns an RDD containing the elements of this RDD that are completely contained by qry
    */
-  def containedby(qry: G): ContainedBySpatialRDD[G,V] = new ContainedBySpatialRDD(qry, this)
+  def containedby(qry: G): SpatialRDD[G,V] = new ContainedBySpatialRDD(qry, this)
   
   /**
    * Find all elements that contain the given geometry. 
@@ -70,7 +70,7 @@ abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param g The geometry that must be contained by other geometries in this RDD
    * @return Returns an RDD consisting of all elements in this RDD that contain the given geometry g 
    */
-  def contains(g: G): ContainsSpatialRDD[G,V] = new ContainsSpatialRDD(g, this)
+  def contains(g: G): SpatialRDD[G,V] = new ContainsSpatialRDD(g, this)
   
   /**
    * Find the k nearest neighbors of the given geometry in this RDD
@@ -79,7 +79,16 @@ abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param k The number of nearest neighbors to find
    * @return Returns an RDD containing the k nearest neighbors of qry
    */
-  def kNN(qry: G, k: Int): KNNSpatialRDD[G,V] = new KNNSpatialRDD(qry, k, this)
+  def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
+    // compute k NN for each partition individually --> n * k results
+    val r = new KNNSpatialRDD(qry, k, this) 
+    
+    // sort all n lists and sort by distance, then take only the first k elements
+    val arr = r.sortBy(_._2._1, ascending = true).take(k)  
+    
+    // return as an RDD
+    this.sparkContext.parallelize(arr, this.getNumPartitions)
+  }
   
 }
 
@@ -105,14 +114,6 @@ object SpatialRDD {
 	 */
 	implicit def convertSpatialPersistedIndexing[G <: SpatialObject : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new IndexedSpatialRDDFunctions(rdd)
 
-	/**
-	 * Convert a string into a geometry object. The String must be a valid WKT representation
-	 * 
-	 * @param s The WKT string
-	 * @return The geometry parsed from the given textual representation
-	 */
-	implicit def stringToGeom(s: String): SpatialObject = SpatialObject(new WKTReader().read(s))
-			
 }
 
 //---------------------------------------------------------------------------------------
@@ -129,13 +130,22 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
   ) extends Serializable {
   
   
-  def intersect(qry: G): RDD[(G,V)] = new IntersectionSpatialRDD(qry, rdd)
+  def intersect(qry: G): SpatialRDD[G,V] = new IntersectionSpatialRDD(qry, rdd)
   
-  def containedby(qry: G): RDD[(G,V)] = new ContainedBySpatialRDD(qry, rdd)
+  def containedby(qry: G): SpatialRDD[G,V] = new ContainedBySpatialRDD(qry, rdd)
   
-  def contains(qry: G): RDD[(G,V)] = new ContainsSpatialRDD(qry, rdd)
+  def contains(qry: G): SpatialRDD[G,V] = new ContainsSpatialRDD(qry, rdd)
   
-  def kNN(qry: G, k: Int): RDD[(G,Double,V)] = new KNNSpatialRDD(qry, k, rdd)
+  def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
+    // compute k NN for each partition individually --> n * k results
+    val r = new KNNSpatialRDD(qry, k, rdd) 
+    
+    // sort all n lists and sort by distance, then take only the first k elements
+    val arr = r.sortBy(_._2._1, ascending = true).take(k)  
+    
+    // return as an RDD
+    rdd.sparkContext.parallelize(arr, rdd.getNumPartitions)
+  }
   
   // LIVE
   def liveIndex(ppD: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(new SpatialGridPartitioner(ppD, rdd))

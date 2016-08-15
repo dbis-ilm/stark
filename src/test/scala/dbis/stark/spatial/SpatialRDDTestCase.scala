@@ -84,18 +84,16 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
   }
   
-  ignore should "find the correct nearest neighbors" in { 
+  it should "find the correct nearest neighbors" in { 
     val rdd = createRDD()
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q: SpatialObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
-	  // FIXME: problem: if we have two partitions, the compute method is executed twice
-	  // one execution per partition, hence, we will find twice the number of requested results
+	  val q: SpatialObject = "POINT (53.483437 -2.2040706)"
 	  val foundGeoms = rdd.kNN(q, 6).collect()
 	  
 	  foundGeoms.size shouldBe 6
-	  foundGeoms.foreach{ case (g,_,_) => g shouldBe q}
+	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
     
   } 
   

@@ -3,6 +3,7 @@ package dbis.stark.spatial.indexed.live
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Partition
+
 import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.indexed.SpatialGridPartition
 import dbis.stark.spatial.indexed.RTree
@@ -44,7 +45,9 @@ abstract class IndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param qry The query geometry to intersect with the elements in this RDD
    * @return Returns an RDD that contains all elements that intersect with the given query geometry 
    */
-  def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIntersectionIndexedSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner[G,V]], this)
+  def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIndexedIntersectionSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner[G,V]], this)
+  
+  def contains(qry: G) = new LiveIndexedContainsSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner[G,V]], this)
   
 //  def kNN(qry: T, k: Int): KNNIndexedSpatialRDD[T] = new KNNIndexedSpatialRDD(qry, k, this)
 }

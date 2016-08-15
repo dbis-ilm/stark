@@ -18,16 +18,22 @@ import scala.collection.JavaConverters._
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
-import dbis.stark.spatial.indexed.live.LiveIntersectionIndexedSpatialRDD
-import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
 import dbis.stark.spatial.plain.IntersectionSpatialRDD
-import dbis.stark.spatial.plain.KNNSpatialRDD
-import dbis.stark.spatial.indexed.persistent.PersistedIndexedIntersectionSpatialRDD
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.plain.ContainsSpatialRDD
 import dbis.stark.spatial.plain.ContainedBySpatialRDD
 import dbis.stark.spatial.plain.JoinSpatialRDD
+import dbis.stark.spatial.plain.KNNSpatialRDD
+
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.live.LiveIndexedIntersectionSpatialRDD
+import dbis.stark.spatial.indexed.live.LiveIndexedContainsSpatialRDD
+import dbis.stark.spatial.indexed.live.LiveIndexedContainedbySpatialRDD
+import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
+
+import dbis.stark.spatial.indexed.persistent.PersistedIndexedIntersectionSpatialRDD
+import dbis.stark.spatial.indexed.persistent.PersistedIndexedContainsSpatialRDD
+import dbis.stark.spatial.indexed.persistent.PersistedIndexedContainedbySpatialRDD
 import dbis.stark.spatial.indexed.persistent.IndexedSpatialJoinRDD
-import dbis.stark.spatial.plain.ContainsSpatialRDD
 
 import dbis.stark.SpatialObject
 import dbis.stark.SpatialObject._
@@ -204,7 +210,12 @@ class LiveIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag]
   ) extends Serializable {
   
 
-  def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIntersectionIndexedSpatialRDD(qry, partitioner, rdd)
+  def intersect(qry: G): IndexedSpatialRDD[G,V] = new LiveIndexedIntersectionSpatialRDD(qry, partitioner, rdd)
+  
+  def contains(qry: G) = new LiveIndexedContainsSpatialRDD(qry, partitioner, rdd)
+  
+  def containedby(qry: G) = new LiveIndexedContainedbySpatialRDD(qry, partitioner, rdd)
+  
   
 //  def kNN(qry: G, k: Int): RDD[(G,V)] = new KNNSpatialRDD(qry, k, rdd)
 }
@@ -215,6 +226,10 @@ class LiveIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag]
 
 class IndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) {
+  
+  def contains(qry: G) = new PersistedIndexedContainsSpatialRDD(qry, rdd)
+  
+  def containedby(qry: G) = new PersistedIndexedContainedbySpatialRDD(qry, rdd)
   
   def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)
   

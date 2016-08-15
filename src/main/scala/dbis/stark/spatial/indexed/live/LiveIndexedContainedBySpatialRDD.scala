@@ -1,26 +1,22 @@
 package dbis.stark.spatial.indexed.live
 
 import scala.reflect.ClassTag
+
+import org.apache.spark.rdd.RDD
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.RDD
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
+
+import dbis.stark.SpatialObject
+import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.SpatialGridPartition
 import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.Utils
-import dbis.stark.SpatialObject
 
-/**
- * An RDD representing a spatial intersection using an internal R-Tree,
- * that is filled on the fly.
- * 
- * @param qry The query geometry
- * @param prev The parent RDD 
- */
-class LiveIntersectionIndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
-    qry: G, 
+class LiveIndexedContainedbySpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+    qry: G,
     @transient private val _partitioner: SpatialPartitioner[G,V], 
     @transient private val prev: RDD[(G,V)]
   ) extends IndexedSpatialRDD(_partitioner, prev) {
@@ -72,7 +68,7 @@ class LiveIntersectionIndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassT
      * for all result elements we need to check if they
      * really intersect with the actual geometry
      */
-    val res = result.filter{ case (g,v) => qry.intersects(g) }
+    val res = result.filter{ case (g,v) => g.containedBy(qry) }
     
     res.iterator
   }

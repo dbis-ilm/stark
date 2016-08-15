@@ -16,7 +16,7 @@ class PersistedIndexedIntersectionSpatialRDD[G <: SpatialObject : ClassTag, D: C
     @transient private val prev: RDD[RTree[G,(G,D)]]
   ) extends RDD[(G,D)](prev) {
   
-  type Index = RTree[G,(G,D)]
+  private type Index = RTree[G,(G,D)]
   
   @DeveloperApi
   def compute(split: Partition, context: TaskContext): Iterator[(G,D)] = 

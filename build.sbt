@@ -14,3 +14,7 @@ libraryDependencies ++= Seq(
 )
 
 parallelExecution in Test := false
+
+assemblyJarName in assembly := "spatialspark.jar"
+
+assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)

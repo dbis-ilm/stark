@@ -227,4 +227,16 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe false }
   }  
+  
+//########################################################################################
+  
+  it should "have the correct x y coordinates from WKT" in {
+    
+    val wkt = "POINT(10 20)"
+    val so = SpatialObject(wkt)
+    
+    so.getGeo.getCentroid.getX shouldBe 10
+    so.getGeo.getCentroid.getY shouldBe 20
+    
+  }
 }

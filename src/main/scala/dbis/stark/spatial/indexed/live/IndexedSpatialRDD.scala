@@ -49,5 +49,5 @@ abstract class IndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
   
   def contains(qry: G) = new LiveIndexedContainsSpatialRDD(qry, partitioner.get.asInstanceOf[SpatialPartitioner[G,V]], this)
   
-//  def kNN(qry: T, k: Int): KNNIndexedSpatialRDD[T] = new KNNIndexedSpatialRDD(qry, k, this)
+  def kNN(qry: G, k: Int): IndexedSpatialRDD[G,V] = ??? //new KNNIndexedSpatialRDD(qry, k, this)
 }

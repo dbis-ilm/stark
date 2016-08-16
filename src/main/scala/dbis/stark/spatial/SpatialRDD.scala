@@ -37,6 +37,7 @@ import dbis.stark.spatial.indexed.persistent.IndexedSpatialJoinRDD
 
 import dbis.stark.SpatialObject
 import dbis.stark.SpatialObject._
+import dbis.spatial.NPoint
 
 /**
  * A base class for spatial RDD without indexing
@@ -160,15 +161,16 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
   
   def indexFixedGrid(ppD: Int) = makeIdx(grid(ppD))
   
-  def index(cost: Double, cellSize: Double) = 
-    makeIdx(new ShuffledRDD[G,V,V](rdd, new BSPartitioner(rdd, cellSize, cost)))
+  def index(cost: Double, cellSize: Double) = {
+    val bsp = new BSPartitioner(rdd, cellSize, cost)
+    makeIdx(new ShuffledRDD[G,V,V](rdd, bsp))
+  }
 //    makeIdx(new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(5, rdd)))
   
   /**
    * Index the given RDD on its geometry component using an R-Tree
    */
   private def makeIdx(rdd: RDD[(G,V)], treeCapacity: Int = 10) = rdd.mapPartitions( iter => { 
-  
       val tree = new RTree[G,(G,V)](treeCapacity)
       
       for((g,v) <- iter) {
@@ -234,6 +236,8 @@ class IndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
   def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)
   
   def join[V2: ClassTag](other: RDD[(G,V2)]) = new IndexedSpatialJoinRDD(rdd, other)
+  
+  def kNN(qry: G, k: Int): IndexedSpatialRDD[G,V] = ???
   
 }
 

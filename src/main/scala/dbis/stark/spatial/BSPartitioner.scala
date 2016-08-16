@@ -1,19 +1,14 @@
 package dbis.stark.spatial
 
 import scala.reflect.ClassTag
-import org.apache.spark.rdd.RDD
-import scala.collection.mutable.Queue
-import scala.collection.mutable.ListBuffer
-import etm.core.monitor.EtmMonitor
-import dbis.spatial.{NPoint,NRectRange}
-import dbis.spatial.partitioner.BSP
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.io.File
-import java.nio.file.OpenOption
-import java.nio.file.StandardOpenOption
+import scala.collection.mutable.Map
 
 import scala.collection.JavaConverters._
+
+import org.apache.spark.rdd.RDD
+
+import dbis.spatial.{NPoint,NRectRange}
+import dbis.spatial.partitioner.BSP
 import dbis.stark.SpatialObject
 
 /**
@@ -27,11 +22,14 @@ import dbis.stark.SpatialObject
  */
 class BSPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[(G,V)],
-    sideLength: Double,
-    maxCostPerPartition: Double = 1.0) extends SpatialPartitioner(rdd) {
+    _sideLength: Double,
+    _maxCostPerPartition: Double = 1.0) extends SpatialPartitioner(rdd) {
   
+  lazy val maxCostPerPartition = _maxCostPerPartition
+  lazy val sideLength = _sideLength
   
-  protected[spatial] val numXCells = Math.ceil((maxX - minX) / sideLength).toInt
+  protected[spatial] val numXCells = Math.ceil((maxX - minX) / _sideLength).toInt
+  protected[spatial] val numYCells = Math.ceil((maxY - minY) / _sideLength).toInt
   
   /**
    * Compute the bounds of a cell with the given ID
@@ -42,11 +40,11 @@ class BSPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
     val dy = id / numXCells
     val dx = id % numXCells
     
-    val llx = dx * sideLength + minX
-    val lly = dy * sideLength + minY
+    val llx = dx * _sideLength + minX
+    val lly = dy * _sideLength + minY
     
-    val urx = llx + sideLength
-    val ury = lly + sideLength
+    val urx = llx + _sideLength
+    val ury = lly + _sideLength
       
     NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
   }
@@ -57,47 +55,62 @@ class BSPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simply aggregate by cell
    */
-  protected[spatial] val cells = rdd.map { case (g,v) =>  
-  
+  protected[spatial] val cells: Array[(NRectRange, Int)] = {
+    
+    val themap = Map.empty[NRectRange, Int]
+    (0 until numXCells * numYCells).map { i => 
+      val cell = getCellBounds(i)
+      
+      themap += (cell -> 0)
+    }
+    
+    rdd.map { case (g,v) =>
       val p = g.getCentroid
       
       val newX = p.getX - minX
       val newY = p.getY - minY
     
-      val x = (newX.toInt / sideLength).toInt
-      val y = (newY.toInt / sideLength).toInt
+      val x = (newX.toInt / _sideLength).toInt
+      val y = (newY.toInt / _sideLength).toInt
       
       val cellId = y * numXCells + x
       
-      (getCellBounds(cellId),1)
-    }.reduceByKey(_+_).collect()
+      (cellId,1)
+    }
+    .reduceByKey(_ + _)
+    .collect
+    .map { case (id, cnt) => (getCellBounds(id), cnt) }
+    .foreach { case (cell, cnt) => themap(cell) += cnt }
+    
+    themap.toArray
+  }
 
   
   protected[spatial] val bsp = new BSP(
       NPoint(minX, minY), 
       NPoint(maxX, maxY), 
       cells, 
-      sideLength, 
-      maxCostPerPartition)  
+      _sideLength, 
+      _maxCostPerPartition)  
     
   override def partitionBounds(idx: Int): NRectRange = bsp.partitions(idx)  
   
-//  def printPartitions(fName: String) {
-//    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
-//    Files.write(new File(fName).toPath(), list, StandardOpenOption.CREATE, StandardOpenOption.WRITE) 
-//      
-//  } 
-//    
-//  def printHistogram(fName: String) {
-//    
-//    println(s"num in hist: ${cells.map(_._2).sum}")
-//    
-//    
-//    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
-//    Files.write(new File(fName).toPath(), list, StandardOpenOption.CREATE, StandardOpenOption.WRITE) 
-//      
-//  }   
+  def printPartitions(fName: String) {
+    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
+    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+      
+  } 
     
+  def printHistogram(fName: String) {
+    
+    println(s"num in hist: ${cells.map(_._2).sum}")
+    
+    
+    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
+    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+      
+  } 
+  
   override def numPartitions: Int = bsp.partitions.size
   
   override def getPartition(key: Any): Int = {
@@ -117,7 +130,7 @@ class BSPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
       case None => 
         println(bsp.partitions.mkString("\n"))
         println(bsp.partitionStats)
-        throw new IllegalStateException("didum")
+        throw new IllegalStateException(s"$g is not in any partition!")
       case Some(part) =>  
         part.id
       

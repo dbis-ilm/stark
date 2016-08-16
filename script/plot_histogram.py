@@ -23,7 +23,7 @@ def plot(file):
     show()
 
 def print_msg(exit_code):
-    print 'plot_histogram.py -i <clustering file>'
+    print('plot_histogram.py -i <clustering file>')
     sys.exit(exit_code)
 
 if __name__ == "__main__":

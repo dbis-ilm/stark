@@ -44,16 +44,10 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
       sc.stop()
   }
   
-  def createRDD(file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',') = {
-    sc.textFile(file, 2)
-      .map { line => line.split(sep) }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), SpatialObject(new WKTReader().read(arr(7)))) }
-      .keyBy( _._4)
-  } 
   
   "A PLAIN SpatialRDD" should "find the correct intersection result for points" in { 
     
-    val rdd = createRDD()
+    val rdd = Helper.createRDD(sc)
     
     val foundPoints = rdd.intersect(qry).collect()
     
@@ -64,7 +58,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   it should "find all elements contained by a query" in { 
-    val rdd = createRDD()
+    val rdd = Helper.createRDD(sc)
     
     val foundPoints = rdd.containedby(qry).collect()
     
@@ -72,7 +66,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   it should "find all elements that contain a given point" in { 
-	  val rdd = createRDD()
+	  val rdd = Helper.createRDD(sc)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -85,7 +79,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   it should "find the correct nearest neighbors" in { 
-    val rdd = createRDD()
+    val rdd = Helper.createRDD(sc)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -97,6 +91,20 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
   } 
   
+  
+  it should "cluster correctly" in {
+    val rdd = Helper.createRDD(sc)
+    
+    val start = System.currentTimeMillis()
+    val res = rdd.cluster(5, 0.2)
+    val end1 = System.currentTimeMillis()
+    res.count()
+    val end2 = System.currentTimeMillis()
+    
+    println(s"clustering finished in ${end1 - start}ms (excl count)")
+    println(s"clustering finished in ${end2 - start}ms (incl count)")
+    
+  }  
   
   
 }

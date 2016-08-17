@@ -37,11 +37,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   
   def createRDD(file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',') = {
-    sc.textFile(file, 2)
-      .map { line => line.split(sep) }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), SpatialObject(arr(7))) }
-      .keyBy( _._4)
-      .index(cost = 10, cellSize = 1)
+    Helper.createRDD(sc).index(cost = 10, cellSize = 1)
   } 
   
   "An INDEXED SpatialRDD" should "find the correct intersection result for points" in { 

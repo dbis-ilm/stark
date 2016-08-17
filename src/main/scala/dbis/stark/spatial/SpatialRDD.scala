@@ -38,6 +38,9 @@ import dbis.stark.spatial.indexed.persistent.IndexedSpatialJoinRDD
 import dbis.stark.SpatialObject
 import dbis.stark.SpatialObject._
 import dbis.spatial.NPoint
+import dbis.dbscan.DBScan
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.mllib.linalg.Vectors
 
 /**
  * A base class for spatial RDD without indexing
@@ -151,7 +154,7 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     val arr = r.sortBy(_._2._1, ascending = true).take(k)  
     
     // return as an RDD
-    rdd.sparkContext.parallelize(arr, rdd.getNumPartitions)
+    rdd.sparkContext.parallelize(arr)
   }
   
   // LIVE
@@ -199,6 +202,19 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
    */
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = new JoinSpatialRDD(
       new ShuffledRDD[G,V,V](rdd, new BSPartitioner[G,V](rdd, 10, 10)) , other, pred)
+  
+  
+  def cluster(minPts: Int, epsilon: Double) = { 
+    val dbscan = new DBScan[(G,V)](epsilon, minPts)
+    val r = rdd.map{ case (g,v) => 
+      
+      val c = g.getCentroid
+      (Vectors.dense(c.getX, c.getY), (g,v))
+    }
+    val model = dbscan.run(rdd.sparkContext, r)
+    
+    model.points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
+  }
 }
 
 

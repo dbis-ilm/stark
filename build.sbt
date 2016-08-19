@@ -1,4 +1,4 @@
-name := "spatialspark"
+name := "stark"
 
 scalaVersion := "2.11.8"
 
@@ -15,6 +15,6 @@ libraryDependencies ++= Seq(
 
 parallelExecution in Test := false
 
-assemblyJarName in assembly := "spatialspark.jar"
+assemblyJarName in assembly := "stark.jar"
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)

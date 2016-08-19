@@ -2,9 +2,7 @@ name := "spatialspark"
 
 scalaVersion := "2.11.8"
 
-lazy val root = (project in file(".")) //.dependsOn(parti)
-
-//lazy val parti = project.in(file("spatialpartitioner"))
+lazy val root = (project in file(".")) 
 
 libraryDependencies ++= Seq(
    "com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),

@@ -212,11 +212,11 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param outfile An optional filename to write clustering result to
    * @return Returns an RDD which contains the corresponding cluster ID for each tuple 
    */
-  def cluster(minPts: Int, epsilon: Double, outfile: Option[String] = None) = {
+  def cluster(minPts: Int, epsilon: Double, maxPartitionCost: Int = 10, outfile: Option[String] = None) = {
     
     // create a dbscan object with given parameters
     val dbscan = new DBScan[(G,V)](epsilon, minPts)
-    dbscan.maxPartitionSize = rdd.count().toInt
+    dbscan.maxPartitionSize = maxPartitionCost
     
     // DBScan expects Vectors -> transform the geometry into a vector
     val r = rdd.map{ case (g,v) => 

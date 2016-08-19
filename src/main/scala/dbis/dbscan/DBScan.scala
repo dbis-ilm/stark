@@ -1,6 +1,5 @@
 package dbis.dbscan
 
-//import org.apache.spark.Logging
 import org.apache.spark.rdd._
 import org.apache.spark.mllib.linalg.{Vectors, Vector}
 import scala.reflect.ClassTag
@@ -56,11 +55,11 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
      *         variable
      */
     val globalMBB = getGlobalMBB(input.map { case (v, _) => v })
-    val data = input.map{ case (v, p) => new ClusterPoint[T](v, payload = Some(p))}
+    val data = input.map{ case (v, p) => new ClusterPoint(v, payload = Some(p))}
     performClustering(data, globalMBB)
   }
 
-//  def run(sc: SparkContext, input: RDD[Vector]): DBScanModel[T] = {
+//  def run(sc: SparkContext, input: RDD[Vector]): DBScanModel = {
 //    /*
 //      * step 1: determine the optimal partitioning, i.e. a list of MBBs describing the
 //      *         partitions in the n-dimensional space and send it around as broadcast
@@ -81,7 +80,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     */
   private def computePartitioning(globalMBB: MBB, input: RDD[ClusterPoint[T]]): List[MBB] = {
     val partitioner = if (maxPartitionSize > 0) {
-//      //logInfo("step 1: calculating the partitioning using the binary space partitioner")
+      //logInfo("step 1: calculating the partitioning using the binary space partitioner")
       new BSPartitioner()
         .setMBB(globalMBB)
         .setCellSize(eps * 2.0)
@@ -89,7 +88,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
         .computeHistogam(input, eps * 2.0)
     }
     else {
-//      //logInfo(s"step 1: calculating the partitioning using the grid partitioner with $ppd partitions per dimension")
+      //logInfo(s"step 1: calculating the partitioning using the grid partitioner with $ppd partitions per dimension")
       new GridPartitioner()
         .setMBB(globalMBB)
         .setPPD(ppd)
@@ -120,7 +119,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
      *         variable
      */
     // val globalMBB = getGlobalMBB(input)
-//    //logInfo(s"step 0: determining global MBB: $globalMBB")
+    //logInfo(s"step 0: determining global MBB: $globalMBB")
 
     /*
     val partitioner = new GridPartitioner().setMBB(globalMBB).setPPD(4)

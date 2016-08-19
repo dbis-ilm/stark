@@ -101,7 +101,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     
 
-    val res = rdd.cluster(minPts = 10, epsilon = 2.0, Some(f.toString()))
+    val res = rdd.cluster(minPts = 10, epsilon = 2.0, maxPartitionCost = 1000, outfile = Some(f.toString()))
     
     res.count() shouldBe rdd.count() 
     

@@ -13,7 +13,7 @@ object CellHistogram {
   implicit def clusterPointToNPoint[T: ClassTag](cp: ClusterPoint[T]) = NPoint(cp.vec.toArray)
   implicit def vectorToNPoint(v: Vector) = NPoint(v.toArray)
 
-  def zero[T: ClassTag](mbbs: List[MBB]): CellHistogram = {
+  def zero(mbbs: List[MBB]): CellHistogram = {
     val buckets = new Array[(NRectRange, Int)](mbbs.size)
     mbbs.zipWithIndex.foreach{ case (mbb, i) => buckets(i) = (NRectRange(i, mbb.minVec, mbb.maxVec), 0)}
     CellHistogram(buckets)

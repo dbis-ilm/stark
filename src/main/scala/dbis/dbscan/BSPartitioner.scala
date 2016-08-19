@@ -2,6 +2,7 @@ package dbis.dbscan
 
 import dbis.spatial.{NRectRange, NPoint}
 import dbis.spatial.partitioner.BSP
+import org.apache.log4j.Logger
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
@@ -9,7 +10,7 @@ import scala.reflect.ClassTag
 /**
   * Created by kai on 10.02.16.
   */
-class BSPartitioner[T : ClassTag] extends Partitioner with java.io.Serializable {
+class BSPartitioner extends Partitioner with java.io.Serializable {
   var cellSize: Double = 0.0
   var mbb: MBB = MBB.zero
   var maxPoints: Int = 0
@@ -26,7 +27,7 @@ class BSPartitioner[T : ClassTag] extends Partitioner with java.io.Serializable 
     this
   }
 
-  def computeHistogam(input: RDD[ClusterPoint[T]], eps: Double) = {
+  def computeHistogam[T : ClassTag](input: RDD[ClusterPoint[T]], eps: Double) = {
     def diffVector(v1: Vector, v2: Vector): Vector = {
       val v = new Array[Double](Math.max(v1.size, v2.size))
       for (i <- v.indices) v(i) = v1(i) - v2(i)

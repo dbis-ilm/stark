@@ -16,6 +16,7 @@ import scala.reflect.ClassTag
 class DBScanModel[T: ClassTag] (val points: RDD[ClusterPoint[T]],
                    val mbbs: RDD[MBB],
                    private val distanceFun: (Vector, Vector) => Double) extends java.io.Serializable {
+  var nClusters = -1L
 
   /**
     * Returns the number of clusters in the clustering model. Note, that performs a distinct+count at
@@ -23,13 +24,16 @@ class DBScanModel[T: ClassTag] (val points: RDD[ClusterPoint[T]],
     *
     * @return the number of clusters
     */
-  lazy val numOfClusters: Long =
-      points
+  def numOfClusters: Long = {
+    if (nClusters == -1) {
+      nClusters = points
           .filter(_.clusterId > 0)
           .map(_.clusterId)
           .distinct()
           .count()
-  
+    }
+    nClusters
+  }
   def predict(point: Vector): Int = {
     /* TODO:
      *  1. identify the containing partitions

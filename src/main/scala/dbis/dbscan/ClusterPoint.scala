@@ -11,6 +11,7 @@ object ClusterLabel extends Enumeration {
 }
 
 import ClusterLabel._
+import scala.reflect.ClassTag
 
 /**
   * A ClusterPoint instance is a cluster point with an associated cluster identifier (an integer value),
@@ -22,7 +23,7 @@ import ClusterLabel._
   * @param payload optional data ignored for clustering but kept for the result
   * @param isMerge true if the point is a merge candidate, i.e. appears in multiple overlapping partitions
   */
-case class ClusterPoint[T](override val vec: Vector,
+case class ClusterPoint[T : ClassTag](override val vec: Vector,
 												var clusterId: Int = 0,
 												var label: ClusterLabel = Unclassified,
                         val payload: Option[T] = None,
@@ -40,5 +41,5 @@ case class ClusterPoint[T](override val vec: Vector,
   * The companion object of LabeledPoint.
   */
 object ClusterPoint {
-  def apply[T](p: ClusterPoint[T], pload: Option[T], merge: Boolean) = new ClusterPoint(p.vec, p.clusterId, p.label, payload = pload, isMerge = merge)
+  def apply[T : ClassTag](p: ClusterPoint[T], pload: Option[T], merge: Boolean) = new ClusterPoint(p.vec, p.clusterId, p.label, payload = pload, isMerge = merge)
 }

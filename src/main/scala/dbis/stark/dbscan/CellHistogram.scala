@@ -1,4 +1,4 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import dbis.spatial.{NPoint, NRectRange}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}

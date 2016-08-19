@@ -1,7 +1,8 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
+
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.spark.mllib.linalg.Vectors

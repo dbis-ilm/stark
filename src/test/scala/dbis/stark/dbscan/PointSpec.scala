@@ -1,7 +1,8 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
-import org.scalatest.{Matchers, FlatSpec}
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
+import org.apache.spark.mllib.linalg.Vectors
 
 class PointSpec extends FlatSpec with Matchers {
 	"Point" should "be created from a vector" in {

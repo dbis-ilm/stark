@@ -1,4 +1,4 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import dbis.spatial.{NRectRange, NPoint}
 import dbis.spatial.partitioner.BSP

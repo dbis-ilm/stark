@@ -1,7 +1,9 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
 import org.apache.spark.mllib.linalg.{Vectors, Vector}
+
 
 class LocalDBScanSpec extends FlatSpec with Matchers {
   def euclideanDistance(v1: Vector, v2: Vector): Double = {

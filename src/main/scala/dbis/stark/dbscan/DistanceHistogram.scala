@@ -1,4 +1,4 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import org.apache.log4j.Logger
 import org.apache.spark.mllib.linalg.{Vector, Vectors}

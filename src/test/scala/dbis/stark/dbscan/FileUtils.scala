@@ -1,4 +1,4 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import java.io.File
 

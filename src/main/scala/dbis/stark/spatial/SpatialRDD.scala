@@ -10,6 +10,8 @@ import org.apache.spark.Partitioner
 import org.apache.spark.OneToOneDependency
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.SparkContext
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.mllib.linalg.Vectors
 
 import scala.reflect.ClassTag
 import scala.collection.JavaConversions._
@@ -37,10 +39,7 @@ import dbis.stark.spatial.indexed.persistent.IndexedSpatialJoinRDD
 
 import dbis.stark.SpatialObject
 import dbis.stark.SpatialObject._
-import dbis.spatial.NPoint
-import dbis.dbscan.DBScan
-import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.linalg.Vectors
+import dbis.stark.dbscan.DBScan
 
 /**
  * A base class for spatial RDD without indexing

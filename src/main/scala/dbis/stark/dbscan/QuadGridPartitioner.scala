@@ -1,4 +1,4 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import org.apache.spark.mllib.linalg.Vectors
 import scala.collection.mutable.ListBuffer

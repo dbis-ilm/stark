@@ -1,4 +1,4 @@
-package dbis.dbscan
+package dbis.stark.dbscan
 
 import org.apache.spark.rdd._
 import org.apache.spark.mllib.linalg.{Vectors, Vector}

@@ -1,6 +1,6 @@
 package dbis.stark.dbscan
 
-import dbis.spatial.{NPoint, NRectRange}
+import dbis.stark.spatial.{NPoint, NRectRange}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import scala.reflect.ClassTag
 

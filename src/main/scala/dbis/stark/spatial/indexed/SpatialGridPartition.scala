@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed
 
 import scala.reflect.ClassTag
-import dbis.spatial.NRectRange
+import dbis.stark.spatial.NRectRange
 import dbis.stark.SpatialObject
 
 class SpatialGridPartition[G <: SpatialObject : ClassTag,  D: ClassTag](

@@ -6,7 +6,6 @@ import scala.reflect.ClassTag
 import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Envelope
 
-import dbis.spatial.{NPoint, NRectRange}
 import dbis.stark.SpatialObject
 
 /**

@@ -9,7 +9,6 @@ import org.apache.spark.SparkConf
 
 import dbis.stark.SpatialObject
 import dbis.stark.spatial.SpatialRDD._
-import dbis.spatial.NPoint
 
 class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   import SpatialRDDTestCase._

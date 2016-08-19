@@ -1,7 +1,6 @@
 package dbis.stark.spatial
 
 import org.apache.spark.Partition
-import dbis.spatial.NRectRange
 
 class SpatialPartition(
     private val partitionId: Int, 

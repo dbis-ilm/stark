@@ -12,9 +12,6 @@ import scala.collection.mutable.Map
 
 import com.vividsolutions.jts.io.WKTReader
 
-import dbis.spatial.NPoint
-import dbis.spatial.NRectRange
-
 
 import dbis.stark.SpatialObject
 import org.apache.spark.rdd.ShuffledRDD

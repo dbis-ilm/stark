@@ -1,7 +1,7 @@
 package dbis.stark.dbscan
 
-import dbis.spatial.{NRectRange, NPoint}
-import dbis.spatial.partitioner.BSP
+import dbis.stark.spatial.{NRectRange, NPoint}
+import dbis.stark.spatial.partitioner.BSP
 import org.apache.log4j.Logger
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD

@@ -1,7 +1,6 @@
 package dbis.stark.spatial
 
 import com.vividsolutions.jts.io.WKTReader
-import dbis.spatial.NRectRange
 import com.vividsolutions.jts.geom.Envelope
 
 object Utils {

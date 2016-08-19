@@ -7,8 +7,7 @@ import scala.collection.JavaConverters._
 
 import org.apache.spark.rdd.RDD
 
-import dbis.spatial.{NPoint,NRectRange}
-import dbis.spatial.partitioner.BSP
+import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.SpatialObject
 
 /**

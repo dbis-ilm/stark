@@ -5,6 +5,7 @@ import org.apache.spark.mllib.random.RandomRDDs
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
+import dbis.stark.TestUtils
 
 class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   var sc: SparkContext = _
@@ -47,8 +48,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   "SparkDBScan" should "find a clustering with grid partitioning" in {
-    FileUtils.rmrf("grid-results")
-    FileUtils.rmrf("grid-mbbs")
+    TestUtils.rmrf("grid-results")
+    TestUtils.rmrf("grid-mbbs")
 
     val dbscan = new DBScan[List[String]]().setEpsilon(0.3).setMinPts(10).setPPD(4)
     val data = sc.textFile("src/test/resources/labeled_data.csv")
@@ -73,8 +74,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   it should "find a clustering with binary space partitioning" in {
-    FileUtils.rmrf("bsp-results")
-    FileUtils.rmrf("bsp-mbbs")
+    TestUtils.rmrf("bsp-results")
+    TestUtils.rmrf("bsp-mbbs")
 
     val dbscan = new DBScan[List[String]]().setEpsilon(0.3).setMinPts(10).setMaxPartitionSize(100)
     val data = sc.textFile("src/test/resources/labeled_data.csv")

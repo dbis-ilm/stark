@@ -9,6 +9,7 @@ import org.apache.spark.SparkConf
 
 import dbis.stark.SpatialObject
 import dbis.stark.spatial.SpatialRDD._
+import dbis.stark.TestUtils
 
 class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   import SpatialRDDTestCase._
@@ -36,7 +37,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   
   def createRDD(file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',') = {
-    Helper.createRDD(sc).index(cost = 10, cellSize = 1)
+    TestUtils.createRDD(sc).index(cost = 10, cellSize = 1)
   } 
   
   "An INDEXED SpatialRDD" should "find the correct intersection result for points" in { 

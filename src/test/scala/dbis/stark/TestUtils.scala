@@ -1,9 +1,10 @@
-package dbis.stark.dbscan
+package dbis.stark
 
 import java.io.File
+import org.apache.spark.SparkContext
 
 
-object FileUtils {
+object TestUtils {
 
   case class FileOperationError(msg: String) extends RuntimeException(msg)
 
@@ -23,4 +24,11 @@ object FileUtils {
     if (!file.delete) throw FileOperationError(s"Deleting $file failed!")
 
   def mkdir(path: String): Unit = (new File(path)).mkdirs
+  
+  def createRDD(sc: SparkContext, file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',', numParts: Int = 1) = {
+    sc.textFile(file,numParts)
+      .map { line => line.split(sep) }
+      .map { arr => (arr(0), arr(1).toInt, arr(2), SpatialObject(arr(7))) }
+      .keyBy( _._4)
+  } 
 }

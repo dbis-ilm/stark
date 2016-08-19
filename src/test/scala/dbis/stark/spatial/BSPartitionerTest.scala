@@ -15,6 +15,7 @@ import com.vividsolutions.jts.io.WKTReader
 
 import dbis.stark.SpatialObject
 import org.apache.spark.rdd.ShuffledRDD
+import dbis.stark.TestUtils
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
@@ -50,7 +51,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "have the correct min/max in real world scenario" in {
     
-    val rdd = Helper.createRDD(sc)
+    val rdd = TestUtils.createRDD(sc)
     
     val parti = new BSPartitioner(rdd,1, 10)
     
@@ -63,7 +64,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "have the correct number of x cells in reald world scenario with length = 1" in {
     
-    val rdd = Helper.createRDD(sc)
+    val rdd = TestUtils.createRDD(sc)
     
     val parti = new BSPartitioner(rdd,1, 10)
     
@@ -134,7 +135,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return all points for one partition" in {
     
-    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = Helper.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 1000) 
@@ -147,7 +148,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return all points for two partitions" in {
     
-    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = Helper.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 500) 
@@ -163,7 +164,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return only one partition if max cost equals input size" in {
     
-    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = Helper.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 1, _maxCostPerPartition = 1000) 

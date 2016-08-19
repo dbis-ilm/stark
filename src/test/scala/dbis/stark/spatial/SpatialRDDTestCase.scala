@@ -20,6 +20,7 @@ import java.nio.file.StandardOpenOption
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.SpatialObject
 import dbis.stark.SpatialObject._
+import dbis.stark.TestUtils
 
 object SpatialRDDTestCase {
   
@@ -47,7 +48,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   "A PLAIN SpatialRDD" should "find the correct intersection result for points" in { 
     
-    val rdd = Helper.createRDD(sc)
+    val rdd = TestUtils.createRDD(sc)
     
     val foundPoints = rdd.intersect(qry).collect()
     
@@ -58,7 +59,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   it should "find all elements contained by a query" in { 
-    val rdd = Helper.createRDD(sc)
+    val rdd = TestUtils.createRDD(sc)
     
     val foundPoints = rdd.containedby(qry).collect()
     
@@ -66,7 +67,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   it should "find all elements that contain a given point" in { 
-	  val rdd = Helper.createRDD(sc)
+	  val rdd = TestUtils.createRDD(sc)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -79,7 +80,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
   
   it should "find the correct nearest neighbors" in { 
-    val rdd = Helper.createRDD(sc)
+    val rdd = TestUtils.createRDD(sc)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -93,10 +94,10 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   
   "A clustering" should "return all points" in {
-    val rdd = Helper.createRDD(sc)
+    val rdd = TestUtils.createRDD(sc)
     
-    val f = new java.io.File("clusterresult").toPath()
-    Helper.rmrf(f) // delete output directory if existing to avoid write problems 
+    val f = new java.io.File("clusterresult")
+    TestUtils.rmrf(f) // delete output directory if existing to avoid write problems 
 
     
     

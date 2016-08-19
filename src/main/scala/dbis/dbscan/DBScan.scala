@@ -1,8 +1,6 @@
 package dbis.dbscan
 
 //import org.apache.spark.Logging
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.rdd._
 import org.apache.spark.mllib.linalg.{Vectors, Vector}
 import scala.reflect.ClassTag
@@ -51,7 +49,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
   /*                                                                                                     */
   /*-----------------------------------------------------------------------------------------------------*/
 
-  def run(sc: SparkContext, input: RDD[(Vector, T)]): DBScanModel[T] = {
+  def run(input: RDD[(Vector, T)]): DBScanModel[T] = {
     /*
      * step 1: determine the optimal partitioning, i.e. a list of MBBs describing the
      *         partitions in the n-dimensional space and send it around as broadcast
@@ -59,7 +57,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
      */
     val globalMBB = getGlobalMBB(input.map { case (v, _) => v })
     val data = input.map{ case (v, p) => new ClusterPoint[T](v, payload = Some(p))}
-    performClustering(sc, data, globalMBB)
+    performClustering(data, globalMBB)
   }
 
 //  def run(sc: SparkContext, input: RDD[Vector]): DBScanModel[T] = {
@@ -115,7 +113,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param input the input RDD consisting of Vectors (of an arbitrary number of dimensions)
     * @return a clustering model containing the objects with their cluster id as label
     */
-	private def performClustering(sc: SparkContext, input: RDD[ClusterPoint[T]], globalMBB: MBB): DBScanModel[T] = {
+	private def performClustering(input: RDD[ClusterPoint[T]], globalMBB: MBB): DBScanModel[T] = {
     /*
      * step 1: determine the optimal partitioning, i.e. a list of MBBs describing the
      *         partitions in the n-dimensional space and send it around as broadcast
@@ -134,7 +132,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
 
     // we expand all partitions by epsilon
     partitionMBBs.foreach(mbb => mbb.expand(eps))
-    val broadcastMBBs = sc.broadcast(partitionMBBs)
+    val broadcastMBBs = input.sparkContext.broadcast(partitionMBBs)
 
     /*
      * step 2: assign the points to their partition
@@ -184,7 +182,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
      */
     //logInfo("step 5: compute global mapping")
     val globalClusterMap = computeGlobalMapping(clusterPairs)
-    val broadcastMapping = sc.broadcast(globalClusterMap)
+    val broadcastMapping = input.sparkContext.broadcast(globalClusterMap)
 
     /*
      * step 6: we combine the points belonging to exactly one partition with the merged
@@ -202,7 +200,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
      * step 8: finally, we construct a clustering model
      */
     //logInfo("step 7: construct clustering model")
-    val partitionRDD = sc.parallelize(partitionMBBs)
+    val partitionRDD = input.sparkContext.parallelize(partitionMBBs)
     new DBScanModel(finalClustering, partitionRDD, distanceFun)
 	}
 

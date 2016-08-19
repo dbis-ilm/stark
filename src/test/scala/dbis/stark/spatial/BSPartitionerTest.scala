@@ -17,6 +17,7 @@ import dbis.spatial.NRectRange
 
 
 import dbis.stark.SpatialObject
+import org.apache.spark.rdd.ShuffledRDD
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
@@ -38,11 +39,6 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { case (string, id) => (new WKTReader().read(string), id) 
   }
   
-  private def createRealWorldRDD() = sc.textFile("src/test/resources/new_eventful_flat_1000.csv", 2)
-      .map { line => line.split(',') }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), SpatialObject(arr(7))) }
-      .keyBy( _._4)
-  
   "The BSP partitioner" should "find correct min/max values" in {
     
     val rdd = createRDD()    
@@ -57,7 +53,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "have the correct min/max in real world scenario" in {
     
-    val rdd = createRealWorldRDD()
+    val rdd = Helper.createRDD(sc)
     
     val parti = new BSPartitioner(rdd,1, 10)
     
@@ -70,7 +66,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "have the correct number of x cells in reald world scenario with length = 1" in {
     
-    val rdd = createRealWorldRDD()
+    val rdd = Helper.createRDD(sc)
     
     val parti = new BSPartitioner(rdd,1, 10)
     
@@ -137,4 +133,46 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 //      pId shouldBe partIds(id.toInt)
 //    }
   }
+  
+  
+  it should "return all points for one partition" in {
+    
+    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = Helper.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    
+    // with maxcost = size of RDD everything will end up in one partition
+    val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 1000) 
+    
+    val shuff = new ShuffledRDD(rdd, parti) 
+       
+    shuff.count() shouldBe rdd.count()
+    
+  }
+  
+  it should "return all points for two partitions" in {
+    
+    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = Helper.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    
+    // with maxcost = size of RDD everything will end up in one partition
+    val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 500) 
+    
+    val shuff = new ShuffledRDD(rdd, parti) 
+    // insert dummy action to make sure Shuffled RDD is evaluated
+    shuff.foreach{f => }
+    
+    shuff.count() shouldBe 1000   
+    shuff.count() shouldBe rdd.count()
+    
+  }
+  
+  it should "return only one partition if max cost equals input size" in {
+    
+    val rdd: RDD[(SpatialObject, (String, Int, String, SpatialObject))] = Helper.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    
+    // with maxcost = size of RDD everything will end up in one partition
+    val parti = new BSPartitioner(rdd, 1, _maxCostPerPartition = 1000) 
+    
+    parti.numPartitions shouldBe 1    
+    
+  }
+  
 }

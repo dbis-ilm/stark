@@ -20,21 +20,25 @@ def plot(file, partitions):
             draw_box(xmin[i], ymin[i], xmax[i], ymax[i])
 
     # load the clustered data
-    x,y = loadtxt(file, delimiter=',', unpack=True)
+    x,y,id = loadtxt(file, delimiter=',', unpack=True)
+    print(len(x))
     # build a list of cluster ids
-    #cluster_ids = list(set(id))
+    cluster_ids = list(set(id))
+
     # ... and based on it, a dictionary for mapping the cluster_ids to [0, 1, 2, ...]
-    #ids = {}
-    #for i, c in enumerate(cluster_ids):
-    #   ids[c] = i
+    ids = {}
+    for i, c in enumerate(cluster_ids):
+      ids[c] = i
+
     # map the cluster ids
-    #mapped_ids = [ids[c] for c in id]
+    mapped_ids = [ids[c] for c in id]
+
     # and draw a scatter plot
-    scatter(x,y,cmap=plt.cm.RdYlGn)
+    scatter(x,y,c=mapped_ids,cmap=plt.cm.RdYlGn)
     show()
 
 def print_msg(exit_code):
-    print 'plot_clustering.py -i <clustering file>'
+    print('plot_clustering.py -i <clustering file> [-p <mbb file>]')
     sys.exit(exit_code)
 
 if __name__ == "__main__":

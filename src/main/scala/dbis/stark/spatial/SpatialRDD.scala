@@ -204,15 +204,43 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
       new ShuffledRDD[G,V,V](rdd, new BSPartitioner[G,V](rdd, 10, 10)) , other, pred)
   
   
-  def cluster(minPts: Int, epsilon: Double) = { 
+  /**
+   * Cluster this SpatialRDD using DBSCAN
+   * 
+   * @param minPts
+   * @param epsilon
+   * @param outfile An optional filename to write clustering result to
+   * @return Returns an RDD which contains the corresponding cluster ID for each tuple 
+   */
+  def cluster(minPts: Int, epsilon: Double, outfile: Option[String] = None) = {
+    
+    // create a dbscan object with given parameters
     val dbscan = new DBScan[(G,V)](epsilon, minPts)
+    dbscan.maxPartitionSize = rdd.count().toInt
+    
+    // DBScan expects Vectors -> transform the geometry into a vector
     val r = rdd.map{ case (g,v) => 
       
+      // TODO: can we make this work for polygons as well?
       val c = g.getCentroid
-      (Vectors.dense(c.getX, c.getY), (g,v))
+      (Vectors.dense(c.getY, c.getX), (g,v))
     }
-    val model = dbscan.run(rdd.sparkContext, r)
     
+    // start the DBScan computation 
+    val model = dbscan.run(r)
+    
+    // if the outfile is defined, write the clustering result 
+    if(outfile.isDefined)
+      model.points.coalesce(1).saveAsTextFile(outfile.get)
+
+      
+    /*
+     * Finally, transform into a form that corresponds to a spatial RDD
+     * (Geo, (ClusterID, V)) - where V is the rest of the tuple, i.e. its
+     * actual content.
+     * 
+     * We do know that there is a payload
+     */
     model.points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
 }

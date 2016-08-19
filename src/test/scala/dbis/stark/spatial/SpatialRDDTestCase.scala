@@ -35,7 +35,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   private var sc: SparkContext = _
   
   override def beforeAll() {
-    val conf = new SparkConf().setMaster("local").setAppName("spatialrddtestcase")
+    val conf = new SparkConf().setMaster("local[1]").setAppName("spatialrddtestcase")
     sc = new SparkContext(conf)
   }
   
@@ -92,17 +92,28 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   } 
   
   
-  it should "cluster correctly" in {
+  "A clustering" should "return all points" in {
     val rdd = Helper.createRDD(sc)
     
-    val start = System.currentTimeMillis()
-    val res = rdd.cluster(5, 0.2)
-    val end1 = System.currentTimeMillis()
-    res.count()
-    val end2 = System.currentTimeMillis()
+    val f = new java.io.File("clusterresult").toPath()
+    Helper.rmrf(f) // delete output directory if existing to avoid write problems 
+
     
-    println(s"clustering finished in ${end1 - start}ms (excl count)")
-    println(s"clustering finished in ${end2 - start}ms (incl count)")
+    
+
+    val res = rdd.cluster(minPts = 10, epsilon = 2.0, Some(f.toString()))
+    
+    res.count() shouldBe rdd.count() 
+    
+    
+//    println(s"output size ${res.count()}")
+//    val s = res.map{ case (g,(id, v)) => (id, g) }.groupByKey.zipWithIndex.map { case ((cid,l),i) => (i, l.size) }.cache()
+//    s.foreach(println)
+    
+//    println(s"clustered points: ${s.map{ case (i,c) => c }.sum}")
+    
+    
+    
     
   }  
   

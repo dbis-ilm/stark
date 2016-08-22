@@ -27,7 +27,7 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
     this
   }
 
-  def computeHistogam[T : ClassTag](input: RDD[ClusterPoint[T]], eps: Double) = {
+  def computeHistogam[K, T : ClassTag](input: RDD[ClusterPoint[K, T]], eps: Double) = {
     def diffVector(v1: Vector, v2: Vector): Vector = {
       val v = new Array[Double](Math.max(v1.size, v2.size))
       for (i <- v.indices) v(i) = v1(i) - v2(i)

@@ -18,7 +18,7 @@ import scala.collection.mutable.ListBuffer
   * @param minPts the MinPts parameter describing the minimum number of points required
   *               to form a dense region
   */
-class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends java.io.Serializable {
+class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends java.io.Serializable {
   var ppd: Int = 0
   var maxPartitionSize: Int = 100
 
@@ -48,14 +48,14 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
   /*                                                                                                     */
   /*-----------------------------------------------------------------------------------------------------*/
 
-  def run(input: RDD[(Vector, T)]): DBScanModel[T] = {
+  def run(input: RDD[(K, Vector, T)]): DBScanModel[K,T] = {
     /*
      * step 1: determine the optimal partitioning, i.e. a list of MBBs describing the
      *         partitions in the n-dimensional space and send it around as broadcast
      *         variable
      */
-    val globalMBB = getGlobalMBB(input.map { case (v, _) => v })
-    val data = input.map{ case (v, p) => new ClusterPoint(v, payload = Some(p))}
+    val globalMBB = getGlobalMBB(input.map { case (_, v, _) => v })
+    val data = input.map{ case (id, v, p) => new ClusterPoint(id, v, payload = Some(p))}
     performClustering(data, globalMBB)
   }
 
@@ -78,7 +78,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param input the input dataset needed for sampling
     * @return the list of MBBs describing the partitions
     */
-  private def computePartitioning(globalMBB: MBB, input: RDD[ClusterPoint[T]]): List[MBB] = {
+  private def computePartitioning(globalMBB: MBB, input: RDD[ClusterPoint[K,T]]): List[MBB] = {
     val partitioner = if (maxPartitionSize > 0) {
       //logInfo("step 1: calculating the partitioning using the binary space partitioner")
       new BSPartitioner()
@@ -112,7 +112,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param input the input RDD consisting of Vectors (of an arbitrary number of dimensions)
     * @return a clustering model containing the objects with their cluster id as label
     */
-	private def performClustering(input: RDD[ClusterPoint[T]], globalMBB: MBB): DBScanModel[T] = {
+	private def performClustering(input: RDD[ClusterPoint[K,T]], globalMBB: MBB): DBScanModel[K,T] = {
     /*
      * step 1: determine the optimal partitioning, i.e. a list of MBBs describing the
      *         partitions in the n-dimensional space and send it around as broadcast
@@ -277,7 +277,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param input an RDD representing the input data
     * @return the MBB for the data set
     */
-  def getGlobalMBB(input: RDD[Vector]): MBB = input.aggregate(MBB.zero)(MBB.mbbSeq, MBB.mbbComb)
+  protected[dbscan] def getGlobalMBB(input: RDD[Vector]): MBB = input.aggregate(MBB.zero)(MBB.mbbSeq, MBB.mbbComb)
 
   /**
     * Returns the indices of the partitions (i.e. the partition number) containing the point described by vec.
@@ -286,7 +286,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param vec the point to be checked
     * @return the ids of the containing partition
     */
-  def containingPartitions(partitions: List[MBB], vec: Vector): List[Int] =
+  protected[dbscan] def containingPartitions(partitions: List[MBB], vec: Vector): List[Int] =
     // note: merge points may belong to more than one partition!
     partitions.zipWithIndex.filter{ case (mbb, id) => mbb.contains(vec)}.map{ case (m,i) => i}
 
@@ -299,7 +299,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @return an RDD of pairs of partition-id (the index of the partition in the MBB list) and
     *         the point
     */
-  def partitionInput(input: RDD[ClusterPoint[T]], partitions: List[MBB]): RDD[(Int,ClusterPoint[T])] =
+  protected[dbscan] def partitionInput(input: RDD[ClusterPoint[K,T]], partitions: List[MBB]): RDD[(Int,ClusterPoint[K,T])] =
     input.flatMap{ point =>
       val partitionList = containingPartitions(partitions, point.vec)
       require(partitionList.nonEmpty)
@@ -321,7 +321,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param points the list of points to be considered
     * @return true if p belongs to a cluster and isn't noise
     */
-  def expandCluster(p: ClusterPoint[T], clusterID: Int, points: List[ClusterPoint[T]]) : Boolean = {
+  protected[dbscan] def expandCluster(p: ClusterPoint[K,T], clusterID: Int, points: List[ClusterPoint[K,T]]) : Boolean = {
     // we consider only points within the eps distance
     var seeds = points.filter(l => distanceFun(p.vec, l.vec) < eps).toBuffer
     if (seeds.size < minPts) {
@@ -361,7 +361,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param startId the first available cluster identifier
     * @return the list of clustered points (i.e. label and clusterId are set now)
     */
-  def localDBScan(points: List[ClusterPoint[T]], startId: Int) : List[ClusterPoint[T]] = {
+  protected[dbscan] def localDBScan(points: List[ClusterPoint[K,T]], startId: Int) : List[ClusterPoint[K,T]] = {
     // prepare the next available cluster id
     var nextClusterID: Int = startId + 1
     points.foreach(p => {
@@ -386,9 +386,9 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param mbbs the list of MBBs describing the partitioning of data
     * @return an iterator on the list of tuples of partition-id, list-of-clustered-points
     */
-  def applyLocalDBScan(iter: Iterator[(Int, Iterable[(Int, ClusterPoint[T])])], mbbs: List[MBB]):
-    Iterator[(Int, Iterable[ClusterPoint[T]])] = {
-    val clusteredData = ListBuffer[(Int,Iterable[ClusterPoint[T]])]()
+  protected[dbscan] def applyLocalDBScan(iter: Iterator[(Int, Iterable[(Int, ClusterPoint[K,T])])], mbbs: List[MBB]):
+    Iterator[(Int, Iterable[ClusterPoint[K,T]])] = {
+    val clusteredData = ListBuffer[(Int,Iterable[ClusterPoint[K,T]])]()
     while (iter.hasNext) {
       val (partitionId, objIter) = iter.next()
       // determine a new starting cluster id for the partition
@@ -423,7 +423,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param entries the global mapping table
     * @return the point with the new cluster id
     */
-  def mapClusterId(point: ClusterPoint[T], entries: Map[Int, Int]) : ClusterPoint[T] = {
+  protected[dbscan] def mapClusterId(point: ClusterPoint[K,T], entries: Map[Int, Int]) : ClusterPoint[K,T] = {
     // if we can find the local cluster id in the table we take the global one,
     // otherwise there is no need to map it (i.e. the point wasn't assigned to multiple clusters
     val clusterID = if (entries.isDefinedAt(point.clusterId)) entries(point.clusterId) else point.clusterId
@@ -438,7 +438,7 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param pairs a list of pairs of cluster ids representing the same cluster
     * @return a global mapping table for cluster ids
     */
-  def computeGlobalMapping(pairs: Array[(Int, Int)]) : Map[Int, Int] = {
+  protected[dbscan] def computeGlobalMapping(pairs: Array[(Int, Int)]) : Map[Int, Int] = {
     // a helper function for generating a sequence of unique ids
     val nextId = { var i = 100000; () => { i += 1; i} }
 
@@ -469,19 +469,19 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @param iter an iterator on tuples of partition-id, list-of-points
     * @return an iterator to a list of cluster-id mappings
     */
-  def buildClusterPairs(iter: Iterator[(Vector, Iterable[ClusterPoint[T]])]) : Iterator[(Int, Int)] = {
+  protected[dbscan] def buildClusterPairs(iter: Iterator[(Vector, Iterable[ClusterPoint[K,T]])]) : Iterator[(Int, Int)] = {
     var clusterSet : Set[(Int, Int)] = Set()
-    var lastKey: Vector = Vectors.zeros(0)
+    var lastVec: Vector = Vectors.zeros(0)
     var lastCluster: Int = -1
-
+    
     while (iter.hasNext) {
       val (_, pointIter) = iter.next()
       for (p <- pointIter)  {
-        if (p.clusterId > 0 && lastKey == p.vec && lastCluster != p.clusterId) {
+        if (p.clusterId > 0 && lastVec == p.vec && lastCluster != p.clusterId) {
           clusterSet += ((lastCluster, p.clusterId))
         }
-       if (p.clusterId > 0) {
-          lastKey = p.vec
+        if (p.clusterId > 0) {
+          lastVec = p.vec
           lastCluster = p.clusterId
         }
       }
@@ -497,8 +497,8 @@ class DBScan[T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends 
     * @return an iterator to a list of unique point (contains only a single point)
     *
     */
-  def eliminateDuplicates(iter: Iterator[(Vector, Iterable[ClusterPoint[T]])]) : Iterator[ClusterPoint[T]] = {
-    val buf = ListBuffer[ClusterPoint[T]]()
+  protected[dbscan] def eliminateDuplicates(iter: Iterator[(Vector, Iterable[ClusterPoint[K,T]])]) : Iterator[ClusterPoint[K,T]] = {
+    val buf = ListBuffer[ClusterPoint[K,T]]()
     while (iter.hasNext) {
       val (_, pointIter) = iter.next()
       // let's consider only points belonging to a cluster

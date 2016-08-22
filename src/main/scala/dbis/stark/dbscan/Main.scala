@@ -70,14 +70,14 @@ object Main {
     val msg = if (numDimensions == -1) { numDimensions = 20; "all" } else numDimensions
 //    log.info(s"starting DBSCAN with eps=$eps, minPts=$minPts on $msg dimensions of file '${inputFile.toString}'")
 
-    val dbscan = new DBScan[Int]().setEpsilon(eps).setMinPts(minPts)
+    val dbscan = new DBScan[Long,Int]().setEpsilon(eps).setMinPts(minPts)
 
     if (ppd > 0) dbscan.setPPD(ppd) else dbscan.setMaxPartitionSize(maxPartitionSize)
 
     val data = sc.textFile(inputFile.toString(), 3 * sc.defaultParallelism)
         .map(line => line.split(",").slice(0, numDimensions).map(_.toDouble))
-//        .zipWithIndex
-        .map( t => (Vectors.dense(t), 1) )
+        .zipWithIndex // to create a unique key for each entry - this triggers a spark job if there is more than one partition
+        .map{ case (t, i) => (i, Vectors.dense(t), 1) }
 
     val model = dbscan.run(data)
     model.points.coalesce(1).saveAsTextFile(outputFile.toString())

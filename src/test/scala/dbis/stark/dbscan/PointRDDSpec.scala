@@ -29,15 +29,18 @@ class PointRDDSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   "Points" should "be created from RDD[Vector]" in {
-    val rdd = sc.parallelize(Array(Vectors.dense(1.0, 1.0),
-      Vectors.dense(2.0, 2.0),
-      Vectors.dense(3.0, 3.0),
-      Vectors.dense(4.0, 4.0)))
-    val res = rdd.map(p => ClusterPoint(p))
+    val rdd = sc.parallelize(Array(
+      (0, Vectors.dense(1.0, 1.0)),
+      (1, Vectors.dense(2.0, 2.0)),
+      (2, Vectors.dense(3.0, 3.0)),
+      (3, Vectors.dense(4.0, 4.0))))
+      
+    val res = rdd.map{ case (id, p) => ClusterPoint(id,p) }
+    
     res.collect() should be (Array(
-      ClusterPoint(Vectors.dense(1.0, 1.0), 0, ClusterLabel.Unclassified),
-      ClusterPoint(Vectors.dense(2.0, 2.0), 0, ClusterLabel.Unclassified),
-      ClusterPoint(Vectors.dense(3.0, 3.0), 0, ClusterLabel.Unclassified),
-      ClusterPoint(Vectors.dense(4.0, 4.0), 0, ClusterLabel.Unclassified)))
+      ClusterPoint(0,Vectors.dense(1.0, 1.0), 0, ClusterLabel.Unclassified),
+      ClusterPoint(1,Vectors.dense(2.0, 2.0), 0, ClusterLabel.Unclassified),
+      ClusterPoint(2,Vectors.dense(3.0, 3.0), 0, ClusterLabel.Unclassified),
+      ClusterPoint(3,Vectors.dense(4.0, 4.0), 0, ClusterLabel.Unclassified)))
   }
 }

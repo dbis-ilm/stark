@@ -35,7 +35,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfter {
         
         res
       }
-      .map { case (x,y) => ClusterPoint[Int](Vectors.dense(x,y), 0) }
+      .zipWithUniqueId
+      .map { case ((x,y),id) => ClusterPoint[Long, Int](id,Vectors.dense(x,y), 0) }
       
   
   "The BSPartitioner" should "create one partition if max cost equals input size" in {

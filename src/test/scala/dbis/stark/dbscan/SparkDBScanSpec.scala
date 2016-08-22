@@ -34,10 +34,10 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
       .map(line => line.split(","))
       .map(t => (Vectors.dense(t(0).toDouble, t(1).toDouble)))
 
-    val dbscan = new DBScan[Int]().setEpsilon(0.3).setMinPts(10)
+    val dbscan = new DBScan[Long,Int]().setEpsilon(0.3).setMinPts(10)
     val mbb = dbscan.getGlobalMBB(data)
 
-    val cdata = data.map(v => ClusterPoint[Int](v, payload = Some(0)))
+    val cdata = data.zipWithUniqueId().map{ case (v,id) => ClusterPoint[Long, Int](id, v, payload = Some(0))}
     val partitioner = new BSPartitioner()
       .setMBB(mbb)
       .setCellSize(0.3)
@@ -51,10 +51,11 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     TestUtils.rmrf("grid-results")
     TestUtils.rmrf("grid-mbbs")
 
-    val dbscan = new DBScan[List[String]]().setEpsilon(0.3).setMinPts(10).setPPD(4)
+    val dbscan = new DBScan[Long,List[String]]().setEpsilon(0.3).setMinPts(10).setPPD(4)
     val data = sc.textFile("src/test/resources/labeled_data.csv")
       .map(line => line.split(","))
-      .map(t => (Vectors.dense(t(0).toDouble, t(1).toDouble), List(t(2))))
+      .zipWithUniqueId()
+      .map{ case (t, id) => (id, Vectors.dense(t(0).toDouble, t(1).toDouble), List(t(2))) }
 
     val model = dbscan.run(data)
     model.points.coalesce(1).saveAsTextFile("grid-results")
@@ -77,10 +78,11 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     TestUtils.rmrf("bsp-results")
     TestUtils.rmrf("bsp-mbbs")
 
-    val dbscan = new DBScan[List[String]]().setEpsilon(0.3).setMinPts(10).setMaxPartitionSize(100)
+    val dbscan = new DBScan[Long, List[String]]().setEpsilon(0.3).setMinPts(10).setMaxPartitionSize(100)
     val data = sc.textFile("src/test/resources/labeled_data.csv")
       .map(line => line.split(","))
-      .map(t => (Vectors.dense(t(0).toDouble, t(1).toDouble), List(t(2))))
+      .zipWithUniqueId()
+      .map{ case (t,id) => (id,Vectors.dense(t(0).toDouble, t(1).toDouble), List(t(2)))}
 
     val model = dbscan.run(data)
     model.points.coalesce(1).saveAsTextFile("bsp-results")

@@ -13,7 +13,7 @@ import scala.reflect.ClassTag
   * @param mbbs the RDD with the MBBs describing the partitions
   * @param distanceFun the distance function used for clustering the points
   */
-class DBScanModel[T: ClassTag] (val points: RDD[ClusterPoint[T]],
+class DBScanModel[K,T: ClassTag] (val points: RDD[ClusterPoint[K,T]],
                    val mbbs: RDD[MBB],
                    private val distanceFun: (Vector, Vector) => Double) extends java.io.Serializable {
   var nClusters = -1L

@@ -10,7 +10,7 @@ import scala.reflect.ClassTag
 case class CellHistogram(buckets: Array[(NRectRange, Int)])
 
 object CellHistogram {
-  implicit def clusterPointToNPoint[T: ClassTag](cp: ClusterPoint[T]) = NPoint(cp.vec.toArray)
+  implicit def clusterPointToNPoint[K,T: ClassTag](cp: ClusterPoint[K,T]) = NPoint(cp.vec.toArray)
   implicit def vectorToNPoint(v: Vector) = NPoint(v.toArray)
 
   def zero(mbbs: List[MBB]): CellHistogram = {
@@ -19,7 +19,7 @@ object CellHistogram {
     CellHistogram(buckets)
   }
 
-  def seq[T: ClassTag](histo1: CellHistogram, pt: ClusterPoint[T]): CellHistogram = {
+  def seq[K,T: ClassTag](histo1: CellHistogram, pt: ClusterPoint[K,T]): CellHistogram = {
     CellHistogram(histo1.buckets.map { b => if (b._1.contains(pt)) (b._1, b._2 + 1) else b })
   }
 

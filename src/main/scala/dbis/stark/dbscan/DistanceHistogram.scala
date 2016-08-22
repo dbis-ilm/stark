@@ -24,7 +24,7 @@ object DistanceHistogram {
     * @param ignore the index of point to be ignored
     * @return the minimal distance
     */
-  def findMinDistance[T : ClassTag](p: ClusterPoint[T], pts: Iterable[(ClusterPoint[T], Int)], ignore: Int): Double = {
+  def findMinDistance[K,T : ClassTag](p: ClusterPoint[K,T], pts: Iterable[(ClusterPoint[K,T], Int)], ignore: Int): Double = {
     pts.filter(_._2 != ignore).map{ case (cp, _) => distanceFun(p.vec, cp.vec) }.min
   }
 
@@ -36,7 +36,7 @@ object DistanceHistogram {
     * @param nSamples
     * @return
     */
-  def computeDistanceHistogram[T : ClassTag](iter: Iterator[(Int, Iterable[(Int, ClusterPoint[T])])],
+  def computeDistanceHistogram[K,T : ClassTag](iter: Iterator[(Int, Iterable[(Int, ClusterPoint[K,T])])],
                                maxDist: Double, nBuckets: Int, nSamples: Int): Iterator[Histogram] = {
     // construct an array of buckets
     val bucketWidth = maxDist / nBuckets.toDouble

@@ -23,7 +23,7 @@ object NeighborhoodHistogram {
     * @param epsilon
     * @return
     */
-  def countNeighbors[T : ClassTag](p: ClusterPoint[T], pts: Iterable[ClusterPoint[T]], epsilon: Double): Double = {
+  def countNeighbors[K,T : ClassTag](p: ClusterPoint[K,T], pts: Iterable[ClusterPoint[K,T]], epsilon: Double): Double = {
     pts.count{ cp => distanceFun(p.vec, cp.vec) <= epsilon } - 1.0
   }
 
@@ -37,7 +37,7 @@ object NeighborhoodHistogram {
     * @param nSamples
     * @return
     */
-  def computeNeighborhoodHistogram[T : ClassTag](iter: Iterator[(Int, Iterable[(Int, ClusterPoint[T])])],
+  def computeNeighborhoodHistogram[K,T : ClassTag](iter: Iterator[(Int, Iterable[(Int, ClusterPoint[K,T])])],
                                    maxPartitionSize: Long, epsilon: Double, nBuckets: Int,
                                    nSamples: Int): Iterator[Histogram] = {
     // construct an array of buckets

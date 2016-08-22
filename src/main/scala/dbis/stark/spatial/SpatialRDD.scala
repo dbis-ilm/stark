@@ -211,24 +211,52 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
    * @param outfile An optional filename to write clustering result to
    * @return Returns an RDD which contains the corresponding cluster ID for each tuple 
    */
-  def cluster(minPts: Int, epsilon: Double, maxPartitionCost: Int = 10, outfile: Option[String] = None) = {
+  def cluster[KeyType](
+      minPts: Int, 
+      epsilon: Double,
+      keyExtractor: ((G,V)) => KeyType, 
+      maxPartitionCost: Int = 10, 
+      outfile: Option[String] = None
+    ) = {
     
     // create a dbscan object with given parameters
-    val dbscan = new DBScan[(G,V)](epsilon, minPts)
+    val dbscan = new DBScan[KeyType,(G,V)](epsilon, minPts)
     dbscan.maxPartitionSize = maxPartitionCost
     
     // DBScan expects Vectors -> transform the geometry into a vector
     val r = rdd.map{ case (g,v) => 
       
-      // TODO: can we make this work for polygons as well?
+      
+      /* TODO: can we make this work for polygons as well?
+       * See Generalized DBSCAN: 
+       * Sander, Ester, Krieger, Xu
+       * "Density-Based Clustering in Spatial Databases: The Algorithm GDBSCAN and Its Applications"
+       * http://link.springer.com/article/10.1023%2FA%3A1009745219419
+       */
       val c = g.getCentroid
-      (Vectors.dense(c.getY, c.getX), (g,v))
+      
+      
+      /* extract the key for the cluster points
+       * this is used to distinguish points that have the same coordinates
+       */
+      val key = keyExtractor((g,v))
+      
+      /* emit the tuple as input for the clustering
+       *  (id, coordinates, payload)
+       * The payload is the actual tuple to which we will project at the end
+       * to hide the internals of this implementation and to return data that 
+       * matches the input format and   
+       */
+      
+      (key, Vectors.dense(c.getY, c.getX), (g,v))
     }
     
     // start the DBScan computation 
     val model = dbscan.run(r)
     
-    // if the outfile is defined, write the clustering result 
+    /* if the outfile is defined, write the clustering result
+     * this can be used for debugging and visualization 
+     */
     if(outfile.isDefined)
       model.points.coalesce(1).saveAsTextFile(outfile.get)
 
@@ -238,7 +266,7 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
      * (Geo, (ClusterID, V)) - where V is the rest of the tuple, i.e. its
      * actual content.
      * 
-     * We do know that there is a payload
+     * We do know that there is a payload, hence calling .get is safe 
      */
     model.points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }

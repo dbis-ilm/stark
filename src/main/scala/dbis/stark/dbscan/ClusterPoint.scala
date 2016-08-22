@@ -38,7 +38,7 @@ case class ClusterPoint[K, T : ClassTag](
     *
     * @return the string representation
     */
-  override def toString: String = s"${vec.toArray.mkString(",")},$clusterId"
+  override def toString: String = s"$id,${vec.toArray.mkString(",")},$clusterId"
 }
 
 /**

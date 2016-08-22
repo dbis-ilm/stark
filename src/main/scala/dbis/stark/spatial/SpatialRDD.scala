@@ -40,6 +40,8 @@ import dbis.stark.spatial.indexed.persistent.IndexedSpatialJoinRDD
 import dbis.stark.SpatialObject
 import dbis.stark.SpatialObject._
 import dbis.stark.dbscan.DBScan
+import dbis.stark.dbscan.ClusterPoint
+import dbis.stark.dbscan.ClusterLabel
 
 /**
  * A base class for spatial RDD without indexing
@@ -208,13 +210,17 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
    * 
    * @param minPts
    * @param epsilon
+   * @param keyExtractor A function that extracts or generates a unique key for each point
+   * @param includeNoise A flag whether or not to include noise points in the result
+   * @param maxPartitionCost Maximum cost (= number of points) per partition
    * @param outfile An optional filename to write clustering result to
    * @return Returns an RDD which contains the corresponding cluster ID for each tuple 
    */
   def cluster[KeyType](
       minPts: Int, 
       epsilon: Double,
-      keyExtractor: ((G,V)) => KeyType, 
+      keyExtractor: ((G,V)) => KeyType,
+      includeNoise: Boolean = true, 
       maxPartitionCost: Int = 10, 
       outfile: Option[String] = None
     ) = {
@@ -266,9 +272,15 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
      * (Geo, (ClusterID, V)) - where V is the rest of the tuple, i.e. its
      * actual content.
      * 
+     * Also, remove noise if desired. 
+     * TODO: If noise has to be removed, can we use this more deeply inside 
+     * the DBSCAN code to reduce data?
+     * 
      * We do know that there is a payload, hence calling .get is safe 
      */
-    model.points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
+    val points = (if(includeNoise) model.points else model.points.filter(_.label != ClusterLabel.Noise))
+    
+    points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
 }
 

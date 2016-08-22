@@ -474,23 +474,17 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     var clusterSet : Set[(Int, Int)] = Set()
     var lastVec: Vector = Vectors.zeros(0)
     var lastCluster: Int = -1
-//    var lastId: Option[K] = None
     
     while (iter.hasNext) {
       val (_, pointIter) = iter.next()
       
-//      val sortedIter = pointIter.toList.sortBy(_.id)
-//      println("----")
       for (p <- pointIter)  {
-//      for (p <- sortedIter)  {
-//        println(s"comparing id ${p.id}")
-        if (p.clusterId > 0 && lastVec == p.vec && lastCluster != p.clusterId /*&& (lastId.isEmpty || lastId.get == p.id)*/) {
+        if (p.clusterId > 0 && lastVec == p.vec && lastCluster != p.clusterId) {
           clusterSet += ((lastCluster, p.clusterId))
         }
         if (p.clusterId > 0) {
           lastVec = p.vec
           lastCluster = p.clusterId
-//          lastId = Some(p.id)
         }
       }
     }
@@ -506,40 +500,15 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     *
     */
   protected[dbscan] def eliminateDuplicates(iter: Iterator[(Vector, Iterable[ClusterPoint[K,T]])]) : Iterator[ClusterPoint[K,T]] = {
-    val buf = ListBuffer[ClusterPoint[K,T]]()
     
     val seenIds = Set.empty[K]
     
-    while (iter.hasNext) {
-      val (_, pointIter) = iter.next()
-
-      // let's consider only points belonging to a cluster
-//      val filteredList = pointIter.filter(_.clusterId > 0)
-      // if we found a clustered point we choose the first cluster id
-      // otherwise (no clustered point found) we add the noise point to
-      // make sure we construct a complete model
-//      buf += (if (filteredList.nonEmpty) filteredList.head else pointIter.head)
-      
-      
-      /*
-       * We check for duplicate points by remembering all IDs that we have seen so far.
-       * 
-       * The problem with the code above is that it adds just one noise point and leaves out all others
-       * and that duplicates are not recognized.
-       */
-      // we could use a map, too
-      val filteredList = pointIter.filter{ p => 
+    iter.flatMap{ case (_, pointIter) => pointIter.filter{ p => 
         val res = !seenIds.contains(p.id)
         seenIds += p.id
         res
-      }
-      
-      // FIXME: Is this correct the way it is?
-      buf ++= filteredList
-
-      //      buf ++= (if (filteredList.nonEmpty) filteredList else pointIter)
+      } 
     }
-    buf.iterator
   }
 
 }

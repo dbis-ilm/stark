@@ -34,6 +34,16 @@ __my_script/
 # ignore database
 db
 
+#####
+# ignore files generated during tests
+grid-mbbs/
+grid-results/
+clusterresult/
+bsp-mbbs/
+bsp-results/
+
+
+
 # sbt specific
 .cache
 .cache-*

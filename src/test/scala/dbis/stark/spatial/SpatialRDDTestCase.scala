@@ -103,25 +103,14 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
 
     val res = rdd.cluster(
-        keyExtractor = { case (_,(id, _, _,_)) => id } , // key extractor to extract point IDs from tuple
+        keyExtractor = { case (_,(id, _, _,_)) => id } , // key extractor to extract point IDs from tuple //keyExtractor = _._2._1,
         minPts = 10, 
-        epsilon = 2.0,  
+        epsilon = 5.0,  
         maxPartitionCost = 500, 
         includeNoise = true,
         outfile = Some(f.toString()))
     
     res.count() shouldBe rdd.count() 
-    
-    
-//    println(s"output size ${res.count()}")
-//    val s = res.map{ case (g,(id, v)) => (id, g) }.groupByKey.zipWithIndex.map { case ((cid,l),i) => (i, l.size) }.cache()
-//    s.foreach(println)
-    
-//    println(s"clustered points: ${s.map{ case (i,c) => c }.sum}")
-    
-    
-    
-    
   }  
   
   

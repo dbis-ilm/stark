@@ -20,8 +20,8 @@ class JoinSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val right: RDD[(G,V2)],
     predicate: (G,G) => Boolean
 //    part: SpatialPartitioner
-  )  extends SpatialRDD[G,(V,V2)](left.context, Seq(new OneToOneDependency(left), 
-                                                              new OneToOneDependency(right))) {
+//  )  extends SpatialRDD[G,(V,V2)](left.context, Seq(new OneToOneDependency(left), new OneToOneDependency(right))) {
+    )  extends RDD[(V,V2)](left.context, Seq(new OneToOneDependency(left), new OneToOneDependency(right))) {
   
   override def getPartitions = Array.tabulate(left.getNumPartitions){ i =>  new JoinPartition(i, 
 		  new NarrowIndexJoinSplitDep(left, i, left.partitions(i)),
@@ -32,7 +32,7 @@ class JoinSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
   }
   
   @DeveloperApi
-  override def compute(s: Partition, context: TaskContext): Iterator[(G,(V,V2))] = {
+  override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[JoinPartition]
     val left  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]].toList
 
@@ -53,7 +53,8 @@ class JoinSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
       
     }
     
-    val f = map.iterator.flatMap{ case (g, l) => l.map { case (lv, rv) => (g,(lv,rv)) } }
+//    val f = map.iterator.flatMap{ case (g, l) => l.map { case (lv, rv) => (g,(lv,rv)) } }
+    val f = map.iterator.flatMap{ case (g, l) => l}
     
     new InterruptibleIterator(context, f)
   }

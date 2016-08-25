@@ -86,4 +86,16 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  
 	      
   } 
+  
+  it should "compute the correct join result" in {
+    
+    val rdd1 = createRDD()
+    val rdd2 = TestUtils.createRDD(sc)
+    
+    val res = rdd1.join(rdd2, { case (l,r) => l.getCentroid.intersects(r.getCentroid) })
+    
+//    res.count() shouldBe rdd2.count() 
+    res.count()
+  }
+  
 }

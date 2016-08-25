@@ -57,7 +57,8 @@ class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: Clas
     @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
     @transient val right: RDD[(G,V2)]
 //    part: SpatialPartitioner
-  )  extends SpatialRDD[G,(V,V2)](left.context, Nil) /*CoGroupedRDD(Seq(left, right), left.partitioner.get)*/ {
+  //)  extends SpatialRDD[G,(V,V2)](left.context, Nil) /*CoGroupedRDD(Seq(left, right), left.partitioner.get)*/ {
+    )  extends RDD[(V,V2)](left.context, Nil) {
   
   override def getDependencies: Seq[Dependency[_]] = Seq(
     new OneToOneDependency(left),
@@ -70,7 +71,7 @@ class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: Clas
       Array.tabulate(right.getNumPartitions)(j => new NarrowIndexJoinSplitDep(right, j, right.partitions(j))))
   }
   
-  override def compute(s: Partition, context: TaskContext): Iterator[(G,(V,V2))] = {
+  override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[JoinPartition]
     
     val left  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[RTree[G, (G,V)]]].toList
@@ -95,7 +96,7 @@ class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: Clas
         val res = right.flatMap{ case (rg, rv) =>
     		  idx.query(rg) // query R-Tree and get matching MBBs
         		  .filter{ case (lg, _) => lg.intersects(rg)} // check if real geom also matches
-        		  .map { case (lg, lv) => (lg,(lv, rv))  }    // key is the left geom
+        		  .map { case (lg, lv) => (lg,(lv, rv))  }    // key is the left geom to make it a spatial RDD again
         }
         
         map.insertAll(res)
@@ -104,7 +105,8 @@ class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: Clas
       iters += map.iterator
     }
 
-    val f = iters.flatten.flatMap { case (g, l) => l.map { case (lv,rv) => (g,(lv, rv)) }}
+//    val f = iters.flatten.flatMap { case (g, l) => l.map { case (lv,rv) => (g,(lv, rv)) }}
+    val f = iters.flatten.flatMap { case (g, l) => l}
     
     // return an interruptable iterator of all our produced iterators
     new InterruptibleIterator(context, f.iterator)

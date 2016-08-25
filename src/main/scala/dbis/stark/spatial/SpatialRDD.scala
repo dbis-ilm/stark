@@ -124,7 +124,7 @@ object SpatialRDD {
 	 * @return Returns a IndexedSpatialRDDFunctions object that contains spatial methods that use indexing
 	 */
 	implicit def convertSpatialPersistedIndexing[G <: SpatialObject : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new IndexedSpatialRDDFunctions(rdd)
-
+	
 }
 
 //---------------------------------------------------------------------------------------
@@ -260,12 +260,6 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     // start the DBScan computation 
     val model = dbscan.run(r)
     
-    /* if the outfile is defined, write the clustering result
-     * this can be used for debugging and visualization 
-     */
-    if(outfile.isDefined)
-      model.points.coalesce(1).saveAsTextFile(outfile.get)
-
       
     /*
      * Finally, transform into a form that corresponds to a spatial RDD
@@ -279,6 +273,12 @@ class SpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
      * We do know that there is a payload, hence calling .get is safe 
      */
     val points = (if(includeNoise) model.points else model.points.filter(_.label != ClusterLabel.Noise))
+    
+    /* if the outfile is defined, write the clustering result
+     * this can be used for debugging and visualization 
+     */
+    if(outfile.isDefined)
+      points.coalesce(1).saveAsTextFile(outfile.get)
     
     points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
@@ -318,7 +318,7 @@ class IndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
   
   def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)
   
-  def join[V2: ClassTag](other: RDD[(G,V2)]) = new IndexedSpatialJoinRDD(rdd, other)
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new IndexedSpatialJoinRDD(rdd, other)
   
   def kNN(qry: G, k: Int): IndexedSpatialRDD[G,V] = ???
   

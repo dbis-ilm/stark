@@ -14,6 +14,8 @@ libraryDependencies ++= Seq(
    "com.github.scopt" %% "scopt" % "3.5.0"
 )
 
+test in assembly := {}
+
 parallelExecution in Test := false
 
 assemblyJarName in assembly := "stark.jar"

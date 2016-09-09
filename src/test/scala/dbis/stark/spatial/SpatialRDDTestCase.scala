@@ -111,7 +111,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
         outfile = Some(f.toString()))
     
     res.count() shouldBe rdd.count() 
-  }  
+  } 
   
   
 }

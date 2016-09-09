@@ -33,7 +33,7 @@ object Predicates {
    * @return Returns <code>true</code> if the left object is completely contained by the right object, according to the definition in [[dbis.stark.SpatialObject]],
    * otherwise <code>false</code>
    */
-  def containedby[G <: SpatialObject : ClassTag, G2 <: SpatialObject : ClassTag](g1: G, g2: G2) = g2.contains(g1)
+  def containedby[G <: SpatialObject : ClassTag, G2 <: SpatialObject : ClassTag](g1: G, g2: G2) = g1.containedBy(g2)
   
   /**
    * Returns <code>true</code> if the two given objects are within a given distance, i.e.
@@ -52,5 +52,10 @@ object Predicates {
       g2: G2, 
       maxDist: Double, 
       distFunc: (G, G2) => Double) = distFunc(g1,g2) <= maxDist
+      
+  def dist[G <: SpatialObject: ClassTag, G2 <: SpatialObject : ClassTag](
+      maxDist: Double, 
+      distFunc: (G, G2) => Double)
+      (g1: G, g2:G2) = withinDistance(g1, g2, maxDist, distFunc)
   
 }

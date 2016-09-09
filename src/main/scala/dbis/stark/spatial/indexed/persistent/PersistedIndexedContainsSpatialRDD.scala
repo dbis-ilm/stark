@@ -6,18 +6,21 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.indexed.RTree
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
+import dbis.stark.spatial.Predicates
 
 class PersistedIndexedContainsSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
     qry: G,
     @transient private val prev: RDD[RTree[G,(G,V)]]
-  ) extends RDD[(G,V)](prev) {
+  ) extends RDD[RTree[G,(G,V)]](prev) {
   
   private type Index = RTree[G,(G,V)]
   
-  def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = 
-    firstParent[Index].iterator(split, context).flatMap { tree =>
-      tree.query(qry).filter{ case (g,v) => g.contains(qry)}
+  def compute(split: Partition, context: TaskContext): Iterator[RTree[G,(G,V)]] =
+    firstParent[Index].iterator(split, context).map { tree =>
+      tree.queryRO(qry, Predicates.contains _)
+      tree
     }
+    
 
   /**
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only

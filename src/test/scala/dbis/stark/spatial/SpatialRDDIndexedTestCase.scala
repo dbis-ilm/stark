@@ -10,6 +10,8 @@ import org.apache.spark.SparkConf
 import dbis.stark.SpatialObject
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.TestUtils
+import org.apache.spark.rdd.RDD
+import dbis.stark.spatial.indexed.RTree
 
 class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   import SpatialRDDTestCase._
@@ -49,7 +51,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 //    parti.printHistogram("/home/hage/histo")
 //    parti.printPartitions("/home/hage/parts")
     
-    val foundPoints = rdd.intersect(qry).collect()
+    val foundPoints = rdd.intersect(qry).flatten.collect()
     
     withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
     
@@ -60,7 +62,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   it should "find all elements contained by a query" in { 
     val rdd = createRDD()
     
-    val foundPoints = rdd.containedby(qry).collect()
+    val foundPoints = rdd.containedby(qry).flatten.collect()
     
     withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
   }
@@ -71,7 +73,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
 	  val q = SpatialObject("POINT (53.483437 -2.2040706)")
-	  val foundGeoms = rdd.contains(q).collect()
+	  val foundGeoms = rdd.contains(q).flatten.collect()
 	  
 	  foundGeoms.size shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -96,6 +98,22 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
 //    res.count() shouldBe rdd2.count() 
     res.count()
+  }
+  
+  it should "have correct types for chained executions" in  {
+    val q = SpatialObject("POINT (53.483437 -2.2040706)")
+    val rdd1 = createRDD()
+    val res = rdd1.contains(q)
+    
+    res.isInstanceOf[RDD[RTree[SpatialObject, (SpatialObject, (String, Int, String, SpatialObject))]]] shouldBe true
+    
+    val res2 = res.intersect(qry)
+    res2.isInstanceOf[RDD[RTree[SpatialObject, (SpatialObject, (String, Int, String, SpatialObject))]]] shouldBe true
+
+    val res3 = res2.join(rdd1.flatten, (g1, g2) => false)
+    
+    res3.collect().size shouldBe 0
+    
   }
   
 }

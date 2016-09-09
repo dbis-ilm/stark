@@ -17,7 +17,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: Clas
 
   def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)
 
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new IndexedSpatialJoinRDD(rdd, other)
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new IndexedSpatialJoinRDD(rdd, other, pred)
 
   def kNN(qry: G, k: Int) = {
     val r = new PersistedIndexedKNNSpatialRDD(qry, k, rdd)
@@ -30,5 +30,12 @@ class PersistedIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: Clas
   
   def withinDistance(qry: G, maxDist: Double, distFunc: (SpatialObject,SpatialObject) => Double) = 
     new PersistedIndexedWithinDistanceSpatialRDD(qry, maxDist, distFunc, rdd)
+  
+  
+  /**
+   * This gets all entries out of the index and returns
+   * a plain flat RDD
+   */
+  def flatten = rdd.mapPartitions((trees) => trees.flatMap(tree => tree.result), true)
 
 }

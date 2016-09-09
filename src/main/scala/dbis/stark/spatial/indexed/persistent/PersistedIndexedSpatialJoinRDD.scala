@@ -55,10 +55,12 @@ protected[spatial] class JoinPartition(
 
 class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
-    @transient val right: RDD[(G,V2)]
+    @transient val right: RDD[(G,V2)],
+    pred: (G,G) => Boolean
 //    part: SpatialPartitioner
   //)  extends SpatialRDD[G,(V,V2)](left.context, Nil) /*CoGroupedRDD(Seq(left, right), left.partitioner.get)*/ {
     )  extends RDD[(V,V2)](left.context, Nil) {
+  
   
   override def getDependencies: Seq[Dependency[_]] = Seq(
     new OneToOneDependency(left),
@@ -95,7 +97,7 @@ class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: Clas
   
         val res = right.flatMap{ case (rg, rv) =>
     		  idx.query(rg) // query R-Tree and get matching MBBs
-        		  .filter{ case (lg, _) => lg.intersects(rg)} // check if real geom also matches
+        		  .filter{ case (lg, _) => pred(lg, rg) } // check if real geom also matches
         		  .map { case (lg, lv) => (lg,(lv, rv))  }    // key is the left geom to make it a spatial RDD again
         }
         

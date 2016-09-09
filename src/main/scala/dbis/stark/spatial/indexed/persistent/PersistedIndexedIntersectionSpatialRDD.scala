@@ -10,18 +10,20 @@ import org.apache.spark.annotation.DeveloperApi
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.SpatialObject
+import dbis.stark.spatial.Predicates
 
 class PersistedIndexedIntersectionSpatialRDD[G <: SpatialObject : ClassTag, D: ClassTag](
     qry: G, 
     @transient private val prev: RDD[RTree[G,(G,D)]]
-  ) extends RDD[(G,D)](prev) {
+  ) extends RDD[RTree[G,(G,D)]](prev) {
   
   private type Index = RTree[G,(G,D)]
   
   @DeveloperApi
-  def compute(split: Partition, context: TaskContext): Iterator[(G,D)] = 
-    firstParent[Index].iterator(split, context).flatMap { tree =>
-      tree.query(qry).filter{ case (g,v) => qry.intersects(g)}
+  def compute(split: Partition, context: TaskContext): Iterator[RTree[G,(G,D)]] = 
+    firstParent[Index].iterator(split, context).map { tree =>
+      tree.queryRO(qry, Predicates.intersects _)
+      tree
     }
 
   /**

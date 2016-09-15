@@ -28,7 +28,7 @@ object TestUtils {
   def createRDD(sc: SparkContext, file: String = "src/test/resources/new_eventful_flat_1000.csv", sep: Char = ',', numParts: Int = 1) = {
     sc.textFile(file,numParts)
       .map { line => line.split(sep) }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), SpatialObject(arr(7))) }
+      .map { arr => (arr(0), arr(1).toInt, arr(2), STObject(arr(7))) }
       .keyBy( _._4)
   } 
 }

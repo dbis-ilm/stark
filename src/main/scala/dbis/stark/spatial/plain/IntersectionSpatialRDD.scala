@@ -9,9 +9,9 @@ import org.apache.spark.Dependency
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
-class IntersectionSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class IntersectionSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G, 
     @transient private val prev: RDD[(G,V)]
   ) extends SpatialRDD(prev) {

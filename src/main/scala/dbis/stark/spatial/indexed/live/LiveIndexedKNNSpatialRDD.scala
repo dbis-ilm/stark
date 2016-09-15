@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.live
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import scala.reflect.ClassTag
 import dbis.stark.spatial.SpatialPartitioner
 import org.apache.spark.rdd.RDD
@@ -12,7 +12,7 @@ import org.apache.spark.ShuffleDependency
 import dbis.stark.spatial.indexed.SpatialGridPartition
 import dbis.stark.spatial.Utils
 
-class LiveIndexedKNNSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class LiveIndexedKNNSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G, 
     k: Int,
     @transient private val _partitioner: SpatialPartitioner[G,V], 

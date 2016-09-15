@@ -20,7 +20,7 @@ import scala.collection.JavaConverters._
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import dbis.stark.spatial.plain._
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
@@ -31,7 +31,7 @@ import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
  *
  * @param prev The parent RDD
  */
-abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     @transient private val _sc: SparkContext,
     @transient private val _deps: Seq[Dependency[_]]
   ) extends RDD[(G,V)](_sc, _deps) {
@@ -50,7 +50,7 @@ abstract class SpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
   def withinDistance(
       qry: G, 
       maxDist: Double, 
-      distFunc: (SpatialObject,SpatialObject) => Double
+      distFunc: (STObject,STObject) => Double
     ) = new PlainSpatialRDDFunctions(this).withinDistance(qry, maxDist, distFunc)
 
   /**
@@ -97,7 +97,7 @@ object SpatialRDD {
    * @param rdd The RDD to convert
    * @return Returns a SpatialRDDFunctions object that contains spatial methods
    */
-	implicit def convertSpatialPlain[G <: SpatialObject : ClassTag, V: ClassTag](rdd: RDD[(G, V)]) = new PlainSpatialRDDFunctions[G,V](rdd)
+	implicit def convertSpatialPlain[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G, V)]) = new PlainSpatialRDDFunctions[G,V](rdd)
 
 	/**
 	 * Convert an RDD to a SpatialRDD which uses persisted indexing.
@@ -105,7 +105,7 @@ object SpatialRDD {
 	 * @param rdd The RDD to convert
 	 * @return Returns a IndexedSpatialRDDFunctions object that contains spatial methods that use indexing
 	 */
-	implicit def convertSpatialPersistedIndexing[G <: SpatialObject : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new PersistedIndexedSpatialRDDFunctions(rdd)
+	implicit def convertSpatialPersistedIndexing[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]) = new PersistedIndexedSpatialRDDFunctions(rdd)
 
 }
 

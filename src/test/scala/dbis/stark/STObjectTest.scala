@@ -4,18 +4,18 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import com.vividsolutions.jts.io.WKTReader
 
-class SpatialObjectTest extends FlatSpec with Matchers {
+class STObjectTest extends FlatSpec with Matchers {
     
   "A spatial object" should "intersect with a contained polygon and interval" in {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
     val qryT = Interval(20L, 30L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe true }
   }
@@ -24,12 +24,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
     val qryT = Instant(50L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe true }
   }
@@ -38,12 +38,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POINT(7 8)")
     val qryT = Instant(89L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe true }
   }
@@ -52,12 +52,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val qryT = Interval(10L, 100L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe true }
   }
@@ -66,11 +66,11 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = Interval(10L, 100L)
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
-	  val qryO = SpatialObject(qryG, None)
+	  val qryO = STObject(qryG, None)
 
 	  withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe false }
   }
@@ -79,12 +79,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = None
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
 	  val qryT = Instant(89L)
-	  val qryO = SpatialObject(qryG, qryT)
+	  val qryO = STObject(qryG, qryT)
 
 	  withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe false }
   }
@@ -93,11 +93,11 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = None
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
-	  val qryO = SpatialObject(qryG, None)
+	  val qryO = STObject(qryG, None)
 
 	  withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe true }
   }
@@ -106,12 +106,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = Instant(89L)
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POINT( 100 100 )")
 	  val qryT = Instant(89L)
-	  val qryO = SpatialObject(qryG, qryT)
+	  val qryO = STObject(qryG, qryT)
 
 	  withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe false }
   }
@@ -122,12 +122,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
     val qryT = Interval(20L, 30L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe true }
   }
@@ -136,12 +136,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
     val qryT = Instant(50L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe true }
   }
@@ -150,12 +150,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POINT(7 8)")
     val qryT = Instant(89L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe true }
   }
@@ -164,12 +164,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val t = Interval(10L, 100L)
-    val o = SpatialObject(g, t)
+    val o = STObject(g, t)
     
     
     val qryG = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
     val qryT = Interval(10L, 100L)
-    val qryO = SpatialObject(qryG, qryT)
+    val qryO = STObject(qryG, qryT)
     
     withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe true }
   }
@@ -178,11 +178,11 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = Interval(10L, 100L)
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
-	  val qryO = SpatialObject(qryG, None)
+	  val qryO = STObject(qryG, None)
 
 	  withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe false }
   }
@@ -191,12 +191,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = None
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
 	  val qryT = Instant(89L)
-	  val qryO = SpatialObject(qryG, qryT)
+	  val qryO = STObject(qryG, qryT)
 
 	  withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe false }
   }
@@ -205,11 +205,11 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = None
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))")
-	  val qryO = SpatialObject(qryG, None)
+	  val qryO = STObject(qryG, None)
 
 	  withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe true }
   }
@@ -218,12 +218,12 @@ class SpatialObjectTest extends FlatSpec with Matchers {
 
 	  val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")
 	  val t = Instant(89L)
-	  val o = SpatialObject(g, t)
+	  val o = STObject(g, t)
 
 
 	  val qryG = new WKTReader().read("POINT( 100 100 )")
 	  val qryT = Instant(89L)
-	  val qryO = SpatialObject(qryG, qryT)
+	  val qryO = STObject(qryG, qryT)
 
 	  withClue(s"$o contains at $qryO"){ o.contains(qryO) shouldBe false }
   }  
@@ -233,7 +233,7 @@ class SpatialObjectTest extends FlatSpec with Matchers {
   it should "have the correct x y coordinates from WKT" in {
     
     val wkt = "POINT(10 20)"
-    val so = SpatialObject(wkt)
+    val so = STObject(wkt)
     
     so.getGeo.getCentroid.getX shouldBe 10
     so.getGeo.getCentroid.getY shouldBe 20

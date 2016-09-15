@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import scala.reflect.ClassTag
 import dbis.stark.spatial.indexed.RTree
 import org.apache.spark.rdd.RDD
@@ -8,7 +8,7 @@ import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
 
-class PersistedIndexedKNNSpatialRDD[G <: SpatialObject : ClassTag, D: ClassTag](
+class PersistedIndexedKNNSpatialRDD[G <: STObject : ClassTag, D: ClassTag](
     qry: G, 
     k: Int,
     @transient private val prev: RDD[RTree[G,(G,D)]]

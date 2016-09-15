@@ -2,11 +2,11 @@ package dbis.stark
 
 import com.vividsolutions.jts.geom.Geometry
 
-import SpatialObject._
+import STObject._
 import com.vividsolutions.jts.io.WKTReader
 
 /**
- * A SpatialObject represents some spatial geometry. It can also have
+ * A STObject represents some spatial geometry. It can also have
  * a time component, thus it represents an object in space and time.
  * 
  * The idea for the following methods is to check whether their spatial component fulfills the requirement (validity, intersection, etc)
@@ -20,10 +20,10 @@ import com.vividsolutions.jts.io.WKTReader
  * @param g The geometry 
  * @param time The optional time component 
  */
-case class SpatialObject(private val g: GeoType, time: Option[TemporalExpression]) extends BaseExpression[SpatialObject] {
+case class STObject(private val g: GeoType, time: Option[TemporalExpression]) extends BaseExpression[STObject] {
   
-  def intersectsSpatial(t: SpatialObject) = g.intersects(t.g)
-  def intersectsTemporal(t: SpatialObject) = (time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.intersects(t.time.get)))
+  def intersectsSpatial(t: STObject) = g.intersects(t.g)
+  def intersectsTemporal(t: STObject) = (time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.intersects(t.time.get)))
   
   /**
    * Check if this spatial object intersects with the other given object.
@@ -35,11 +35,11 @@ case class SpatialObject(private val g: GeoType, time: Option[TemporalExpression
    * @param t The other spatial object to check
    * @return Returns <code>true</code> iff this object intersects with the other given object in both space and time.
    */
-  def intersects(t: SpatialObject) = intersectsSpatial(t) && intersectsTemporal(t)
+  def intersects(t: STObject) = intersectsSpatial(t) && intersectsTemporal(t)
   
   
-  def containsSpatial(t: SpatialObject) = g.contains(t.g)
-  def containsTemporal(t: SpatialObject) = (time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.contains(t.time.get))) 
+  def containsSpatial(t: STObject) = g.contains(t.g)
+  def containsTemporal(t: STObject) = (time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.contains(t.time.get))) 
   
   /**
    * Check if this spatial object completely contains the other given object.
@@ -51,18 +51,18 @@ case class SpatialObject(private val g: GeoType, time: Option[TemporalExpression
    * @param t The other spatial object to check
    * @return Returns <code>true</code> iff this object completely contains the other given object in both space and time
    */
-  def contains(t: SpatialObject) = containsSpatial(t) && containsTemporal(t)
+  def contains(t: STObject) = containsSpatial(t) && containsTemporal(t)
   
   // just the reverse operation of contains
-  def containedBySpatial(t: SpatialObject) = t.containsSpatial(this)
-  def containedByTemporal(t: SpatialObject) = t.containsTemporal(this)
+  def containedBySpatial(t: STObject) = t.containsSpatial(this)
+  def containedByTemporal(t: STObject) = t.containsTemporal(this)
   
   /**
    * Check if this spatial object is completely contained by the other given object.
    * <br><br>
-   * This is the reverse operation of [[dbis.stark.SpatialObject#contains]] 
+   * This is the reverse operation of [[dbis.stark.STObject#contains]] 
    */
-  def containedBy(t: SpatialObject) = containedBySpatial(t) && containedByTemporal(t) 
+  def containedBy(t: STObject) = containedBySpatial(t) && containedByTemporal(t) 
   
   /**
    * Check if this NRechtRange is equal to some other object.
@@ -72,7 +72,7 @@ case class SpatialObject(private val g: GeoType, time: Option[TemporalExpression
    * The ID is <emph>NOT</emph> considered for equality check!  
    */
   override def equals(that: Any): Boolean = that match {
-    case SpatialObject(g, t) => (this.g equals g) && (this.time equals t)
+    case STObject(g, t) => (this.g equals g) && (this.time equals t)
     case _ => false
   }
   
@@ -84,17 +84,17 @@ case class SpatialObject(private val g: GeoType, time: Option[TemporalExpression
   
 }
 
-object SpatialObject {
+object STObject {
   
-  def apply(wkt: String): SpatialObject = this(new WKTReader().read(wkt))
-  def apply(g: GeoType): SpatialObject = this(g, None)
-  def apply(g: GeoType, t: TemporalExpression): SpatialObject = this(g, Some(t))
+  def apply(wkt: String): STObject = this(new WKTReader().read(wkt))
+  def apply(g: GeoType): STObject = this(g, None)
+  def apply(g: GeoType, t: TemporalExpression): STObject = this(g, Some(t))
   
   type GeoType = Geometry
   
-  implicit def getInternal(s: SpatialObject): GeoType = s.g
+  implicit def getInternal(s: STObject): GeoType = s.g
   
-  implicit def makeSpatialObject(g: GeoType): SpatialObject = SpatialObject(g)
+  implicit def makeSTObject(g: GeoType): STObject = STObject(g)
   
   /**
 	 * Convert a string into a geometry object. The String must be a valid WKT representation
@@ -102,6 +102,6 @@ object SpatialObject {
 	 * @param s The WKT string
 	 * @return The geometry parsed from the given textual representation
 	 */
-	implicit def stringToGeom(s: String): SpatialObject = SpatialObject(s)
+	implicit def stringToGeom(s: String): STObject = STObject(s)
   
 }

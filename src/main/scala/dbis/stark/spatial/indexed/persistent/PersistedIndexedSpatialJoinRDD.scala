@@ -24,7 +24,7 @@ import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import scala.collection.mutable.ListBuffer
 import dbis.stark.spatial.SpatialGridPartitioner
 import dbis.stark.spatial.BSPartitioner
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
 
 protected[spatial] case class NarrowIndexJoinSplitDep(
@@ -53,7 +53,7 @@ protected[spatial] class JoinPartition(
 
 
 
-class IndexedSpatialJoinRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
+class IndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
     @transient val right: RDD[(G,V2)],
     pred: (G,G) => Boolean

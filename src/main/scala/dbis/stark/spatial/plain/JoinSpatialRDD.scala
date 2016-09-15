@@ -13,9 +13,9 @@ import dbis.stark.spatial.indexed.persistent.NarrowIndexJoinSplitDep
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import scala.collection.mutable.ListBuffer
 import org.apache.spark.InterruptibleIterator
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
-class JoinSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag, V2: ClassTag](
+class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
     @transient val right: RDD[(G,V2)],
     predicate: (G,G) => Boolean

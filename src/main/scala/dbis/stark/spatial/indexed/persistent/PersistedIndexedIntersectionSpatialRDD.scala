@@ -9,10 +9,10 @@ import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import dbis.stark.spatial.Predicates
 
-class PersistedIndexedIntersectionSpatialRDD[G <: SpatialObject : ClassTag, D: ClassTag](
+class PersistedIndexedIntersectionSpatialRDD[G <: STObject : ClassTag, D: ClassTag](
     qry: G, 
     @transient private val prev: RDD[RTree[G,(G,D)]]
   ) extends RDD[RTree[G,(G,D)]](prev) {

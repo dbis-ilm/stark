@@ -9,13 +9,13 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.SpatialGridPartition
 import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.Utils
 
-class LiveIndexedContainedbySpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class LiveIndexedContainedbySpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G,
     @transient private val _partitioner: SpatialPartitioner[G,V], 
     @transient private val prev: RDD[(G,V)]

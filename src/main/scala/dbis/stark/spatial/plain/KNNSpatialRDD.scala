@@ -9,9 +9,9 @@ import org.apache.spark.OneToOneDependency
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
-class KNNSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class KNNSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G, k: Int, 
     private val prev: RDD[(G,V)]
   ) extends RDD[(G,(Double, V))](prev) {

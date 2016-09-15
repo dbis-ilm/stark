@@ -18,8 +18,8 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
 import dbis.stark.spatial.SpatialRDD._
-import dbis.stark.SpatialObject
-import dbis.stark.SpatialObject._
+import dbis.stark.STObject
+import dbis.stark.STObject._
 import dbis.stark.TestUtils
 
 object SpatialRDDTestCase {
@@ -71,7 +71,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q: SpatialObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
+	  val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
 	  val foundGeoms = rdd.contains(q).collect()
 	  
 	  foundGeoms.size shouldBe 6
@@ -84,7 +84,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q: SpatialObject = "POINT (53.483437 -2.2040706)"
+	  val q: STObject = "POINT (53.483437 -2.2040706)"
 	  val foundGeoms = rdd.kNN(q, 6).collect()
 	  
 	  foundGeoms.size shouldBe 6

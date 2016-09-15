@@ -5,7 +5,7 @@ import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.mllib.linalg.Vectors
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import dbis.stark.spatial.SpatialRDD
 import dbis.stark.spatial.SpatialGridPartitioner
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
@@ -21,7 +21,7 @@ import dbis.stark.dbscan.ClusterLabel
  *
  * @param rdd The original RDD to treat as a spatial RDD
  */
-class PlainSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
+class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends Serializable {
 
@@ -43,7 +43,7 @@ class PlainSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
     rdd.sparkContext.parallelize(arr)
   }
   
-  def withinDistance(qry: G, maxDist: Double, distFunc: (SpatialObject,SpatialObject) => Double) = 
+  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
     new WithinDistanceSpatialRDD(qry,maxDist, distFunc, rdd)
   
   /**

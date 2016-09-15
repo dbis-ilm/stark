@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.live
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialPartitioner
@@ -14,10 +14,10 @@ import org.apache.spark.SparkEnv
 import com.vividsolutions.jts.geom.GeometryFactory
 import com.vividsolutions.jts.geom.Coordinate
 
-class LiveIndexedWithinDistanceSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class LiveIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G,
     maxDist: Double,
-    distFunc: (SpatialObject,SpatialObject) => Double,
+    distFunc: (STObject,STObject) => Double,
     @transient private val _partitioner: SpatialPartitioner[G,V], 
     @transient private val prev: RDD[(G,V)]
   ) extends IndexedSpatialRDD(_partitioner, prev) {

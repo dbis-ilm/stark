@@ -165,11 +165,9 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     // and they both should contain the same elements (we don't care abour ordering)
     spatialJoinResult should contain theSameElementsAs(plainJoinResult)
-    
-    
   }
   
-  "A clustering" should "return all points" in {
+  it should "return a cluster result with all points" in {
     val rdd = TestUtils.createRDD(sc)
     
     val f = new java.io.File("clusterresult")

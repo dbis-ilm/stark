@@ -34,6 +34,11 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
     def contains(r: NRectRange): Boolean =
       this.contains(r.ll) && r.ur.c.zipWithIndex.forall { case (e, idx) => e <= ur(idx) }
     
+    def intersects(r: NRectRange): Boolean = points.exists { p => r.contains(p) }
+    
+    def points = Array(ll, ur, NPoint(ll(0),ur(1)), NPoint(ur(0),ll(1)))
+      
+    
     /** 
      *  Dimensionality of the geometry
      */

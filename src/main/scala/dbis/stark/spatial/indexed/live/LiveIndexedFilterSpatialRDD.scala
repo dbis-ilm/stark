@@ -1,30 +1,44 @@
 package dbis.stark.spatial.indexed.live
 
-import dbis.stark.STObject
 import scala.reflect.ClassTag
+
 import org.apache.spark.rdd.RDD
-import dbis.stark.spatial.SpatialPartitioner
-import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
-import dbis.stark.spatial.indexed.SpatialGridPartition
-import dbis.stark.spatial.Utils
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.SparkEnv
-import com.vividsolutions.jts.geom.GeometryFactory
-import com.vividsolutions.jts.geom.Coordinate
 
-class LiveIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
-    qry: G,
-    maxDist: Double,
-    distFunc: (STObject,STObject) => Double,
+import dbis.stark.STObject
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.SpatialGridPartition
+import dbis.stark.spatial.SpatialPartitioner
+import dbis.stark.spatial.Utils
+import dbis.stark.spatial.SpatialPartition
+import dbis.stark.spatial.indexed.RTree
+
+/**
+ * An RDD representing a spatial intersection using an internal R-Tree,
+ * that is filled on the fly.
+ * 
+ * @param qry The query geometry
+ * @param prev The parent RDD 
+ */
+class LiveIndexedFilterSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
+    qry: G, 
+    capacity: Int,
+    predicate: (G,G) => Boolean,
     @transient private val _partitioner: SpatialPartitioner[G,V], 
     @transient private val prev: RDD[(G,V)]
   ) extends IndexedSpatialRDD(_partitioner, prev) {
   
+  /**
+   * :: DeveloperApi ::
+   * Implemented by subclasses to compute a given partition.
+   */
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = {
-    val part = split.asInstanceOf[SpatialGridPartition[G,(G,V)]]
+    val part = split.asInstanceOf[SpatialPartition]
 
     /* check if the query geometry overlaps with the bounds of this partition
      * if not, the partition does not contain potential query results
@@ -33,7 +47,7 @@ class LiveIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag]
      */
     if(!qry.getEnvelopeInternal.intersects(Utils.toEnvelope(part.bounds))) {
         // this is not the partition that holds data that might produce results
-        logDebug(s"not our part: ${part.bounds}  vs $qry")
+//        logDebug(s"not our part: ${part.bounds}  vs $qry")
         return Iterator.empty
     }
     
@@ -43,7 +57,7 @@ class LiveIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag]
       .read()
       .asInstanceOf[Iterator[(G, V)]]
     
-    val indexTree = part.theIndex
+    val indexTree = new RTree[G,(G,V)](capacity)
     
     // Build our index live on-the-fly
     iter.foreach{ case (geom, data) =>
@@ -55,6 +69,8 @@ class LiveIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag]
     }
     indexTree.build()
     
+    
+    
     // now query the index
     val result = indexTree.query(qry)
     
@@ -63,10 +79,9 @@ class LiveIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag]
      * for all result elements we need to check if they
      * really intersect with the actual geometry
      */
-    val res = result.filter{ case (g,_) => distFunc(g, qry) <= maxDist }
+    val res = result.filter{ case (g,_) => predicate(qry,g) }
     
     res.iterator
   }
-  
   
 }

@@ -33,7 +33,7 @@ object Predicates {
    * @return Returns <code>true</code> if the left object is completely contained by the right object, according to the definition in [[dbis.stark.STObject]],
    * otherwise <code>false</code>
    */
-  def containedby[G <: STObject : ClassTag, G2 <: STObject : ClassTag](g1: G, g2: G2) = g1.containedBy(g2)
+  def containedby[G <: STObject : ClassTag, G2 <: STObject : ClassTag](g1: G, g2: G2) = g2.containedBy(g1)
   
   /**
    * Returns <code>true</code> if the two given objects are within a given distance, i.e.

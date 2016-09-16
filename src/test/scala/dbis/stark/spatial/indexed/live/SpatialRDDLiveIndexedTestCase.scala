@@ -1,4 +1,4 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.indexed.live
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
@@ -21,6 +21,7 @@ import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.STObject
 import dbis.stark.STObject._
 import dbis.stark.TestUtils
+import dbis.stark.spatial.Predicates
 
 object SpatialRDDLiveIndexedTestCase {
   
@@ -45,7 +46,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   }
   
   
-  "A PLAIN SpatialRDD" should "find the correct intersection result for points" in { 
+  "A LIVE indexed SpatialRDD" should "find the correct intersection result for points" in { 
     
     val rdd = TestUtils.createRDD(sc).liveIndex(5,10)
     
@@ -171,7 +172,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
   }
   
-  "A clustering" should "return all points" in {
+  it should "return a cluster result with all points" in {
     val rdd = TestUtils.createRDD(sc)
     
     val f = new java.io.File("clusterresult")
@@ -189,7 +190,5 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
         outfile = Some(f.toString()))
     
     res.count() shouldBe rdd.count() 
-  } 
-  
-  
+  }
 }

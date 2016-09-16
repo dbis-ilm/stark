@@ -59,7 +59,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
       
       override def visitItem(item: Any) {
         val i = item.asInstanceOf[Data[D]]
-        if(i.ts == ts - 1 && pred(i.so, qry) )
+        if(i.ts == ts - 1 && pred(qry, i.so) )
           i.ts += 1
       }
     }

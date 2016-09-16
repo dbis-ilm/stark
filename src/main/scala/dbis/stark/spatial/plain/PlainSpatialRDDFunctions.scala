@@ -155,9 +155,9 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
 
   // LIVE
-  def liveIndex(ppD: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(new SpatialGridPartitioner(ppD, rdd))
+  def liveIndex(ppD: Int, order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(new SpatialGridPartitioner(ppD, rdd), order)
 
-  def liveIndex(partitioner: SpatialPartitioner[G,V]) = new LiveIndexedSpatialRDDFunctions(partitioner, rdd)
+  def liveIndex(partitioner: SpatialPartitioner[G,V], order: Int) = new LiveIndexedSpatialRDDFunctions(partitioner, rdd, order)
 
   def indexFixedGrid(ppD: Int, order: Int = 10) = makeIdx(grid(ppD), order)
 

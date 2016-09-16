@@ -4,10 +4,12 @@ import dbis.stark.STObject
 import scala.reflect.ClassTag
 import dbis.stark.spatial.SpatialPartitioner
 import org.apache.spark.rdd.RDD
+import dbis.stark.spatial.plain.LiveIndexedJoinSpatialRDD
 
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     partitioner: SpatialPartitioner[G,V],
-    rdd: RDD[(G,V)]
+    rdd: RDD[(G,V)],
+    capacity: Int
   ) extends Serializable {
 
 
@@ -31,4 +33,6 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       maxDist: Double, 
       distFunc: (STObject,STObject) => Double
     ) = new LiveIndexedWithinDistanceSpatialRDD(qry, maxDist, distFunc, partitioner, rdd)
+  
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new LiveIndexedJoinSpatialRDD(rdd, other, pred, capacity)
 }

@@ -1,17 +1,22 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.indexed.persistent
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
-
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
-
 import dbis.stark.STObject
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.TestUtils
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.indexed.RTree
+import dbis.stark.STObject.getInternal
+import dbis.stark.STObject.makeSTObject
+import dbis.stark.STObject.stringToGeom
+import dbis.stark.spatial.BSPartitioner
+import dbis.stark.spatial.Predicates
+import dbis.stark.spatial.SpatialRDDTestCase
+import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 
 class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   import SpatialRDDTestCase._

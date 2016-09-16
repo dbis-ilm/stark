@@ -53,12 +53,10 @@ protected[spatial] class JoinPartition(
 
 
 
-class IndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
+class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
     @transient val right: RDD[(G,V2)],
     pred: (G,G) => Boolean
-//    part: SpatialPartitioner
-  //)  extends SpatialRDD[G,(V,V2)](left.context, Nil) /*CoGroupedRDD(Seq(left, right), left.partitioner.get)*/ {
     )  extends RDD[(V,V2)](left.context, Nil) {
   
   
@@ -76,25 +74,21 @@ class IndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag]
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[JoinPartition]
     
-    val left  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[RTree[G, (G,V)]]].toList
-    
-    /* FIXME use external map for join
-     * eigentlich muesste der Combiner einen R-Baum haben 
-     * aber das funktioneirt wahrscheinlich nicht mehr mit der Map --> was eigenes implementieren
-     */
-    
-//    require(left.size == 1, "left should be only one partition (for index)")
-    logDebug(s"compute indexed spatial join with ${left.size} left input trees")
+    val left  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[RTree[G, (G,V)]]]
     
     val iters = ListBuffer.empty[Iterator[(G,Combiner)]] 
       
+//		println(s"left size: ${left.size}")
     for(idx <- left) {
-    
+//      println(s"left idx contains: ${idx.itemsTree().size()} ")
       val map = createExternalMap
      
       for(rDep <- split.rightDeps) {
         val right = rDep.rdd.iterator(rDep.split, context).asInstanceOf[Iterator[(G,V2)]]
-  
+        
+//        println(s"\tright size ${rightList.size}")
+        
+        
         val res = right.flatMap{ case (rg, rv) =>
     		  idx.query(rg) // query R-Tree and get matching MBBs
         		  .filter{ case (lg, _) => pred(lg, rg) } // check if real geom also matches

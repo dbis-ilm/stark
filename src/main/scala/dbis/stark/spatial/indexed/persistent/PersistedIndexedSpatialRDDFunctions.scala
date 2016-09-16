@@ -7,17 +7,26 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
 import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.Predicates
 
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) {
 
   def contains(qry: G) = new PersistedIndexedContainsSpatialRDD(qry, rdd)
+//  rdd.mapPartitions({ trees => 
+//    trees.map{ tree =>
+//      tree.queryRO(qry, Predicates.contains _)
+//      tree
+//    }
+//  }, true) // preserve partitioning
+    
+//    
 
   def containedby(qry: G) = new PersistedIndexedContainedbySpatialRDD(qry, rdd)
 
   def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)
 
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new IndexedSpatialJoinRDD(rdd, other, pred)
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
 
   def kNN(qry: G, k: Int) = {
     val r = new PersistedIndexedKNNSpatialRDD(qry, k, rdd)

@@ -48,14 +48,8 @@ object Predicates {
    * otherwise <code>false</code>
    */
   def withinDistance[G <: STObject: ClassTag, G2 <: STObject : ClassTag](
-      g1: G, 
-      g2: G2, 
-      maxDist: Double, 
-      distFunc: (G, G2) => Double) = distFunc(g1,g2) <= maxDist
-      
-  def dist[G <: STObject: ClassTag, G2 <: STObject : ClassTag](
       maxDist: Double, 
       distFunc: (G, G2) => Double)
-      (g1: G, g2:G2) = withinDistance(g1, g2, maxDist, distFunc)
+      (g1: G, g2:G2) = distFunc(g1,g2) <= maxDist
   
 }

@@ -36,8 +36,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   private var sc: SparkContext = _
   
   override def beforeAll() {
-    val conf = new SparkConf().setMaster("local[1]").setAppName("spatialrddtestcase")
-    sc = new SparkContext(conf)
+    sc = TestUtils.createSparkContext("spatialrddtestcase")
   }
   
   override def afterAll() {
@@ -82,8 +81,8 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "find the correct nearest neighbors" in { 
     val rdd = TestUtils.createRDD(sc)
 	  
-	  // we look for all elements that contain a given point. 
-	  // thus, the result should be all points in the RDD with the same coordinates
+	  // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
 	  val foundGeoms = rdd.kNN(q, 6).collect()
 	  
@@ -92,6 +91,83 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
   } 
   
+  
+  it should "find correct self-join result for points with intersect" in {
+    
+    val rdd1 = TestUtils.createRDD(sc, distinct = true).cache()
+
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd1, Predicates.intersects _).map(_._1._4.toText()).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd2 = rdd1.map{ case (st, v) => (st.toText(), 1) }
+    val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult should contain theSameElementsAs(plainJoinResult)
+  }
+  
+  it should "find correct self-join result for points with contains" in {
+    
+    val rdd1 = TestUtils.createRDD(sc, distinct = true).cache()
+
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd1, Predicates.contains _).map(_._1._4.toText()).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd2 = rdd1.map{ case (st, v) => (st.toText(), 1) }
+    val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult should contain theSameElementsAs(plainJoinResult)
+  }
+  
+  it should "find correct self-join result for points with withinDistance" in {
+    
+    val rdd1 = TestUtils.createRDD(sc, distinct = true).cache()
+
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd1, Predicates.withinDistance(0, (g1,g2) => g1.getGeo.distance(g2.getGeo)) _).map(_._1._4.toText()).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd2 = rdd1.map{ case (st, v) => (st.toText(), 1) }
+    val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult should contain theSameElementsAs(plainJoinResult)
+    
+    
+  }
   
   "A clustering" should "return all points" in {
     val rdd = TestUtils.createRDD(sc)

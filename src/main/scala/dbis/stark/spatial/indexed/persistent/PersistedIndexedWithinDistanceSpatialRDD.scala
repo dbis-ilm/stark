@@ -32,7 +32,7 @@ class PersistedIndexedWithinDistanceSpatialRDD[G <: STObject : ClassTag, D: Clas
        * 
        * See http://docs.scala-lang.org/tutorials/tour/currying.html
        */
-      tree.queryRO(qry, Predicates.dist(maxDist, distFunc) _)
+      tree.queryRO(qry, Predicates.withinDistance(maxDist, distFunc) _)
       tree
     }
 

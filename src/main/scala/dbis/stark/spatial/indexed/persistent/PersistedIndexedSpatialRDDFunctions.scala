@@ -12,33 +12,50 @@ import dbis.stark.spatial.Predicates
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) {
 
-  def contains(qry: G) = new PersistedIndexedContainsSpatialRDD(qry, rdd)
-//  rdd.mapPartitions({ trees => 
-//    trees.map{ tree =>
-//      tree.queryRO(qry, Predicates.contains _)
-//      tree
-//    }
-//  }, true) // preserve partitioning
+  def contains(qry: G) = rdd.mapPartitions({ trees => 
+    trees.map{ tree =>
+      tree.queryRO(qry, Predicates.contains _)
+      tree
+    }
+  }, true) // preserve partitioning
     
-//    
 
-  def containedby(qry: G) = new PersistedIndexedContainedbySpatialRDD(qry, rdd)
+  def containedby(qry: G) = rdd.mapPartitions({ trees => 
+    trees.map{ tree =>
+      tree.queryRO(qry, Predicates.containedby _)
+      tree
+    }
+  }, true) // preserve partitioning
 
-  def intersect(qry: G) = new PersistedIndexedIntersectionSpatialRDD(qry, rdd)
+  def intersect(qry: G) = rdd.mapPartitions({ trees => 
+    trees.map{ tree =>
+      tree.queryRO(qry, Predicates.intersects _)
+      tree
+    }
+  }, true) // preserve partitioning
 
   def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
 
   def kNN(qry: G, k: Int) = {
-    val r = new PersistedIndexedKNNSpatialRDD(qry, k, rdd)
-      .map { case (g,v) => (g, (g.distance(qry), v)) }
-      .sortBy(_._2._1, ascending = true)
-      .take(k)
-      
-    rdd.sparkContext.parallelize(r)
+    val nn = rdd.mapPartitions({ trees =>
+        trees.flatMap { tree => 
+        tree.kNN(qry, k)
+      }
+    }, true)
+    .map { case (g,v) => (g, (g.distance(qry), v)) }
+    .sortBy(_._2._1, ascending = true)
+    .take(k)
+    
+    rdd.sparkContext.parallelize(nn)
   }
   
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
-    new PersistedIndexedWithinDistanceSpatialRDD(qry, maxDist, distFunc, rdd)
+    rdd.mapPartitions({ trees => 
+    trees.map{ tree =>
+      tree.queryRO(qry, Predicates.withinDistance(maxDist, distFunc) _)
+      tree
+    }
+  }, true) // preserve partitioning
   
   
   /**

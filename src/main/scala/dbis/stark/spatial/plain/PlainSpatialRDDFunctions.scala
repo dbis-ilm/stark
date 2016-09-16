@@ -25,16 +25,35 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends Serializable {
 
+  /**
+   * Find all elements that intersect with a given query geometry
+   */
+  def intersect(qry: G) = rdd.mapPartitions({iter =>
+    iter.filter { case (g,_) => qry.intersects(g) }})
 
-  def intersect(qry: G): SpatialRDD[G,V] = new IntersectionSpatialRDD(qry, rdd)
+  /**
+   * Find all elements that are contained by a given query geometry
+   */
+  def containedby(qry: G) = rdd.mapPartitions({iter =>
+    iter.filter { case (g,_) => g.containedBy(qry) }})
 
-  def containedby(qry: G): SpatialRDD[G,V] = new ContainedBySpatialRDD(qry, rdd)
-
-  def contains(qry: G): SpatialRDD[G,V] = new ContainsSpatialRDD(qry, rdd)
+  /**
+   * Find all elements that contain a given other geometry
+   */
+  def contains(p: G) = rdd.mapPartitions({iter =>
+    iter.filter { case (g,_) => g.contains(p) }})
 
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
     // compute k NN for each partition individually --> n * k results
-    val r = new KNNSpatialRDD(qry, k, rdd)
+    val r = rdd.mapPartitions({iter => iter.map { case (g,v) => 
+        val d = qry.distance(g)
+        (g,(d,v)) // compute and return distance
+      }
+      .toList
+      .sortWith(_._2._1 < _._2._1) // on distance
+      .take(k) // take only the fist k 
+      .toIterator // remove the iterator
+    })
 
     // sort all n lists and sort by distance, then take only the first k elements
     val arr = r.sortBy(_._2._1, ascending = true).take(k)
@@ -44,7 +63,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
   
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
-    new WithinDistanceSpatialRDD(qry,maxDist, distFunc, rdd)
+    rdd.mapPartitions({iter =>
+      iter.filter { case (g,_) => distFunc(g,qry) <= maxDist }})
+  
+  
   
   /**
    * Join this SpatialRDD with another (spatial) RDD.

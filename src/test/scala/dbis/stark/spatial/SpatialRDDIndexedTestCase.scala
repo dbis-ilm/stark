@@ -96,8 +96,13 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val res = rdd1.join(rdd2, { case (l,r) => l.getCentroid.intersects(r.getCentroid) })
     
+    
+    res.collect().foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
+      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
+    }
+    
 //    res.count() shouldBe rdd2.count() 
-    res.count()
+//    res.count()
   }
   
   it should "have correct types for chained executions" in  {

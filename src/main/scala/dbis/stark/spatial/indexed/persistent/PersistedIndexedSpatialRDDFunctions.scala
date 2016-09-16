@@ -4,11 +4,11 @@ import scala.reflect.ClassTag
 
 import org.apache.spark.rdd.RDD
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
 import dbis.stark.spatial.indexed.RTree
 
-class PersistedIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
+class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) {
 
   def contains(qry: G) = new PersistedIndexedContainsSpatialRDD(qry, rdd)
@@ -28,7 +28,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: Clas
     rdd.sparkContext.parallelize(r)
   }
   
-  def withinDistance(qry: G, maxDist: Double, distFunc: (SpatialObject,SpatialObject) => Double) = 
+  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
     new PersistedIndexedWithinDistanceSpatialRDD(qry, maxDist, distFunc, rdd)
   
   

@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.indexed.RTree
@@ -8,7 +8,7 @@ import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import dbis.stark.spatial.Predicates
 
-class PersistedIndexedContainsSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class PersistedIndexedContainsSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G,
     @transient private val prev: RDD[RTree[G,(G,V)]]
   ) extends RDD[RTree[G,(G,V)]](prev) {

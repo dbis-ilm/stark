@@ -8,7 +8,7 @@ import com.vividsolutions.jts.index.strtree.AbstractNode
 import com.vividsolutions.jts.geom.Geometry
 import com.vividsolutions.jts.index.strtree.STRtree
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import com.vividsolutions.jts.index.strtree.ItemDistance
 import com.vividsolutions.jts.index.ItemVisitor
 
@@ -17,7 +17,7 @@ import com.vividsolutions.jts.index.ItemVisitor
  * 
  * @param capacity The number of elements in a node
  */
-class RTree[G <: SpatialObject : ClassTag, D: ClassTag ](
+class RTree[G <: STObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
   ) extends STRtree(capacity)  {
 
@@ -42,7 +42,7 @@ class RTree[G <: SpatialObject : ClassTag, D: ClassTag ](
    * @param geom The geometry to compute intersection for
    * @returns Returns all elements of the tree that intersect with the query geometry  
    */
-  def query(geom: SpatialObject): List[D] = { 
+  def query(geom: STObject): List[D] = { 
     
     super.query(geom.getEnvelopeInternal).map(_.asInstanceOf[Data[D]].data).toList
     
@@ -53,7 +53,7 @@ class RTree[G <: SpatialObject : ClassTag, D: ClassTag ](
    * 
    * A query only increases the timestamp of an item.
    */
-  def queryRO(qry: SpatialObject, pred: (SpatialObject, SpatialObject) => Boolean) = { 
+  def queryRO(qry: STObject, pred: (STObject, STObject) => Boolean) = { 
     
     class MyVisitor(ts: Int) extends ItemVisitor {
       
@@ -87,7 +87,7 @@ class RTree[G <: SpatialObject : ClassTag, D: ClassTag ](
    * Maybe we could use JTSPlus: https://github.com/jiayuasu/JTSplus
    * From the GeoSpark Guys  
    */
-  def kNN(geom: SpatialObject, k: Int): List[D] = ???
+  def kNN(geom: STObject, k: Int): List[D] = ???
 //    super.nearestNeighbour(geom.getEnvelopeInternal, geom, ItemDistance)
 }
 

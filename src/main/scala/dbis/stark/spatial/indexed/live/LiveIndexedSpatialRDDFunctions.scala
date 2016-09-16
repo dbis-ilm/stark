@@ -1,11 +1,11 @@
 package dbis.stark.spatial.indexed.live
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import scala.reflect.ClassTag
 import dbis.stark.spatial.SpatialPartitioner
 import org.apache.spark.rdd.RDD
 
-class LiveIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag](
+class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     partitioner: SpatialPartitioner[G,V],
     rdd: RDD[(G,V)]
   ) extends Serializable {
@@ -26,9 +26,9 @@ class LiveIndexedSpatialRDDFunctions[G <: SpatialObject : ClassTag, V: ClassTag]
     rdd.sparkContext.parallelize(r)
   }
   
-  def withinDistance[G2 <: SpatialObject : ClassTag](
+  def withinDistance[G2 <: STObject : ClassTag](
       qry: G, 
       maxDist: Double, 
-      distFunc: (SpatialObject,SpatialObject) => Double
+      distFunc: (STObject,STObject) => Double
     ) = new LiveIndexedWithinDistanceSpatialRDD(qry, maxDist, distFunc, partitioner, rdd)
 }

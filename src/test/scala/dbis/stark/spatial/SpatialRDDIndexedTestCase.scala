@@ -7,7 +7,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.TestUtils
 import org.apache.spark.rdd.RDD
@@ -46,7 +46,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val rdd = createRDD()
     
-    val parti = rdd.partitioner.get.asInstanceOf[BSPartitioner[SpatialObject, (SpatialObject, (String, Int, String, SpatialObject))]]
+    val parti = rdd.partitioner.get.asInstanceOf[BSPartitioner[STObject, (STObject, (String, Int, String, STObject))]]
     
 //    parti.printHistogram("/home/hage/histo")
 //    parti.printPartitions("/home/hage/parts")
@@ -72,7 +72,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q = SpatialObject("POINT (53.483437 -2.2040706)")
+	  val q = STObject("POINT (53.483437 -2.2040706)")
 	  val foundGeoms = rdd.contains(q).flatten.collect()
 	  
 	  foundGeoms.size shouldBe 6
@@ -83,7 +83,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   ignore should "find the correct nearest neighbors" in { 
     val rdd = createRDD()
 	  
-	  val q: SpatialObject = "POINT (53.483437 -2.2040706)"
+	  val q: STObject = "POINT (53.483437 -2.2040706)"
 	  val foundGeoms = rdd.kNN(q, 6).collect()
 	  
 	      
@@ -106,14 +106,14 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "have correct types for chained executions" in  {
-    val q = SpatialObject("POINT (53.483437 -2.2040706)")
+    val q = STObject("POINT (53.483437 -2.2040706)")
     val rdd1 = createRDD()
     val res = rdd1.contains(q)
     
-    res.isInstanceOf[RDD[RTree[SpatialObject, (SpatialObject, (String, Int, String, SpatialObject))]]] shouldBe true
+    res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
     
     val res2 = res.intersect(qry)
-    res2.isInstanceOf[RDD[RTree[SpatialObject, (SpatialObject, (String, Int, String, SpatialObject))]]] shouldBe true
+    res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
 
     val res3 = res2.join(rdd1.flatten, (g1, g2) => false)
     

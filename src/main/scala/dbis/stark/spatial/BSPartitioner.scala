@@ -8,7 +8,7 @@ import scala.collection.JavaConverters._
 import org.apache.spark.rdd.RDD
 
 import dbis.stark.spatial.partitioner.BSP
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
 /**
  * A cost based binary space partitioner based on the paper
@@ -19,7 +19,7 @@ import dbis.stark.SpatialObject
  * @param sideLength side length of a quadratic cell - defines granularity
  * @param maxCostPerPartition Maximum cost a partition should have - here: number of elements  
  */
-class BSPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
+class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[(G,V)],
     _sideLength: Double,
     _maxCostPerPartition: Double = 1.0) extends SpatialPartitioner(rdd) {

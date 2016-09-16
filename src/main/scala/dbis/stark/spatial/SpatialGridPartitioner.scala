@@ -6,7 +6,7 @@ import scala.reflect.ClassTag
 import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Envelope
 
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
 /**
  * A grid partitioner that simply applies a grid to the data space.
@@ -20,7 +20,7 @@ import dbis.stark.SpatialObject
  * @param rdd The [[org.apache.spark.RDD]] to partition
  * @param dimensions The dimensionality of the input data 
  */
-class SpatialGridPartitioner[G <: SpatialObject : ClassTag, V: ClassTag](
+class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     partitionsPerDimension: Int, 
     rdd: RDD[(G,V)], 
     dimensions: Int = 2) extends SpatialPartitioner(rdd) {

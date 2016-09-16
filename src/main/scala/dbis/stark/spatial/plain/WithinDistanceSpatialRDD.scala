@@ -3,15 +3,15 @@ package dbis.stark.spatial.plain
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 
-class WithinDistanceSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class WithinDistanceSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G, 
     maxDist: Double,
-    distFunc: (SpatialObject,SpatialObject) => Double,
+    distFunc: (STObject,STObject) => Double,
     @transient private val prev: RDD[(G,V)]
   ) extends SpatialRDD(prev) {
   

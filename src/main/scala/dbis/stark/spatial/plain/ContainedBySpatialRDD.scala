@@ -6,9 +6,9 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
-class ContainedBySpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+class ContainedBySpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     qry: G,
     @transient private val prev: RDD[(G,V)]) extends SpatialRDD[G,V](prev) {
   

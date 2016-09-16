@@ -8,7 +8,7 @@ import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.indexed.SpatialGridPartition
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.SpatialGridPartitioner
-import dbis.stark.SpatialObject
+import dbis.stark.STObject
 
 /**
  * An abstract RDD implementation that uses a live index 
@@ -16,7 +16,7 @@ import dbis.stark.SpatialObject
  * @param _partitioner The partitioner to use for partitioning the underlying data
  * @param oneParent The original RDD 
  */
-abstract class IndexedSpatialRDD[G <: SpatialObject : ClassTag, V: ClassTag](
+abstract class IndexedSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     @transient private val _partitioner: SpatialPartitioner[G,V],
     @transient private val oneParent: RDD[(G,V)]
   ) extends LiveIndexedRDD[G,V](oneParent, _partitioner) {

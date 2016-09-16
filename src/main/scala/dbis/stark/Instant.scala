@@ -37,6 +37,8 @@ case class Instant(
   override def >(o: TemporalExpression): Boolean = o < this
   
   override def >=(o: TemporalExpression): Boolean = o <= this
+  
+  def -(o: Instant): Double = math.abs(o.value - value) 
 }
 
   

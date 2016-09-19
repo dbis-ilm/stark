@@ -22,8 +22,8 @@ case class PartitionStats(numPartitions: Int,
   )
   
 /**
- * A binary space partitioning algorithm implementation
- * based on 
+ * A binary space partitioning algorithm implementation based on 
+ * 
  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
  * by He, Tan, Luo, Feng, Fan 
  * 

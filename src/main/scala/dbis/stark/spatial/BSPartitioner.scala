@@ -18,7 +18,10 @@ import dbis.stark.STObject
  */
 case class Cell(range: NRectRange, extent: NRectRange) {
   override def hashCode() = range.hashCode()
-  override def equals(other: Any) = range.equals(other) 
+  override def equals(other: Any) = other match {
+    case Cell(otherRange, _) => range.equals(otherRange)
+    case _ => false
+  }
 }
 
 /**

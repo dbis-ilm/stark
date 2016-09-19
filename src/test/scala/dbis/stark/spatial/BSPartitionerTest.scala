@@ -99,15 +99,15 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val parti = new BSPartitioner(rdd, 1, 1)
 
     val shouldSizes = Array(
-      (NRectRange(NPoint(2,2), NPoint(3,3)), 2), // 0
-      (NRectRange(NPoint(3,2), NPoint(4,3)), 0), // 1
-      (NRectRange(NPoint(4,2), NPoint(5,3)), 1), // 2
-      (NRectRange(NPoint(2,3), NPoint(3,4)), 0), // 3
-      (NRectRange(NPoint(3,3), NPoint(4,4)), 0), // 4
-      (NRectRange(NPoint(4,3), NPoint(5,4)), 0), // 5
-      (NRectRange(NPoint(2,4), NPoint(3,5)), 1), // 6
-      (NRectRange(NPoint(3,4), NPoint(4,5)), 0), // 7
-      (NRectRange(NPoint(4,4), NPoint(5,5)), 1)  // 8
+      (Cell(NRectRange(NPoint(2,2), NPoint(3,3)),NRectRange(NPoint(2,2), NPoint(3,3))), 2), // 0
+      (Cell(NRectRange(NPoint(3,2), NPoint(4,3)),NRectRange(NPoint(3,2), NPoint(4,3))), 0), // 1
+      (Cell(NRectRange(NPoint(4,2), NPoint(5,3)),NRectRange(NPoint(4,2), NPoint(5,3))), 1), // 2
+      (Cell(NRectRange(NPoint(2,3), NPoint(3,4)),NRectRange(NPoint(2,3), NPoint(3,4))), 0), // 3
+      (Cell(NRectRange(NPoint(3,3), NPoint(4,4)),NRectRange(NPoint(3,3), NPoint(4,4))), 0), // 4
+      (Cell(NRectRange(NPoint(4,3), NPoint(5,4)),NRectRange(NPoint(4,3), NPoint(5,4))), 0), // 5
+      (Cell(NRectRange(NPoint(2,4), NPoint(3,5)),NRectRange(NPoint(2,4), NPoint(3,5))), 1), // 6
+      (Cell(NRectRange(NPoint(3,4), NPoint(4,5)),NRectRange(NPoint(3,4), NPoint(4,5))), 0), // 7
+      (Cell(NRectRange(NPoint(4,4), NPoint(5,5)),NRectRange(NPoint(4,4), NPoint(5,5))), 1)  // 8
     ) 
     
     parti.cells should contain only (shouldSizes:_*)
@@ -152,6 +152,22 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 500) 
+    
+    val shuff = new ShuffledRDD(rdd, parti) 
+    // insert dummy action to make sure Shuffled RDD is evaluated
+    shuff.foreach{f => }
+    
+    shuff.count() shouldBe 1000   
+    shuff.count() shouldBe rdd.count()
+    
+  }
+  
+  it should "return all points for max cost 100 & sidelength = 1" in {
+    
+    val rdd: RDD[(STObject, (String, Int, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    
+    // with maxcost = size of RDD everything will end up in one partition
+    val parti = new BSPartitioner(rdd, 1, _maxCostPerPartition = 100) 
     
     val shuff = new ShuffledRDD(rdd, parti) 
     // insert dummy action to make sure Shuffled RDD is evaluated

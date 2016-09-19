@@ -11,6 +11,17 @@ import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.STObject
 
 /**
+ * This class represents a cell or Partition
+ * 
+ * @param range The computed bounds of the cell
+ * @param extent The theoretical bounds of the cell with the minimum and maximum extent of the contained geometries
+ */
+case class Cell(range: NRectRange, extent: NRectRange) {
+  override def hashCode() = range.hashCode()
+  override def equals(other: Any) = range.equals(other) 
+}
+
+/**
  * A cost based binary space partitioner based on the paper
  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
  * by He, Tan, Luo, Feng, Fan 
@@ -54,17 +65,23 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simply aggregate by cell
    */
-  protected[spatial] val cells: Array[(NRectRange, Int)] = {
+  protected[spatial] val cells: Array[(Cell, Int)] = {
     
-    val themap = Map.empty[NRectRange, Int]
+    val themap = Map.empty[Cell, Int]
+    
     (0 until numXCells * numYCells).map { i => 
-      val cell = getCellBounds(i)
+      val cellBounds = getCellBounds(i)
+      
+      val cell = Cell(cellBounds, cellBounds)
       
       themap += (cell -> 0)
     }
     
     rdd.map { case (g,v) =>
       val p = g.getCentroid
+      
+      val env = g.getEnvelopeInternal
+      val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
       
       val newX = p.getX - minX
       val newY = p.getY - minY
@@ -74,12 +91,22 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       
       val cellId = y * numXCells + x
       
-      (cellId,1)
+      (cellId,(1, extent))
     }
-    .reduceByKey(_ + _)
+    .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) => 
+      val cnt = lCnt + rCnt
+      
+      val extent = lExtent.extend(rExtent)
+      
+      (cnt, extent)
+      
+    }
     .collect
-    .map { case (id, cnt) => (getCellBounds(id), cnt) }
-    .foreach { case (cell, cnt) => themap(cell) += cnt }
+    .map { case (id, cntAndExtent) => (getCellBounds(id), cntAndExtent) }
+    .foreach { case (cellBounds, (cnt,extent)) =>
+      val cell = Cell(cellBounds, extent)
+      themap(cell) += cnt 
+    }
     
     themap.toArray
   }
@@ -88,27 +115,27 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[spatial] val bsp = new BSP(
       NPoint(minX, minY), 
       NPoint(maxX, maxY), 
-      cells, 
+      cells.map{ case (cell, cnt) => (cell.range, cnt)}, // for BSP we only need calculated cell sizes and their respective counts 
       _sideLength, 
       _maxCostPerPartition)  
     
   override def partitionBounds(idx: Int): NRectRange = bsp.partitions(idx)  
   
-  def printPartitions(fName: String) {
-    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
-    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-      
-  } 
-    
-  def printHistogram(fName: String) {
-    
-    println(s"num in hist: ${cells.map(_._2).sum}")
-    
-    
-    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
-    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-      
-  } 
+//  def printPartitions(fName: String) {
+//    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
+//    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+//      
+//  } 
+//    
+//  def printHistogram(fName: String) {
+//    
+//    println(s"num in hist: ${cells.map(_._2).sum}")
+//    
+//    
+//    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
+//    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+//      
+//  } 
   
   override def numPartitions: Int = bsp.partitions.size
   

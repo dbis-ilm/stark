@@ -39,6 +39,11 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
     def points = Array(ll, ur, NPoint(ll(0),ur(1)), NPoint(ur(0),ll(1)))
       
     
+    def extend(other: NRectRange) = NRectRange(
+        this.ll.mergeMin(other.ll),
+        this.ur.mergeMax(other.ur)
+      )
+    
     /** 
      *  Dimensionality of the geometry
      */

@@ -14,6 +14,9 @@ import dbis.stark.spatial.BSPartitioner
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.dbscan.DBScan
 import dbis.stark.dbscan.ClusterLabel
+import dbis.stark.spatial.Utils
+import dbis.stark.spatial.NRectRange
+import dbis.stark.spatial.NPoint
 
 
 /**
@@ -28,21 +31,79 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that intersect with a given query geometry
    */
-  def intersect(qry: G) = rdd.mapPartitions({iter =>
-    iter.filter { case (g,_) => qry.intersects(g) }})
+  def intersect(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
+    
+    val partitionCheck = rdd.partitioner.map { p =>
+      p match {
+        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx)).intersects(qry.getGeo.getEnvelopeInternal)
+        case _ => true
+      }
+    }.getOrElse(true)
+    
+    if(partitionCheck)
+      iter.filter { case (g,_) => qry.intersects(g) }
+    else
+      Iterator.empty
+  })
+    
 
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = rdd.mapPartitions({iter =>
-    iter.filter { case (g,_) => g.containedBy(qry) }})
+  def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
+    
+    val partitionCheck = rdd.partitioner.map { p =>
+      p match {
+        case sp: SpatialPartitioner[G,V] => qry.getGeo.getEnvelopeInternal.contains(Utils.toEnvelope(sp.partitionBounds(idx)))
+        case _ => true
+      }
+    }.getOrElse(true)
+    
+    if(partitionCheck)
+      iter.filter { case (g,_) => qry.intersects(g) }
+    else
+      Iterator.empty
+  })
 
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(p: G) = rdd.mapPartitions({iter =>
-    iter.filter { case (g,_) => g.contains(p) }})
+  def contains(o: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
+    
+    val partitionCheck = rdd.partitioner.map { p =>
+      p match {
+        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx)).contains(o.getGeo.getEnvelopeInternal)
+        case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
+      }
+    }.getOrElse(true)
+    
+    if(partitionCheck)
+      iter.filter { case (g,_) => g.contains(o) }
+    else
+      Iterator.empty
+  })
 
+  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
+    rdd.mapPartitionsWithIndex({(idx,iter) =>
+    
+    val partitionCheck = rdd.partitioner.map { p =>
+      p match {
+        case sp: SpatialPartitioner[G,V] => {
+          val qryEnv = qry.getGeo.getEnvelopeInternal
+          val r = NRectRange(NPoint(qryEnv.getMinX - maxDist - 1, qryEnv.getMinY - maxDist - 1), NPoint(qryEnv.getMaxX + maxDist + 1, qryEnv.getMaxY + maxDist + 1))
+          Utils.toEnvelope(r).intersects(Utils.toEnvelope(sp.partitionBounds(idx)))
+        }
+        case _ => true
+      }
+    }.getOrElse(true)
+    
+    if(partitionCheck)
+      iter.filter { case (g,_) => distFunc(g,qry) <= maxDist }
+    else
+      Iterator.empty
+  })
+    
+      
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
     // compute k NN for each partition individually --> n * k results
     val r = rdd.mapPartitions({iter => iter.map { case (g,v) => 
@@ -60,12 +121,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     // return as an RDD
     rdd.sparkContext.parallelize(arr)
-  }
-  
-  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
-    rdd.mapPartitions({iter =>
-      iter.filter { case (g,_) => distFunc(g,qry) <= maxDist }})
-  
+  }   
   
   
   /**

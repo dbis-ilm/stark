@@ -13,6 +13,15 @@ case class NPoint(c: Array[Double]) extends Cloneable {
 	 */
 	def dim = c.size
 
+	
+	def mergeMin(other: NPoint) = NPoint(
+	    c.zip(other.c).map { case (l,r) => math.min(l, r) }
+    )
+  
+  def mergeMax(other: NPoint) = NPoint(
+      c.zip(other.c).map { case (l,r) => math.max(l, r) }
+    )
+	
 	/*
 	 * Override this because we need to compare "deep", i.e.
 	 * all values instead of just the reference, which may be 

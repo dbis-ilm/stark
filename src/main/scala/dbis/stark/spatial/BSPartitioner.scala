@@ -99,7 +99,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       themap(cell) += cnt 
     }
     
-    themap.toArray
+    themap.toArray.sortBy(_._1.range.id)
   }
 
   

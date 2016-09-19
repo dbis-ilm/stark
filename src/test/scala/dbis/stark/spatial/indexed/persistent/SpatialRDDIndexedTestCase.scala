@@ -52,7 +52,10 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 //    parti.printHistogram("/home/hage/histo")
 //    parti.printPartitions("/home/hage/parts")
     
+    val start = System.currentTimeMillis()
     val foundPoints = rdd.intersect(qry).flatten.collect()
+    val end = System.currentTimeMillis()
+    println(s"intersect + flatten: ${end - start} ms")
     
     withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
     
@@ -63,7 +66,10 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   it should "find all elements contained by a query" in { 
     val rdd = TestUtils.createIndexedRDD(sc)
     
+    val start = System.currentTimeMillis()
     val foundPoints = rdd.containedby(qry).flatten.collect()
+    val end = System.currentTimeMillis()
+    println(s"contaiedby + flatten: ${end - start} ms")
     
     withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
   }

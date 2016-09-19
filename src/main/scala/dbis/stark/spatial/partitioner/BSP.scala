@@ -58,6 +58,28 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
   def sideLength = _sideLength
   def maxCostPerPartition = _maxCostPerPartition
   
+  private val numXCells = Math.ceil((_ur.head - _ll.head) / _sideLength).toInt
+//  private val numYCells = Math.ceil((_ur.last - _ll.last) / _sideLength).toInt
+  
+  def getCellsIn(r: NRectRange): Seq[Int] = {
+    val numCells = cellsPerDimension(r)
+    
+    val llCellId = {
+//      val newX = r.ll(0) - _ll(0)
+//      val newY = r.ll(1) - _ll(1)
+      
+      val x = (r.ll(0).toInt / _sideLength).toInt
+      val y = (r.ll(1).toInt / _sideLength).toInt
+      
+      y * numXCells + x
+    }
+    
+    (0 until numCells(1)).flatMap { i =>
+      (llCellId+i*numXCells until llCellId+i*numXCells+numCells(0) - 1)  
+    }
+  }
+  
+  
   
   /**
    * Compute the cost for a partition, i.e. sum the cost
@@ -72,8 +94,8 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
       .map(_._2) // project to count value (number of elements in cell)
       .sum       // sum up 
     
-  protected[spatial] def cellsPerDimension(part: Cell) = (0 until part.range.dim).map { dim => 
-      math.ceil(part.range.lengths(dim) / _sideLength).toInt  
+  protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim => 
+      math.ceil(part.lengths(dim) / _sideLength).toInt  
     }    
     
   /**
@@ -108,7 +130,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
      * process only those dimensions, were there is more than on cell, 
      * i.e. we could split, actually
      */
-    cellsPerDimension(part).zipWithIndex      // index is the dimension
+    cellsPerDimension(part.range).zipWithIndex      // index is the dimension
                       .filter(_._1 > 1)       // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
@@ -126,15 +148,17 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           
           val range = NRectRange(part.range.ll.clone(), NPoint(ur)) 
           
-          // TODO: we should be able to compute the IDs of the contained cells wo that we don't have to 
-          // run over the histogram again... 
-          val extent = _cellHistogram.map(_._1).filter{ c => range.contains(c.range)}
-            .foldLeft(Cell(range)){ (e1,e2) =>  
-              // Reduce must return a Cell again, thus we wrap a Cell around our computed extent
-              Cell(e1.extent.extend(e2.extent))
-            }
+          println(s"range: $range")
+          getCellsIn(range).foreach(println)
+          println("--------------\n")
           
-          Cell(range, extent.extent)
+          // TODO: we should be able to compute the IDs of the contained cells wo that we don't have to 
+//           run over the histogram again... 
+          val extent = getCellsIn(range)
+            .map{ id => _cellHistogram(id)._1.extent }
+            .foldLeft(range){ (e1,e2) => e1.extend(e2)}
+          
+          Cell(range, extent)
         }
         
         val p2 = {
@@ -142,12 +166,10 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           ll(dim) += i*_sideLength 
          
           val range = NRectRange(NPoint(ll), part.range.ur.clone())
-          val extent = _cellHistogram.map(_._1).filter{ c => range.contains(c.range)}
-            .foldLeft(Cell(range)){ (e1,e2) =>  
-              // Reduce must return a Cell again, thus we wrap a Cell around our computed extent
-              Cell(e1.extent.extend(e2.extent))
-            }
-          Cell(range, extent.extent)  
+          val extent = getCellsIn(range)
+            .map{ id => _cellHistogram(id)._1.extent }
+            .foldLeft(range){ (e1,e2) => e1.extend(e2)}
+          Cell(range, extent)  
         }
         
         // calculate costs in each candidate partition
@@ -186,7 +208,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
 	   */
 	  var s = Cell(NRectRange(0, NPoint(_ll), NPoint(_ur)))
 			  
-			  val cellsPerDim = cellsPerDimension(s)
+			  val cellsPerDim = cellsPerDimension(s.range)
 			  val newUr = _ur.zipWithIndex.map { case (value, dim) => 
 			  if(_ll(dim) + cellsPerDim(dim) * _sideLength > _ur(dim))
 				  _ll(dim) + cellsPerDim(dim) * _sideLength

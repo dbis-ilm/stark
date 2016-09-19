@@ -30,7 +30,7 @@ abstract class IndexedSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
     // create the partitions
     Array.tabulate(parti.numPartitions){ idx =>
       val bounds = parti.partitionBounds(idx)
-      new SpatialPartition(idx, bounds)
+      new SpatialPartition(idx, bounds.extent)
     }
   }
 }

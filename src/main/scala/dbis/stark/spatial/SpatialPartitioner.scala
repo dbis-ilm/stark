@@ -31,6 +31,6 @@ abstract class SpatialPartitioner[G <: STObject : ClassTag, V: ClassTag](
     (minX, maxX + 1, minY, maxY + 1)
   }
   
-  def partitionBounds(idx: Int): NRectRange
+  def partitionBounds(idx: Int): Cell
 }
 

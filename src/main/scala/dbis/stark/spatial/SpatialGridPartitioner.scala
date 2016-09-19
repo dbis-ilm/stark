@@ -30,7 +30,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[this] val xLength = (maxX - minX) / partitionsPerDimension
   protected[this] val yLength = (maxY - minY) / partitionsPerDimension
   
-  protected[spatial] def getCellBounds(id: Int): NRectRange = {
+  protected[spatial] def getCellBounds(id: Int): Cell = {
     
     require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
     
@@ -43,7 +43,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     val urx = llx + xLength
     val ury = lly + yLength
       
-    NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
+    Cell(NRectRange(id, NPoint(llx, lly), NPoint(urx, ury)))
   }
   /**
    * Compute the cell id of a data point
@@ -67,7 +67,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     cellId
   }
   
-  override def partitionBounds(idx: Int): NRectRange = getCellBounds(idx)
+  override def partitionBounds(idx: Int) = getCellBounds(idx)
   
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 

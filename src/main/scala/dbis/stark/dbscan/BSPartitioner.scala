@@ -6,6 +6,7 @@ import org.apache.log4j.Logger
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
+import dbis.stark.spatial.Cell
 
 /**
   * Created by kai on 10.02.16.
@@ -15,7 +16,7 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
   var mbb: MBB = MBB.zero
   var maxPoints: Int = 0
   var cellHistogram: Array[(NRectRange, Int)] = Array()
-
+  
   implicit def npointToVector(n: NPoint) = Vectors.dense(n.c)
 
   def setMBB(m: MBB) = {
@@ -74,10 +75,10 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
 //    logInfo(s"num points according to hist: ${cellHistogram.map(_._2).sum}")
     
     val bsp = new BSP(mbb.minVec.toArray, mbb.maxVec.toArray,
-      cellHistogram, // _cellHistogram: Array[(NRectRange, Int)],
+      cellHistogram.map{ case (r,i) => (Cell(r),i)}, // _cellHistogram: Array[(NRectRange, Int)],
       cellSize, // 2 * eps
       maxPoints.toDouble)
 
-    bsp.partitions.map{ rrange => MBB(rrange.ll, rrange.ur) }
+    bsp.partitions.map{ rrange => MBB(rrange.range.ll, rrange.range.ur) }.toList
   }
 }

@@ -47,7 +47,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val rdd = TestUtils.createIndexedRDD(sc)
     
-    val parti = rdd.partitioner.get.asInstanceOf[BSPartitioner[STObject, (STObject, (String, Int, String, STObject))]]
+//    val parti = rdd.partitioner.get.asInstanceOf[BSPartitioner[STObject, (STObject, (String, Int, String, STObject))]]
     
 //    parti.printHistogram("/home/hage/histo")
 //    parti.printPartitions("/home/hage/parts")

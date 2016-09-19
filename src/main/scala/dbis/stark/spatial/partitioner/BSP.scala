@@ -6,19 +6,20 @@ import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.RecursiveAction
 import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
+import dbis.stark.spatial.Cell
 
 /**
  * A data class to store information about the created partitioning
  */
 case class PartitionStats(numPartitions: Int, 
     avgPoints: Double,    
-    maxPoints: List[(NRectRange, Int)],
-    minPoints: List[(NRectRange, Int)],
+    maxPoints: List[(Cell, Int)],
+    minPoints: List[(Cell, Int)],
     numPointsVariance: Double,
     volume: Double,
     avgVolume: Double,
-    maxVolume: List[(NRectRange, Double)],
-    minVolume: List[(NRectRange, Double)]
+    maxVolume: List[(Cell, Double)],
+    minVolume: List[(Cell, Double)]
   )
   
 /**
@@ -36,7 +37,7 @@ case class PartitionStats(numPartitions: Int,
  * cannot be further split.   
  */
 class BSP(_ll: Array[Double], _ur: Array[Double],
-    _cellHistogram: Array[(NRectRange, Int)],
+    _cellHistogram: Array[(Cell, Int)],
     _sideLength: Double,
     _maxCostPerPartition: Double
   ) extends Serializable {
@@ -47,7 +48,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
   require(_maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
   require(_sideLength > 0, "cell side length must not be negative or zero")
   
-  def this(_ll: NPoint, _ur: NPoint, hist: Array[(NRectRange, Int)], l: Double, cost: Double) = 
+  def this(_ll: NPoint, _ur: NPoint, hist: Array[(Cell, Int)], l: Double, cost: Double) = 
     this(_ll.c, _ur.c, hist, l, cost)
   
   
@@ -64,15 +65,15 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
    * 
    * @param part The partition 
    */
-  def costEstimation(part: NRectRange): Double =
+  def costEstimation(part: Cell): Double =
     _cellHistogram
       // consider only cells that really contains data and that belong to the given range/region
-      .filter { case (cell, cnt) => cnt > 0 && part.contains(cell) }  
+      .filter { case (cell, cnt) => cnt > 0 && part.range.contains(cell.range) }  
       .map(_._2) // project to count value (number of elements in cell)
       .sum       // sum up 
     
-  protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim => 
-      math.ceil(part.lengths(dim) / _sideLength).toInt  
+  protected[spatial] def cellsPerDimension(part: Cell) = (0 until part.range.dim).map { dim => 
+      math.ceil(part.range.lengths(dim) / _sideLength).toInt  
     }    
     
   /**
@@ -93,13 +94,13 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
    * @param part The partition to split
    * @return Returns the two created partitions. If one of them is empty, it is <code>None</code>
    */
-  protected[spatial] def costBasedSplit(part: NRectRange): (Option[NRectRange], Option[NRectRange]) = {
+  protected[spatial] def costBasedSplit(part: Cell): (Option[Cell], Option[Cell]) = {
     var minCostDiff = Double.PositiveInfinity
     
     // result variable with default value - will be overridden in any case
-    var parts: (Option[NRectRange], Option[NRectRange]) = (
-      Some(NRectRange(-1, NPoint(0,0),NPoint(0,0))), 
-      Some(NRectRange(-1,NPoint(0,0),NPoint(0,0)))
+    var parts: (Option[Cell], Option[Cell]) = (
+      Some(Cell(NRectRange(-1, NPoint(0,0),NPoint(0,0)))), 
+      Some(Cell(NRectRange(-1,NPoint(0,0),NPoint(0,0))))
     ) 
     
     /* 
@@ -120,18 +121,33 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           /* we need to copy the array, otherwise we have wrong values
            * in calculation for p2
            */
-          val ur = part.ur.c.clone()
-          ur(dim) = part.ll(dim) + i*_sideLength
+          val ur = part.range.ur.c.clone()
+          ur(dim) = part.range.ll(dim) + i*_sideLength
           
-          NRectRange(part.ll.clone(), NPoint(ur))
+          val range = NRectRange(part.range.ll.clone(), NPoint(ur)) 
+          
+          // TODO: we should be able to compute the IDs of the contained cells wo that we don't have to 
+          // run over the histogram again... 
+          val extent = _cellHistogram.map(_._1).filter{ c => range.contains(c.range)}
+            .foldLeft(Cell(range)){ (e1,e2) =>  
+              // Reduce must return a Cell again, thus we wrap a Cell around our computed extent
+              Cell(e1.extent.extend(e2.extent))
+            }
+          
+          Cell(range, extent.extent)
         }
         
         val p2 = {
-          val ll = part.ll.c.clone()
+          val ll = part.range.ll.c.clone()
           ll(dim) += i*_sideLength 
          
-          NRectRange(NPoint(ll), part.ur.clone())
-          
+          val range = NRectRange(NPoint(ll), part.range.ur.clone())
+          val extent = _cellHistogram.map(_._1).filter{ c => range.contains(c.range)}
+            .foldLeft(Cell(range)){ (e1,e2) =>  
+              // Reduce must return a Cell again, thus we wrap a Cell around our computed extent
+              Cell(e1.extent.extend(e2.extent))
+            }
+          Cell(range, extent.extent)  
         }
         
         // calculate costs in each candidate partition
@@ -168,7 +184,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
 	   * 
 	   * i.e. we expand our space to complete cells
 	   */
-	  var s = NRectRange(0, NPoint(_ll), NPoint(_ur))
+	  var s = Cell(NRectRange(0, NPoint(_ll), NPoint(_ur)))
 			  
 			  val cellsPerDim = cellsPerDimension(s)
 			  val newUr = _ur.zipWithIndex.map { case (value, dim) => 
@@ -178,7 +194,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
 					  _ur(dim)
 	  }
 	  // adjust start range
-	  NRectRange(0, s.ll, NPoint(newUr))
+	  Cell(NRectRange(0, s.range.ll, NPoint(newUr)))
     
   }
     
@@ -192,7 +208,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
     // add it to processing queue
     val queue = Queue(start)
 
-    val resultPartitions = ListBuffer.empty[NRectRange]
+    val resultPartitions = ListBuffer.empty[Cell]
     
     
     while(queue.nonEmpty) {
@@ -206,7 +222,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
        * than max cost allows, however, since we cannot split a cell, we have to live with this
        */
       
-      if((costEstimation(part) > _maxCostPerPartition) && (part.lengths.find ( _ > _sideLength ).isDefined) ) {
+      if((costEstimation(part) > _maxCostPerPartition) && (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
         
         val (p1, p2) = costBasedSplit(part)
         
@@ -223,7 +239,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
     
     // index is the ID of the partition
     resultPartitions.zipWithIndex.foreach { case (r, i) => 
-      r.id = i  
+      r.range.id = i  
     }
 
     resultPartitions.toList
@@ -245,7 +261,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
       .flatMap { case (cell, count) =>
         partitions.view
 //          .map(_._1)
-          .filter { p => p.contains(cell) }
+          .filter { p => p.range.contains(cell.range) }
           .map { p => (p, count) }        
       }
       .groupBy(_._1)
@@ -265,9 +281,9 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
     
     
     
-    val area = partitions.view.map(_.volume).sum
+    val area = partitions.view.map(_.range.volume).sum
     val avgArea = area / numParts
-    val partAreas = partCounts.map { case (part,_) => (part, part.volume) }
+    val partAreas = partCounts.map { case (part,_) => (part, part.range.volume) }
     // _2 is the area of a partition
     val maxA = partAreas.view.map(_._2).max
     val minA = partAreas.view.map(_._2).min

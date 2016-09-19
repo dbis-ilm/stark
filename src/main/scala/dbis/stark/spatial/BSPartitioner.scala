@@ -10,19 +10,7 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.STObject
 
-/**
- * This class represents a cell or Partition
- * 
- * @param range The computed bounds of the cell
- * @param extent The theoretical bounds of the cell with the minimum and maximum extent of the contained geometries
- */
-case class Cell(range: NRectRange, extent: NRectRange) {
-  override def hashCode() = range.hashCode()
-  override def equals(other: Any) = other match {
-    case Cell(otherRange, _) => range.equals(otherRange)
-    case _ => false
-  }
-}
+
 
 /**
  * A cost based binary space partitioner based on the paper
@@ -118,11 +106,11 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[spatial] val bsp = new BSP(
       NPoint(minX, minY), 
       NPoint(maxX, maxY), 
-      cells.map{ case (cell, cnt) => (cell.range, cnt)}, // for BSP we only need calculated cell sizes and their respective counts 
+      cells, // for BSP we only need calculated cell sizes and their respective counts 
       _sideLength, 
       _maxCostPerPartition)  
     
-  override def partitionBounds(idx: Int): NRectRange = bsp.partitions(idx)  
+  override def partitionBounds(idx: Int) = bsp.partitions(idx)  
   
 //  def printPartitions(fName: String) {
 //    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
@@ -152,7 +140,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
      */
     val part = bsp.partitions.filter{ p =>
       val c = g.getCentroid
-      p.contains(NPoint(c.getX, c.getY)) 
+      p.range.contains(NPoint(c.getX, c.getY)) 
     }.headOption
     
     part match {
@@ -161,7 +149,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
         println(bsp.partitionStats)
         throw new IllegalStateException(s"$g is not in any partition!")
       case Some(part) =>  
-        part.id
+        part.range.id
       
     }
     

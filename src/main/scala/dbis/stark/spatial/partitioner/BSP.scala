@@ -2,8 +2,6 @@ package dbis.stark.spatial.partitioner
 
 import scala.collection.mutable.Queue
 import scala.collection.mutable.ListBuffer
-import java.util.concurrent.ForkJoinPool
-import java.util.concurrent.RecursiveAction
 import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
 import dbis.stark.spatial.Cell
@@ -58,24 +56,22 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
   def sideLength = _sideLength
   def maxCostPerPartition = _maxCostPerPartition
   
-  private val numXCells = Math.ceil((_ur.head - _ll.head) / _sideLength).toInt
-//  private val numYCells = Math.ceil((_ur.last - _ll.last) / _sideLength).toInt
   
-  def getCellsIn(r: NRectRange): Seq[Int] = {
+  private val numXCells = math.ceil(( math.abs(math.abs(_ur.head) - math.abs(_ll.head) - 1) ) / _sideLength).toInt
+  
+  def getCellsIn(r: NRectRange, minX: Double, minY: Double): Seq[Int] = {
     val numCells = cellsPerDimension(r)
-    
     val llCellId = {
-//      val newX = r.ll(0) - _ll(0)
-//      val newY = r.ll(1) - _ll(1)
       
-      val x = (r.ll(0).toInt / _sideLength).toInt
-      val y = (r.ll(1).toInt / _sideLength).toInt
+      val x = math.ceil(math.abs(r.ll(0) - minX) / _sideLength).toInt
+      val y = math.ceil(math.abs(r.ll(1) - minY) / _sideLength).toInt
       
       y * numXCells + x
     }
     
     (0 until numCells(1)).flatMap { i =>
-      (llCellId+i*numXCells until llCellId+i*numXCells+numCells(0) - 1)  
+      
+      (llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells )  
     }
   }
   
@@ -94,9 +90,12 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
       .map(_._2) // project to count value (number of elements in cell)
       .sum       // sum up 
     
-  protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim => 
-      math.ceil(part.lengths(dim) / _sideLength).toInt  
-    }    
+  protected[spatial] def cellsPerDimension(part: NRectRange) = {
+    val lengths =  part.lengths
+    (0 until part.dim).map { dim =>  
+      math.ceil(lengths(dim) / _sideLength).toInt  
+    }
+  }
     
   /**
    * Split the given partition into two partitions so that 
@@ -147,14 +146,13 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           ur(dim) = part.range.ll(dim) + i*_sideLength
           
           val range = NRectRange(part.range.ll.clone(), NPoint(ur)) 
-          
-          println(s"range: $range")
-          getCellsIn(range).foreach(println)
-          println("--------------\n")
-          
-          // TODO: we should be able to compute the IDs of the contained cells wo that we don't have to 
-//           run over the histogram again... 
-          val extent = getCellsIn(range)
+
+          /* we create the extent of this new partition from the extent of
+           * all contained cells
+           * TODO: for each iteration, we could re-use the extent from the 
+           * previous iteration and extend it with the extent of the new cells
+           */
+          val extent = getCellsIn(range, ll(0), ll(1)).par
             .map{ id => _cellHistogram(id)._1.extent }
             .foldLeft(range){ (e1,e2) => e1.extend(e2)}
           
@@ -166,7 +164,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           ll(dim) += i*_sideLength 
          
           val range = NRectRange(NPoint(ll), part.range.ur.clone())
-          val extent = getCellsIn(range)
+          val extent = getCellsIn(range, ll(0), ll(1)).par
             .map{ id => _cellHistogram(id)._1.extent }
             .foldLeft(range){ (e1,e2) => e1.extend(e2)}
           Cell(range, extent)  

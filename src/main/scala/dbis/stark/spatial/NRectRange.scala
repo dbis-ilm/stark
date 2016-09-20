@@ -52,7 +52,7 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
     /**
      * The side lengths of the geometry. Lazily evaluated.
      */
-    lazy val lengths = (0 until dim).map { i => ur(i) - ll(i) }.toArray 
+    lazy val lengths = (0 until dim).map { i => math.abs(ur(i) - ll(i)) }.toArray 
     
     /**
      * The volume (area, in 2D) of the geometry. Lazily evaluated

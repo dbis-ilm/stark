@@ -133,8 +133,13 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
                       .filter(_._1 > 1)       // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
+      var prevP1Range: Option[Cell] = None
+      var prevP2Range: Option[Cell] = None
+                        
       // calculate candidate partitions it we split at each possible cell
       for(i <- (1 until numCells)) {
+        
+        
         
         // TODO: better documentation for this calculation formulas
         val p1 = {
@@ -152,23 +157,35 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
            * TODO: for each iteration, we could re-use the extent from the 
            * previous iteration and extend it with the extent of the new cells
            */
-          val extent = getCellsIn(range, ll(0), ll(1)).par
-            .map{ id => _cellHistogram(id)._1.extent }
-            .foldLeft(range){ (e1,e2) => e1.extend(e2)}
           
+          val newRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
+          val newRangeExtent = getCellsIn(newRange,ll(0), ll(1)).par
+            .map { id => _cellHistogram(id)._1.extent }
+            .foldLeft(range){ (e1,e2) => e1.extend(e2)}
+
+          val extent = prevP1Range.map{ p => p.extent.extend(newRangeExtent)}.getOrElse(newRangeExtent)   
+            
           Cell(range, extent)
         }
+        prevP1Range = Some(p1)
         
         val p2 = {
           val ll = part.range.ll.c.clone()
           ll(dim) += i*_sideLength 
          
+          /*
+           * Here, we cannot add the extent of new cells, since P2 shrinks with the increase of
+           * P1. Thus we have fewer cells and our extent can only shrink as well (or stay unchanged).
+           * However, I have no good idea how to compute the shrinking.
+           */
           val range = NRectRange(NPoint(ll), part.range.ur.clone())
           val extent = getCellsIn(range, ll(0), ll(1)).par
             .map{ id => _cellHistogram(id)._1.extent }
             .foldLeft(range){ (e1,e2) => e1.extend(e2)}
           Cell(range, extent)  
         }
+        
+        prevP2Range = Some(p2)
         
         // calculate costs in each candidate partition
         val p1Cost = costEstimation(p1)

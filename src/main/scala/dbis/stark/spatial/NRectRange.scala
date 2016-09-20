@@ -44,6 +44,38 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
         this.ur.mergeMax(other.ur)
       )
     
+    def diff(other: NRectRange) = {
+      
+      // FIXME: arbitrary no. dimensions
+      require(dim == 2,"works for 2 dimensions only")
+      require(dim == other.dim, "both Ranges must be of same dimension")
+      require(ll == other.ll, "lower left points must be equal for diff")
+      require(ur(0) == other.ur(0) || ur(1) == other.ur(1), "upper x or y must be equal for diff")
+      
+      if(ur(0) == other.ur(0)) {
+        
+        val (smaller, bigger) = if(ur(1) > other.ur(1)) (other, this) else (this, other)
+        NRectRange(
+          NPoint(ll(0), smaller.ur(1)),
+          bigger.ur.clone()
+        )  
+      } else {
+        
+    	  val (smaller, bigger) = if(ur(0) > other.ur(0)) (other, this) else (this, other)
+        
+        NRectRange(
+          NPoint(smaller.ur(0), ll(1)),
+          bigger.ur.clone()
+        )
+      }
+      
+      
+      
+    }  
+    
+    
+    
+      
     /** 
      *  Dimensionality of the geometry
      */

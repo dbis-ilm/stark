@@ -81,5 +81,34 @@ class NRectRangeTest extends FlatSpec with Matchers {
     
   }
   
+  it should "create the correct diff range for changing x" in {
+    
+    val rect1 = NRectRange(NPoint(-14,-14), NPoint(-7,-7))
+    val rect2 = NRectRange(NPoint(-14,-14), NPoint(-1,-7))
+    
+    val diff = rect1.diff(rect2)
+    diff shouldBe NRectRange(NPoint(-7,-14), NPoint(-1,-7))
+    
+  }
+  
+  it should "create the correct diff range for changing y" in {
+    
+    val rect1 = NRectRange(NPoint(-14,-14), NPoint(-7,-1))
+    val rect2 = NRectRange(NPoint(-14,-14), NPoint(-7,-7))
+    
+    val diff = rect1.diff(rect2)
+    diff shouldBe NRectRange(NPoint(-14,-7), NPoint(-7,-1))
+    
+  }
+  
+  it should "diff should be commutative" in {
+    
+    val rect1 = NRectRange(NPoint(-14,-14), NPoint(-7,-7))
+    val rect2 = NRectRange(NPoint(-14,-14), NPoint(-1,-7))
+    
+    val diff = rect1.diff(rect2)
+    val diff2 = rect2.diff(rect1)
+    diff shouldBe diff2
+  }
   
 }

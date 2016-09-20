@@ -57,21 +57,20 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
   def maxCostPerPartition = _maxCostPerPartition
   
   
-  private val numXCells = math.ceil(( math.abs(math.abs(_ur.head) - math.abs(_ll.head) - 1) ) / _sideLength).toInt
+  private lazy val numXCells = math.ceil(( math.abs(_ur.head - _ll.head) ) / _sideLength).toInt
   
   def getCellsIn(r: NRectRange, minX: Double, minY: Double): Seq[Int] = {
     val numCells = cellsPerDimension(r)
+    
     val llCellId = {
       
       val x = math.ceil(math.abs(r.ll(0) - minX) / _sideLength).toInt
       val y = math.ceil(math.abs(r.ll(1) - minY) / _sideLength).toInt
-      
       y * numXCells + x
     }
     
     (0 until numCells(1)).flatMap { i =>
-      
-      (llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells )  
+      (llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells )
     }
   }
   
@@ -129,17 +128,14 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
      * process only those dimensions, were there is more than on cell, 
      * i.e. we could split, actually
      */
+    
     cellsPerDimension(part.range).zipWithIndex      // index is the dimension
                       .filter(_._1 > 1)       // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
-      var prevP1Range: Option[Cell] = None
-      var prevP2Range: Option[Cell] = None
-                        
+      var prevP1Range: Option[Cell] = None                    
       // calculate candidate partitions it we split at each possible cell
       for(i <- (1 until numCells)) {
-        
-        
         
         // TODO: better documentation for this calculation formulas
         val p1 = {
@@ -158,34 +154,33 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
            * previous iteration and extend it with the extent of the new cells
            */
           
-          val newRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
-          val newRangeExtent = getCellsIn(newRange,ll(0), ll(1)).par
+          val diffRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
+          val diffRangeExtent = getCellsIn(diffRange,ll(0), ll(1))
             .map { id => _cellHistogram(id)._1.extent }
-            .foldLeft(range){ (e1,e2) => e1.extend(e2)}
-
-          val extent = prevP1Range.map{ p => p.extent.extend(newRangeExtent)}.getOrElse(newRangeExtent)   
-            
+            .foldLeft(diffRange){ (e1,e2) =>
+              e1.extend(e2)
+            }
+          val extent = prevP1Range.map{ p => p.extent.extend(diffRangeExtent)}.getOrElse(diffRangeExtent)   
           Cell(range, extent)
         }
         prevP1Range = Some(p1)
-        
         val p2 = {
-          val ll = part.range.ll.c.clone()
-          ll(dim) += i*_sideLength 
+          val rll = part.range.ll.c.clone()
+          rll(dim) += i*_sideLength 
          
           /*
            * Here, we cannot add the extent of new cells, since P2 shrinks with the increase of
            * P1. Thus we have fewer cells and our extent can only shrink as well (or stay unchanged).
            * However, I have no good idea how to compute the shrinking.
            */
-          val range = NRectRange(NPoint(ll), part.range.ur.clone())
-          val extent = getCellsIn(range, ll(0), ll(1)).par
+          val range = NRectRange(NPoint(rll), part.range.ur.clone())
+          val thecells = getCellsIn(range, ll(0), ll(1))
+          val extent = thecells
             .map{ id => _cellHistogram(id)._1.extent }
             .foldLeft(range){ (e1,e2) => e1.extend(e2)}
           Cell(range, extent)  
         }
         
-        prevP2Range = Some(p2)
         
         // calculate costs in each candidate partition
         val p1Cost = costEstimation(p1)
@@ -210,7 +205,6 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
      * and have stored the one that creates a minimal cost difference between both
      * partitions - return this
      */
-    
     parts
   }  
   

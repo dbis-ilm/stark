@@ -40,8 +40,8 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
       
     
     def extend(other: NRectRange) = NRectRange(
-        this.ll.mergeMin(other.ll),
-        this.ur.mergeMax(other.ur)
+        this.ll.mergeMin(other.ll).mergeMin(other.ur),
+        this.ur.mergeMax(other.ur).mergeMax(other.ll)
       )
     
     def diff(other: NRectRange) = {

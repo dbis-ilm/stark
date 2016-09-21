@@ -8,9 +8,10 @@ import dbis.stark.STObject
 import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.Predicates
+import dbis.stark.spatial.SpatialRDDFunctions
 
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[RTree[G, (G,V)]]) {
+    rdd: RDD[RTree[G, (G,V)]]) extends Serializable {
 
   def contains(qry: G) = rdd.mapPartitions({ trees => 
     trees.map{ tree =>

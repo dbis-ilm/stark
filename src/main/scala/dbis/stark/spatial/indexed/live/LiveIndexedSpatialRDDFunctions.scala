@@ -9,12 +9,13 @@ import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.Predicates
+import dbis.stark.spatial.SpatialRDDFunctions
 
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     partitioner: SpatialPartitioner[G,V],
     rdd: RDD[(G,V)],
     capacity: Int
-  ) extends Serializable {
+  ) extends SpatialRDDFunctions[G,V] with Serializable {
 
   def intersect(qry: G) = new LiveIndexedFilterSpatialRDD(qry, capacity, Predicates.intersects _, partitioner, rdd) 
 
@@ -40,6 +41,15 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   
   
   def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new LiveIndexedJoinSpatialRDD(rdd, other, pred, capacity)
+  
+  def cluster[KeyType](
+		  minPts: Int,
+		  epsilon: Double,
+		  keyExtractor: ((G,V)) => KeyType,
+		  includeNoise: Boolean = true,
+		  maxPartitionCost: Int = 10,
+		  outfile: Option[String] = None
+		  ) : RDD[(G, (Int, V))] = ???
 }
 
 

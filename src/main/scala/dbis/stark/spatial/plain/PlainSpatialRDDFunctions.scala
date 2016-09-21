@@ -17,6 +17,7 @@ import dbis.stark.dbscan.ClusterLabel
 import dbis.stark.spatial.Utils
 import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
+import dbis.stark.spatial.SpatialRDDFunctions
 
 
 /**
@@ -26,7 +27,7 @@ import dbis.stark.spatial.NPoint
  */
 class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
-  ) extends Serializable {
+  ) extends SpatialRDDFunctions[G,V] with Serializable {
 
   /**
    * Find all elements that intersect with a given query geometry

@@ -49,7 +49,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     val rdd = TestUtils.createRDD(sc)
     
-    val foundPoints = rdd.intersect(qry).collect()
+    val foundPoints = rdd.intersects(qry).collect()
     
     withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
     

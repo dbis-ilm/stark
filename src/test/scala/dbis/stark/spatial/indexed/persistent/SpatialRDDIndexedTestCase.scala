@@ -52,7 +52,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 //    parti.printHistogram("/home/hage/histo")
 //    parti.printPartitions("/home/hage/parts")
     
-    val foundPoints = rdd.intersect(qry).flatten.collect()
+    val foundPoints = rdd.intersects(qry).flatten.collect()
     
     withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
     
@@ -221,7 +221,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
     
-    val res2 = res.intersect(qry)
+    val res2 = res.intersects(qry)
     res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
 
     val res3 = res2.join(rdd1.flatten, (g1, g2) => false)

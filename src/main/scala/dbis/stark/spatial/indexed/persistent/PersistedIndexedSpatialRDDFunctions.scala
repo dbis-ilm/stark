@@ -27,7 +27,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     }
   }, true) // preserve partitioning
 
-  def intersect(qry: G) = rdd.mapPartitions({ trees => 
+  def intersects(qry: G) = rdd.mapPartitions({ trees => 
     trees.map{ tree =>
       tree.queryRO(qry, Predicates.intersects _)
       tree

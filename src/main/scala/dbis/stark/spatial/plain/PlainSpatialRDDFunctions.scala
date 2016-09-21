@@ -28,7 +28,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that intersect with a given query geometry
    */
-  def intersect(qry: G) = rdd.mapPartitions({iter =>
+  def intersects(qry: G) = rdd.mapPartitions({iter =>
     iter.filter { case (g,_) => qry.intersects(g) }})
 
   /**

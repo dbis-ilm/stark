@@ -16,7 +16,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     capacity: Int
   ) extends Serializable {
 
-  def intersect(qry: G) = new LiveIndexedFilterSpatialRDD(qry, capacity, Predicates.intersects _, partitioner, rdd) 
+  def intersects(qry: G) = new LiveIndexedFilterSpatialRDD(qry, capacity, Predicates.intersects _, partitioner, rdd) 
 
   def contains(qry: G) = new LiveIndexedFilterSpatialRDD(qry, capacity, Predicates.contains _, partitioner, rdd)
 

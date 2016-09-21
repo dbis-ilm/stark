@@ -10,8 +10,6 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.STObject
 
-
-
 /**
  * A cost based binary space partitioner based on the paper
  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
@@ -29,8 +27,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
   
-  protected[spatial] val numXCells = Math.ceil((maxX - minX) / _sideLength).toInt
-  protected[spatial] val numYCells = Math.ceil((maxY - minY) / _sideLength).toInt
+  protected[spatial] val numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
+  protected[spatial] val numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
   
   /**
    * Compute the bounds of a cell with the given ID
@@ -74,8 +72,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       val env = g.getEnvelopeInternal
       val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
       
-      val newX = p.getX - minX
-      val newY = p.getY - minY
+      val newX = math.abs(p.getX - minX)
+      val newY = math.abs(p.getY - minY)
     
       val x = (newX.toInt / _sideLength).toInt
       val y = (newY.toInt / _sideLength).toInt
@@ -112,21 +110,21 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
   override def partitionBounds(idx: Int) = bsp.partitions(idx)  
   
-//  def printPartitions(fName: String) {
-//    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
-//    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-//      
-//  } 
-//    
-//  def printHistogram(fName: String) {
-//    
-//    println(s"num in hist: ${cells.map(_._2).sum}")
-//    
-//    
-//    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
-//    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-//      
-//  } 
+  def printPartitions(fName: String) {
+    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
+    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+      
+  } 
+    
+  def printHistogram(fName: String) {
+    
+    println(s"num in hist: ${cells.map(_._2).sum}")
+    
+    
+    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
+    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+      
+  } 
   
   override def numPartitions: Int = bsp.partitions.size
   

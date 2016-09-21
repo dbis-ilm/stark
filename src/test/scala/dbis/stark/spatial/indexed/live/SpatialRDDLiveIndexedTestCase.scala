@@ -50,7 +50,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = TestUtils.createRDD(sc).liveIndex(5,10)
     
-    val foundPoints = rdd.intersect(qry).collect()
+    val foundPoints = rdd.intersects(qry).collect()
     
     withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
     

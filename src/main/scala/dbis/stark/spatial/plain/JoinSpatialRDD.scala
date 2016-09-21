@@ -14,6 +14,9 @@ import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import scala.collection.mutable.ListBuffer
 import org.apache.spark.InterruptibleIterator
 import dbis.stark.STObject
+import dbis.stark.spatial.SpatialPartitioner
+import dbis.stark.spatial.Utils
+import org.apache.spark.NarrowDependency
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
@@ -23,29 +26,70 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
 //  )  extends SpatialRDD[G,(V,V2)](left.context, Seq(new OneToOneDependency(left), new OneToOneDependency(right))) {
     )  extends RDD[(V,V2)](left.context, Seq(new OneToOneDependency(left), new OneToOneDependency(right))) {
   
-  override def getPartitions = Array.tabulate(left.getNumPartitions){ i =>  new JoinPartition(i, 
-		  new NarrowIndexJoinSplitDep(left, i, left.partitions(i)),
-			  Array.tabulate(right.getNumPartitions){j => 
-	  		  new NarrowIndexJoinSplitDep(right, j, right.partitions(j))
-    	  }
-		  )
+  override def getPartitions = Array.tabulate(left.getNumPartitions){ i =>  
+    
+    val leftExtent = leftParti.map { p => Utils.toEnvelope(p.partitionBounds(i).extent) }    
+    new JoinPartition(i, 
+		  new NarrowIndexJoinSplitDep(
+	      left, 
+	      i, 
+	      left.partitions(i)),
+//		    Array.tabulate(right.getNumPartitions){ j => 
+//		      new NarrowIndexJoinSplitDep(right, j, right.partitions(j))  
+//        }
+	      // create only right dependencies if the partition bound intersects with the left bounds
+	      (0 until right.getNumPartitions).filter { j =>
+	        if(leftExtent.isDefined && rightParti.isDefined) {
+	          val rightExtent = Utils.toEnvelope(rightParti.get.partitionBounds(j).extent)
+	          leftExtent.get.intersects(rightExtent)
+	        } else
+	          true
+	        
+        }.map( j => new NarrowIndexJoinSplitDep(right, j, right.partitions(j))).toArray 
+		 )
   }
+  
+  private lazy val leftParti = {
+    val p = left.partitioner 
+      if(p.isDefined) {
+        p.get match {
+          case sp: SpatialPartitioner[G,V] => Some(sp)
+          case _ => None
+        }
+      } else 
+        None
+  }
+  private lazy val rightParti = {
+    val p = right.partitioner 
+      if(p.isDefined) {
+        p.get match {
+          case sp: SpatialPartitioner[G,V2] => Some(sp)
+          case _ => None
+        }
+      } else 
+        None
+  }
+  
   
   @DeveloperApi
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[JoinPartition]
-    val left  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]].toList
+    val leftIter  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]].toList
+    
+    // again check if the right geom lies within the extent of left
+    // specially useful if only left was partitioned
+    val rightIter = split.rightDeps.flatMap( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])
+                      .filter { case (rg,_) => 
+                        leftParti.map { p => 
+                          rg.getEnvelopeInternal.intersects(Utils.toEnvelope(p.partitionBounds(s.index).extent))
+                        }.getOrElse(true)
+                      }
 
-    /* FIXME use external map for join
-     * eigentlich muesste der Combiner einen R-Baum haben 
-     * aber das funktioneirt wahrscheinlich nicht mehr mit der Map --> was eigenes implementieren
-     */
-    
-    
     val map = createExternalMap
     
-    for((lg,lv) <- left) {
-      val res = split.rightDeps.flatMap( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])
+    for((lg,lv) <- leftIter) {
+      
+      val res = rightIter
                   .filter { case (rg, rv) => predicate(lg, rg) }
                   .map { case (rg, rv) => (lg,(lv, rv)) }
       

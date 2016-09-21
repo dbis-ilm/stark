@@ -53,7 +53,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 //    parti.printPartitions("/home/hage/parts")
     
     val start = System.currentTimeMillis()
-    val foundPoints = rdd.intersect(qry).flatten.collect()
+    val foundPoints = rdd.intersects(qry).flatten.collect()
     val end = System.currentTimeMillis()
     println(s"intersect + flatten: ${end - start} ms")
     
@@ -227,7 +227,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
     
-    val res2 = res.intersect(qry)
+    val res2 = res.intersects(qry)
     res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
 
     val res3 = res2.join(rdd1.flatten, (g1, g2) => false)

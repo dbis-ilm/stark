@@ -10,8 +10,6 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.STObject
 
-
-
 /**
  * A cost based binary space partitioner based on the paper
  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
@@ -29,8 +27,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
   
-  protected[spatial] val numXCells = Math.ceil((maxX - minX) / _sideLength).toInt
-  protected[spatial] val numYCells = Math.ceil((maxY - minY) / _sideLength).toInt
+  protected[spatial] val numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
+  protected[spatial] val numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
   
   /**
    * Compute the bounds of a cell with the given ID
@@ -74,8 +72,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       val env = g.getEnvelopeInternal
       val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
       
-      val newX = p.getX - minX
-      val newY = p.getY - minY
+      val newX = math.abs(p.getX - minX)
+      val newY = math.abs(p.getY - minY)
     
       val x = (newX.toInt / _sideLength).toInt
       val y = (newY.toInt / _sideLength).toInt
@@ -112,21 +110,21 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
   override def partitionBounds(idx: Int) = bsp.partitions(idx)  
   
-//  def printPartitions(fName: String) {
-//    val list = bsp.partitions.map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
-//    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-//      
-//  } 
-//    
-//  def printHistogram(fName: String) {
-//    
-//    println(s"num in hist: ${cells.map(_._2).sum}")
-//    
-//    
-//    val list = cells.map { case (c,i) => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
-//    java.nio.file.Files.write(new java.io.File(fName).toPath(), list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-//      
-//  } 
+  def printPartitions(fName: java.nio.file.Path) {
+    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
+    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+      
+  } 
+    
+  def printHistogram(fName: java.nio.file.Path) {
+    
+    println(s"num in hist: ${cells.map(_._2).sum}")
+    
+    
+    val list = cells.map(_._1.range).map { case c => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
+    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+      
+  } 
   
   override def numPartitions: Int = bsp.partitions.size
   
@@ -134,9 +132,10 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     val g = key.asInstanceOf[G]
 //    println(s"get partition for key $g")
 
-    /* XXX: This will throw an error if the geometry is outside of our initial data space
+    /* XXX: This will throw an error if the geometry is outside of our partitions!
      * However, this should not happen, because the partitioner is specially for a given RDD
-     * which by definition is immutable. 
+     * which by definition is immutable and the partitions should cover the complete data space 
+     * of the RDD's content
      */
     val part = bsp.partitions.filter{ p =>
       val c = g.getCentroid
@@ -147,6 +146,16 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       case None => 
         println(bsp.partitions.mkString("\n"))
         println(bsp.partitionStats)
+        val histoFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_histogram", null)
+        val partitionFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_partitions", null)
+        
+        println(s"saving historgram to $histoFile")
+        printHistogram(histoFile)
+        
+        println(s"saving partitions to $partitionFile")
+        printPartitions(partitionFile)
+        
+        
         throw new IllegalStateException(s"$g is not in any partition!")
       case Some(part) =>  
         part.range.id

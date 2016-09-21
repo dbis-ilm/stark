@@ -56,7 +56,7 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Compute an intersection of the elements in this RDD with the given geometry
    */
-  def intersect(qry: G) = new PlainSpatialRDDFunctions(this).intersect(qry) 
+  def intersects(qry: G) = new PlainSpatialRDDFunctions(this).intersects(qry) 
 
   /**
    * Find all elements that are contained by the given geometry

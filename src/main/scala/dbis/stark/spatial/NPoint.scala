@@ -6,6 +6,9 @@ package dbis.stark.spatial
  * @param c: The array of coordinate values in each dimension
  */
 case class NPoint(c: Array[Double]) extends Cloneable {
+  
+  require(c.size >= 2, "dimension must be >= 2")
+  
 	def apply(idx:Int) = c(idx)
 
 	/**

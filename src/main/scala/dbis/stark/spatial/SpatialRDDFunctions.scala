@@ -6,7 +6,7 @@ import org.apache.spark.rdd.RDD
 
 abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] extends Serializable {
   
-  def intersect(qry: G): RDD[(G,V)]
+  def intersects(qry: G): RDD[(G,V)]
     
 
   /**

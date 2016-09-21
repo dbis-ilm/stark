@@ -27,8 +27,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
   
-  protected[spatial] val numXCells = Math.ceil((maxX - minX) / _sideLength).toInt
-  protected[spatial] val numYCells = Math.ceil((maxY - minY) / _sideLength).toInt
+  protected[spatial] val numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
+  protected[spatial] val numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
   
   /**
    * Compute the bounds of a cell with the given ID
@@ -66,8 +66,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     rdd.map { case (g,v) =>
       val p = g.getCentroid
       
-      val newX = p.getX - minX
-      val newY = p.getY - minY
+      val newX = math.abs(p.getX - minX)
+      val newY = math.abs(p.getY - minY)
     
       val x = (newX.toInt / _sideLength).toInt
       val y = (newY.toInt / _sideLength).toInt
@@ -129,7 +129,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       case None => 
         println(bsp.partitions.mkString("\n"))
         println(bsp.partitionStats)
-        throw new IllegalStateException(s"$g is not in any partition!")
+        throw new IllegalStateException(s"$g is not in any partition! partitions: \n\t${bsp.partitions.mkString("\n\t")}  \n ${bsp.partitionStats}")
       case Some(part) =>  
         part.id
       

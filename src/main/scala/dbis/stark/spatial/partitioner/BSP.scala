@@ -10,7 +10,11 @@ import dbis.stark.spatial.NPoint
 /**
  * A data class to store information about the created partitioning
  */
-case class PartitionStats(numPartitions: Int, 
+case class PartitionStats(
+    ll: NPoint,
+    ur: NPoint,
+    start: NRectRange,
+    numPartitions: Int, 
     avgPoints: Double,    
     maxPoints: List[(NRectRange, Int)],
     minPoints: List[(NRectRange, Int)],
@@ -18,8 +22,26 @@ case class PartitionStats(numPartitions: Int,
     volume: Double,
     avgVolume: Double,
     maxVolume: List[(NRectRange, Double)],
-    minVolume: List[(NRectRange, Double)]
-  )
+    minVolume: List[(NRectRange, Double)],
+    histoSize: Int
+  ) {
+  
+  override def toString() = s"""stats:
+    start range: $start 
+    ll: $ll
+    ur: $ur
+    numPartitions: $numPartitions
+    avgPoints: $avgPoints
+    maxPoints: $maxPoints
+    minPoints: $minPoints
+    numPointsVariance: $numPointsVariance
+    volume: $volume
+    avg vol: $avgVolume
+    max vol: $maxVolume
+    min vol: $minVolume
+    histo size: $histoSize
+    """
+}
   
 /**
  * A binary space partitioning algorithm implementation
@@ -277,7 +299,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
     
     val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
     
-    PartitionStats(numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea) 
+    PartitionStats(NPoint(ll), NPoint(ur), start,numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea, _cellHistogram.size) 
   }  
     
 }

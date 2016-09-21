@@ -4,7 +4,66 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 
+import org.scalacheck.Properties
+import org.scalacheck.Gen
+import org.scalacheck.Arbitrary
+
+import org.scalacheck.Prop.{forAll, BooleanOperators}
+
+class NPointCheck extends Properties("NPoint") {
+  
+  val pointGen = for {
+    x <- Gen.choose(-180,180)
+    y <- Gen.choose(-90, 90)
+  } yield NPoint(x,y)
+  implicit lazy val arbPoint: Arbitrary[NPoint] = Arbitrary(pointGen)
+  
+
+  
+}
+
+class NRectRangeCheck extends Properties("NRectRange") {
+    
+  
+  
+  val rectGen = for {
+    x1 <- Gen.choose(-180,178)
+    y1 <- Gen.choose(-90, 88)
+    x2 <- Gen.choose(x1+1,180)
+    y2 <- Gen.choose(y1+1, 90)
+  } yield NRectRange(NPoint(x1,y1), NPoint(x2,y2))
+
+  implicit lazy val arbRect: Arbitrary[NRectRange] = Arbitrary(rectGen)
+  
+  
+  property("contains") = forAll { (r: NRectRange) => 
+      r.contains(r) 
+  }
+  
+  property("contains own ll") = forAll { (r: NRectRange) => 
+    r.contains(r.ll)  
+  }
+  
+  property("not contain own ur") = forAll { (r: NRectRange) => 
+    !r.contains(r.ur)  
+  }
+  
+  property("extend") = forAll { (r1: NRectRange, r2: NRectRange) =>
+    
+    val llX = if(r1.ll(0) < r2.ll(0)) r1.ll(0) else r2.ll(0)
+    val llY = if(r1.ll(1) < r2.ll(1)) r1.ll(1) else r2.ll(1)
+    val urX = if(r1.ur(0) > r2.ur(0)) r1.ur(0) else r2.ur(0)
+    val urY = if(r1.ur(1) > r2.ur(1)) r1.ur(1) else r2.ur(1)
+    
+    val expExtend = NRectRange(NPoint(llX,llY),NPoint(urX, urY))
+    
+    val extend = r1.extend(r2)
+    extend == expExtend
+  }
+}
+
 class NRectRangeTest extends FlatSpec with Matchers {
+  
   
   "A NRectRange" should "correctly contain a point" in {
     

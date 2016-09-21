@@ -12,7 +12,7 @@ import dbis.stark.spatial.Cell
 case class PartitionStats(
     ll: NPoint,
     ur: NPoint,
-    start: NRectRange,
+    start: Cell,
     numPartitions: Int, 
     avgPoints: Double,    
     maxPoints: List[(Cell, Int)],
@@ -347,7 +347,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
     
     val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
     
-    PartitionStats(numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea) 
+    PartitionStats(NPoint(ll), NPoint(ur), start,numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea, _cellHistogram.size) 
   }  
     
 }

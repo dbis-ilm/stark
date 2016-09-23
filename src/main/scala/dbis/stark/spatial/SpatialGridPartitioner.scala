@@ -23,7 +23,7 @@ import dbis.stark.STObject
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     partitionsPerDimension: Int, 
-    rdd: RDD[(G,V)], 
+    @transient private val rdd: RDD[(G,V)], 
     dimensions: Int = 2) extends SpatialPartitioner(rdd) {
   
   require(dimensions == 2, "Only 2 dimensions supported currently")
@@ -70,7 +70,8 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     cellId
   }
   
-  override def partitionBounds(idx: Int) = partitions(idx)
+  override def partitionBounds(idx: Int) = getCellBounds(idx)//partitions(idx)
+  override def partitionExtent(idx: Int) = partitions(idx).extent
   
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 

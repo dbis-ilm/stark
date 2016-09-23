@@ -16,6 +16,7 @@ import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.Utils
 import dbis.stark.spatial.SpatialPartition
 import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.SpatialPartitioner
 
 /**
  * An RDD representing a spatial intersection using an internal R-Tree,
@@ -38,21 +39,26 @@ class LiveIndexedFilterSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    */
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[(G,V)] = {
-    val part = split.asInstanceOf[SpatialPartition]
+//    val part = split.asInstanceOf[SpatialPartition]
 
     /* check if the query geometry overlaps with the bounds of this partition
      * if not, the partition does not contain potential query results
      * Therefore, we don't need to build and query the index (which will produce
      * an empty result) 
      */
-    if(!qry.getEnvelopeInternal.intersects(Utils.toEnvelope(part.bounds))) {
-        // this is not the partition that holds data that might produce results
-//        logDebug(s"not our part: ${part.bounds}  vs $qry")
-        return Iterator.empty
-    }
+    
+    val dep = dependencies.head.asInstanceOf[ShuffleDependency[G, V, V]]
+    
+    val partitionCheck = dep.partitioner match {
+        case sp: SpatialPartitioner[G,V] => qry.getGeo.getEnvelopeInternal.intersects(Utils.toEnvelope(sp.partitionBounds(split.index).extent))
+        case _ => true
+      }
+    
+    if(!partitionCheck)
+      return Iterator.empty
     
     // get and read the shuffled data
-    val dep = dependencies.head.asInstanceOf[ShuffleDependency[G, V, V]]
+    
     val iter = SparkEnv.get.shuffleManager.getReader(dep.shuffleHandle, split.index, split.index + 1, context)
       .read()
       .asInstanceOf[Iterator[(G, V)]]
@@ -79,9 +85,7 @@ class LiveIndexedFilterSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
      * for all result elements we need to check if they
      * really intersect with the actual geometry
      */
-    val res = result.filter{ case (g,_) => predicate(qry,g) }
-    
-    res.iterator
+    result.filter{ case (g,_) => predicate(qry,g) }
   }
   
 }

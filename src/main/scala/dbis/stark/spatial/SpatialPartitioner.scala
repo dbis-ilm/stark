@@ -32,5 +32,6 @@ abstract class SpatialPartitioner[G <: STObject : ClassTag, V: ClassTag](
   }
   
   def partitionBounds(idx: Int): Cell
+  def partitionExtent(idx: Int): NRectRange
 }
 

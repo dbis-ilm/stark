@@ -72,7 +72,6 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
   @DeveloperApi
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[JoinPartition]
-    val leftIter  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]].toList
 
     /* FIXME use external map for join
      * eigentlich muesste der Combiner einen R-Baum haben 
@@ -84,27 +83,28 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     
     val tree = new RTree[G,(G,V)](capacity)
     
-    for((lg,lv) <- leftIter) {
+    for((lg,lv) <- split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]]) {
       
       tree.insert(lg, (lg,lv))
     }  
+
     
-    
-    val rightIter = split.rightDeps.flatMap( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])
-//                      .filter { case (rg,_) => 
+    //                      .filter { case (rg,_) => 
 //                        leftParti.map { p => 
 //                          rg.getEnvelopeInternal.intersects(Utils.toEnvelope(p.partitionBounds(s.index).extent))
 //                        }.getOrElse(true)
 //                      }
     
-    val res = rightIter.flatMap{ case (rg, rv) => 
-      tree.query(rg) 
-        .filter{ case (lg, _) => predicate(lg,rg) }
-        .map { case (lg, lv) => (lg, (lv, rv))}
-                  
-    }                  
-  		
-    map.insertAll(res)
+    for(rightIter <- split.rightDeps.map( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]]) ) {
+    
+      val res = rightIter.flatMap{ case (rg, rv) => 
+        tree.query(rg) 
+          .filter{ case (lg, _) => predicate(lg,rg) }
+          .map { case (lg, lv) => (lg, (lv, rv))}
+                    
+      }                  
+      map.insertAll(res)
+    }
       
         
 //    val f = map.iterator.flatMap{ case (g, l) => l.map { case (lv, rv) => (g,(lv,rv)) } }

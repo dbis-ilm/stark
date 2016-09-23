@@ -10,6 +10,6 @@ abstract class LiveIndexedRDD[K: ClassTag, V: ClassTag](
     private val parti: Partitioner
   ) extends RDD[(K,V)](oneParent.context, Seq(new ShuffleDependency[K,V,V](oneParent, parti))) {
       
-  @transient override val partitioner: Option[Partitioner] = Some(parti)
+  override val partitioner: Option[Partitioner] = Some(parti)
   
 }

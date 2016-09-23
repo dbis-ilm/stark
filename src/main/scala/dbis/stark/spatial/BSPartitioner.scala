@@ -108,7 +108,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       _sideLength, 
       _maxCostPerPartition)  
     
-  override def partitionBounds(idx: Int) = bsp.partitions(idx)  
+  override def partitionBounds(idx: Int) = bsp.partitions(idx)
+  override def partitionExtent(idx: Int) = partitionBounds(idx).extent
   
   def printPartitions(fName: java.nio.file.Path) {
     val list = bsp.partitions.map(_.range).map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    

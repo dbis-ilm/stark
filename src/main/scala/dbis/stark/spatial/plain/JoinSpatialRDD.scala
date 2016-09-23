@@ -74,26 +74,35 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
   @DeveloperApi
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[JoinPartition]
-    val leftIter  = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]].toList
     
     // again check if the right geom lies within the extent of left
     // specially useful if only left was partitioned
-    val rightIter = split.rightDeps.flatMap( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])
-                      .filter { case (rg,_) => 
+//    val rightIter = split.rightDeps.flatMap( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])
+//                      .filter { case (rg,_) => 
+//                        leftParti.map { p => 
+//                          rg.getEnvelopeInternal.intersects(Utils.toEnvelope(p.partitionBounds(s.index).extent))
+//                        }.getOrElse(true)
+//                      }
+
+    val map = createExternalMap
+    
+    val leftIter = split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]]
+    for((lg,lv) <- leftIter) {
+      
+      for(rightIter <- split.rightDeps.map( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]])) {
+        val res = rightIter
+                  .filter { case (rg,_) => 
                         leftParti.map { p => 
                           rg.getEnvelopeInternal.intersects(Utils.toEnvelope(p.partitionBounds(s.index).extent))
                         }.getOrElse(true)
                       }
-
-    val map = createExternalMap
-    
-    for((lg,lv) <- leftIter) {
-      
-      val res = rightIter
                   .filter { case (rg, rv) => predicate(lg, rg) }
                   .map { case (rg, rv) => (lg,(lv, rv)) }
       
-  		map.insertAll(res)
+  		  map.insertAll(res)
+      }
+      
+      
       
     }
     

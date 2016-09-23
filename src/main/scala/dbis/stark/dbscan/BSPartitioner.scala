@@ -77,7 +77,8 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
     val bsp = new BSP(mbb.minVec.toArray, mbb.maxVec.toArray,
       cellHistogram.map{ case (r,i) => (Cell(r),i)}, // _cellHistogram: Array[(NRectRange, Int)],
       cellSize, // 2 * eps
-      maxPoints.toDouble)
+      maxPoints.toDouble,
+      withExtent = false)
 
     bsp.partitions.map{ rrange => MBB(rrange.range.ll, rrange.range.ur) }.toList
   }

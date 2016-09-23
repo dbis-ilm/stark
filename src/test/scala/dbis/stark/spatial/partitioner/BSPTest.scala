@@ -133,7 +133,8 @@ class BSPTest extends FlatSpec with Matchers {
         ur,
         histo,
         4, //side Length
-        20
+        20,
+        withExtent = true
       )
     
     val start = Cell(NRectRange(ll,ur))  

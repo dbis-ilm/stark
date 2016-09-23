@@ -59,7 +59,8 @@ case class PartitionStats(
 class BSP(_ll: Array[Double], _ur: Array[Double],
     _cellHistogram: Array[(Cell, Int)],
     _sideLength: Double,
-    _maxCostPerPartition: Double
+    _maxCostPerPartition: Double,
+    withExtent: Boolean
   ) extends Serializable {
   
   require(_ll.size > 0, "zero dimension is not supported")
@@ -68,8 +69,8 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
   require(_maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
   require(_sideLength > 0, "cell side length must not be negative or zero")
   
-  def this(_ll: NPoint, _ur: NPoint, hist: Array[(Cell, Int)], l: Double, cost: Double) = 
-    this(_ll.c, _ur.c, hist, l, cost)
+  def this(_ll: NPoint, _ur: NPoint, hist: Array[(Cell, Int)], l: Double, cost: Double, withExtent: Boolean = false) = 
+    this(_ll.c, _ur.c, hist, l, cost, withExtent)
   
   
   // getter methods for external classes  
@@ -111,12 +112,9 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
       .map(_._2) // project to count value (number of elements in cell)
       .sum       // sum up 
     
-  protected[spatial] def cellsPerDimension(part: NRectRange) = {
-    val lengths =  part.lengths
-    (0 until part.dim).map { dim =>  
-      math.ceil(lengths(dim) / _sideLength).toInt  
+  protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim =>  
+      math.ceil(part.lengths(dim) / _sideLength).toInt  
     }
-  }
     
   /**
    * Split the given partition into two partitions so that 
@@ -170,22 +168,30 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           
           val range = NRectRange(part.range.ll.clone(), NPoint(ur)) 
 
-          /* we create the extent of this new partition from the extent of
-           * all contained cells
-           * TODO: for each iteration, we could re-use the extent from the 
-           * previous iteration and extend it with the extent of the new cells
-           */
+          val cell = if(withExtent) {
+            /* we create the extent of this new partition from the extent of
+             * all contained cells
+             * TODO: for each iteration, we could re-use the extent from the 
+             * previous iteration and extend it with the extent of the new cells
+             */
+            
+            val diffRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
+            val diffRangeExtent = getCellsIn(diffRange,ll(0), ll(1))
+              .map { id => _cellHistogram(id)._1.extent }
+              .foldLeft(diffRange){ (e1,e2) =>
+                e1.extend(e2)
+              }
+            val extent = prevP1Range.map{ p => p.extent.extend(diffRangeExtent)}.getOrElse(diffRangeExtent)   
+            Cell(range, extent)
+          } else {
+            Cell(range)
+          }
           
-          val diffRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
-          val diffRangeExtent = getCellsIn(diffRange,ll(0), ll(1))
-            .map { id => _cellHistogram(id)._1.extent }
-            .foldLeft(diffRange){ (e1,e2) =>
-              e1.extend(e2)
-            }
-          val extent = prevP1Range.map{ p => p.extent.extend(diffRangeExtent)}.getOrElse(diffRangeExtent)   
-          Cell(range, extent)
+          cell
         }
         prevP1Range = Some(p1)
+        
+        
         val p2 = {
           val rll = part.range.ll.c.clone()
           rll(dim) += i*_sideLength 
@@ -196,11 +202,18 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
            * However, I have no good idea how to compute the shrinking.
            */
           val range = NRectRange(NPoint(rll), part.range.ur.clone())
-          val thecells = getCellsIn(range, ll(0), ll(1))
-          val extent = thecells
-            .map{ id => _cellHistogram(id)._1.extent }
-            .foldLeft(range){ (e1,e2) => e1.extend(e2)}
-          Cell(range, extent)  
+          
+          val cell = if(withExtent) {
+            val thecells = getCellsIn(range, ll(0), ll(1))
+            val extent = thecells
+              .map{ id => _cellHistogram(id)._1.extent }
+              .foldLeft(range){ (e1,e2) => e1.extend(e2)}
+            Cell(range, extent)  
+          } else {
+            Cell(range)
+          }
+          
+          cell
         }
         
         

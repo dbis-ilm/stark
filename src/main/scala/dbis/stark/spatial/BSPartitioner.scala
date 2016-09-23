@@ -22,7 +22,8 @@ import dbis.stark.STObject
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[(G,V)],
     _sideLength: Double,
-    _maxCostPerPartition: Double = 1.0) extends SpatialPartitioner(rdd) {
+    _maxCostPerPartition: Double = 1.0,
+    withExtent: Boolean = false) extends SpatialPartitioner(rdd) {
   
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
@@ -106,7 +107,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       NPoint(maxX, maxY), 
       cells, // for BSP we only need calculated cell sizes and their respective counts 
       _sideLength, 
-      _maxCostPerPartition)  
+      _maxCostPerPartition,
+      withExtent)  
     
   override def partitionBounds(idx: Int) = bsp.partitions(idx)
   override def partitionExtent(idx: Int) = partitionBounds(idx).extent

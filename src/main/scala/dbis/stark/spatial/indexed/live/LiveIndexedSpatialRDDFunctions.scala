@@ -4,12 +4,14 @@ import dbis.stark.STObject
 import scala.reflect.ClassTag
 import dbis.stark.spatial.SpatialPartitioner
 import org.apache.spark.rdd.RDD
-import dbis.stark.spatial.plain.LiveIndexedJoinSpatialRDD
 import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.Predicates
 import dbis.stark.spatial.SpatialRDDFunctions
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial.JoinPredicate._
+import org.apache.spark.rdd.ShuffledRDD
 
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     partitioner: SpatialPartitioner[G,V],
@@ -40,7 +42,23 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
   
   
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new LiveIndexedJoinSpatialRDD(rdd, other, pred, capacity)
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = 
+    new LiveIndexedSpatialCartesianJoinRDD(rdd.sparkContext, rdd, other, pred, capacity)
+  
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: SpatialPartitioner[G,_]) = {
+    val predicate: (STObject,STObject) => Boolean = pred match {
+        case INTERSECTS => Predicates.intersects _
+        case CONTAINS => Predicates.contains _
+        case CONTAINEDBY => Predicates.containedby _
+        case _ => throw new IllegalArgumentException(s"$pred is not implemented for join")
+      }
+      
+      new LiveIndexedJoinSpatialRDD(
+          rdd.partitionBy(partitioner),
+          other.partitionBy(partitioner),
+          predicate,
+          capacity)  
+  }
   
   def cluster[KeyType](
 		  minPts: Int,
@@ -52,41 +70,3 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  ) : RDD[(G, (Int, V))] = ???
 }
 
-
-
-//
-//rdd.mapPartitionsWithIndex({(idx, iter) =>
-//    
-//    val env = qry.getGeo.getEnvelopeInternal
-//    val ll = NPoint(env.getMinX, env.getMaxX)
-//    val ur = NPoint(env.getMinY, env.getMaxY)
-//    val intersect = partitioner.partitionBounds(idx).intersects(NRectRange(ll,ur))
-//    
-//    if(intersect) {
-//      val indexTree = new RTree[G,(G,V)](capacity)
-//    
-//      // Build our index live on-the-fly
-//      iter.foreach{ case (geom, data) =>
-//        /* we insert a pair of (geom, data) because we want the tupled
-//         * structure as a result so that subsequent RDDs build from this 
-//         * result can also be used as SpatialRDD
-//         */
-//        indexTree.insert(geom, (geom,data))
-//      }
-//      indexTree.build()
-//    
-//    
-//    
-//      // now query the index
-//      val result = indexTree.query(qry)
-//      
-//      /* The result of a r-tree query are all elements that 
-//       * intersect with the MBB of the query region. Thus, 
-//       * for all result elements we need to check if they
-//       * really intersect with the actual geometry
-//       */
-//      val res = result.filter{ case (g,v) => qry.intersects(g) }  
-//      res.iterator
-//    } else
-//      Iterator.empty
-//  })

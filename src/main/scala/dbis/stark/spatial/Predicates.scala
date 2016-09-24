@@ -3,6 +3,11 @@ package dbis.stark.spatial
 import scala.reflect.ClassTag
 import dbis.stark.STObject
 
+object JoinPredicate extends Enumeration {
+  type JoinPredicate = Value
+  val INTERSECTS, CONTAINS, CONTAINEDBY = Value
+}
+
 object Predicates {
   
   /**

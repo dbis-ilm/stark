@@ -32,6 +32,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
    * @return Returns a RDD with the joined values
    */
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean): RDD[(V,V2)]
+  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: SpatialPartitioner[G,_]): RDD[(V,V2)]
   
   
   /**

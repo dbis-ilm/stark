@@ -1,51 +1,45 @@
-package dbis.stark.spatial.plain
+package dbis.stark.spatial.indexed.live
+
 
 import scala.reflect.ClassTag
+import scala.collection.mutable.ListBuffer
+
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
-import dbis.stark.spatial.SpatialRDD
-import org.apache.spark.Dependency
-import org.apache.spark.OneToOneDependency
-import dbis.stark.spatial.indexed.persistent.JoinPartition
-import dbis.stark.spatial.indexed.persistent.NarrowIndexJoinSplitDep
-import org.apache.spark.util.collection.ExternalAppendOnlyMap
-import scala.collection.mutable.ListBuffer
 import org.apache.spark.InterruptibleIterator
+
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.Utils
 import dbis.stark.spatial.SpatialPartitioner
+import dbis.stark.spatial.SpatialRDD
+import dbis.stark.spatial.plain.CartesianPartition
+
+import com.vividsolutions.jts.geom.Envelope
 
 class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
     @transient val right: RDD[(G,V2)],
     predicate: (G,G) => Boolean,
     capacity: Int
-    )  extends RDD[(V,V2)](left.context, Seq(new OneToOneDependency(left), new OneToOneDependency(right))) {
+    )  extends RDD[(V,V2)](left.context, Nil) {
   
-  override def getPartitions = Array.tabulate(left.getNumPartitions){ i =>  
+  override def getPartitions =  {
+    val parts = ListBuffer.empty[CartesianPartition]
     
-    val leftExtent = leftParti.map { p => Utils.toEnvelope(p.partitionBounds(i).extent) }    
-    new JoinPartition(i, 
-		  new NarrowIndexJoinSplitDep(
-	      left, 
-	      i, 
-	      left.partitions(i)),
-//		    Array.tabulate(right.getNumPartitions){ j => 
-//		      new NarrowIndexJoinSplitDep(right, j, right.partitions(j))  
-//        }
-	      // create only right dependencies if the partition bound intersects with the left bounds
-	      (0 until right.getNumPartitions).filter { j =>
-	        if(leftExtent.isDefined && rightParti.isDefined) {
-	          val rightExtent = Utils.toEnvelope(rightParti.get.partitionBounds(j).extent)
-	          leftExtent.get.intersects(rightExtent)
-	        } else
-	          true
-	        
-        }.map( j => new NarrowIndexJoinSplitDep(right, j, right.partitions(j))).toArray 
-		 )
+    val checkPartitions = leftParti.isDefined && rightParti.isDefined
+    var idx = 0
+    for (
+        s1 <- left.partitions; 
+        s2 <- right.partitions
+        if(!checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index)))) {
+      
+      parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
+      idx += 1
+    }
+    parts.toArray
   }
   
   private lazy val leftParti = {
@@ -71,61 +65,46 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
   
   @DeveloperApi
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
-    val split = s.asInstanceOf[JoinPartition]
-
-    /* FIXME use external map for join
-     * eigentlich muesste der Combiner einen R-Baum haben 
-     * aber das funktioneirt wahrscheinlich nicht mehr mit der Map --> was eigenes implementieren
-     */
-    
-    
-    val map = createExternalMap
+    val split = s.asInstanceOf[CartesianPartition]
     
     val tree = new RTree[G,(G,V)](capacity)
     
-    for((lg,lv) <- split.leftDep.rdd.iterator(split.leftDep.split, context).asInstanceOf[Iterator[(G,V)]]) {
-      
-      tree.insert(lg, (lg,lv))
-    }  
+    left.iterator(split.s1, context).foreach{ case (lg,lv) => tree.insert(lg, (lg,lv)) }
 
+    tree.build()
     
-    //                      .filter { case (rg,_) => 
-//                        leftParti.map { p => 
-//                          rg.getEnvelopeInternal.intersects(Utils.toEnvelope(p.partitionBounds(s.index).extent))
-//                        }.getOrElse(true)
-//                      }
+    /*
+     * Returns:
+		 * an Envelope (for STRtrees), an Interval (for SIRtrees), or other object 
+		 * (for other subclasses of AbstractSTRtree)
+		 * 
+		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
+     */
+    val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
+          
+    val partitionCheck = rightParti.map { p => p match {
+        case sp: SpatialPartitioner[G,V] => 
+          indexBounds.intersects(Utils.toEnvelope(sp.partitionExtent(split.s2.index)))
+        case _ => true
+      }
+    }.getOrElse(true)
+      
     
-    for(rightIter <- split.rightDeps.map( d => d.rdd.iterator(d.split, context).asInstanceOf[Iterator[(G,V2)]]) ) {
-    
-      val res = rightIter.flatMap{ case (rg, rv) => 
+    val res = if(partitionCheck) {
+    	val map = SpatialRDD.createExternalMap[G,V,V2]        
+
+    	right.iterator(split.s2, context).foreach{ case (rg, rv) => 
         tree.query(rg) 
           .filter{ case (lg, _) => predicate(lg,rg) }
-          .map { case (lg, lv) => (lg, (lv, rv))}
-                    
-      }                  
-      map.insertAll(res)
-    }
-      
-        
-//    val f = map.iterator.flatMap{ case (g, l) => l.map { case (lv, rv) => (g,(lv,rv)) } }
-    val f = map.iterator.flatMap{ case (g, l) => l}
+          .map { case (lg, lv) => (lg, (lv, rv)) }
+          .foreach { case (g, v) => map.insert(g, v)  }
+    	}
+    	
+    	map.iterator.flatMap{ case (g, l) => l}
+    	
+    } else
+      Iterator.empty
     
-    new InterruptibleIterator(context, f)
+    new InterruptibleIterator(context, res)
   }
-  
-  type ValuePair = (V,V2)
-  type Combiner = ListBuffer[ValuePair]
-  
-  private def createExternalMap(): ExternalAppendOnlyMap[G, ValuePair, Combiner] = {
-    val createCombiner: ( ValuePair => Combiner) = pair => ListBuffer(pair)
-    
-    val mergeValue: (Combiner, ValuePair) => Combiner = (list, value) => list += value
-    
-    val mergeCombiners: ( Combiner, Combiner ) => Combiner = (c1, c2) => c1 ++= c2
-    
-    new ExternalAppendOnlyMap[G, ValuePair, Combiner](createCombiner, mergeValue, mergeCombiners)
-    
-  }  
-  
-  
 }

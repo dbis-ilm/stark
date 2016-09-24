@@ -22,11 +22,25 @@ import dbis.stark.STObject
  * @param dimensions The dimensionality of the input data 
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
+    @transient private val rdd: RDD[(G,V)],
     partitionsPerDimension: Int, 
-    @transient private val rdd: RDD[(G,V)], 
-    dimensions: Int = 2) extends SpatialPartitioner(rdd) {
+    _minX: Double,
+    _maxX: Double,
+    _minY: Double,
+    _maxY: Double,
+    dimensions: Int = 2) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
   
   require(dimensions == 2, "Only 2 dimensions supported currently")
+  
+  def this(rdd: RDD[(G,V)],
+      partitionsPerDimension: Int, 
+      minMax: (Double, Double, Double, Double)) = 
+    this(rdd, partitionsPerDimension, minMax._1, minMax._2, minMax._3, minMax._4)  
+  
+  def this(rdd: RDD[(G,V)],
+      partitionsPerDimension: Int) = 
+    this(rdd, partitionsPerDimension, SpatialPartitioner.getMinMax(rdd))
+  
   
   protected[this] val xLength = math.abs(maxX - minX) / partitionsPerDimension
   protected[this] val yLength = math.abs(maxY - minY) / partitionsPerDimension

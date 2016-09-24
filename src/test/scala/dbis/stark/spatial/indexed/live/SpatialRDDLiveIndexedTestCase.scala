@@ -50,7 +50,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   "A LIVE indexed SpatialRDD" should "find the correct intersection result for points with grid partitioning" in { 
     
     val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(5, rddRaw),10)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
     
     val foundPoints = rdd.intersects(qry).collect()
     
@@ -62,7 +62,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   it should "find all elements contained by a query with grid partitioning"  in { 
     val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(5, rddRaw),10)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
     
     val foundPoints = rdd.containedby(qry).collect()
     
@@ -71,7 +71,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   it should "find all elements that contain a given point" in { 
 	  val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(5, rddRaw),10)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -85,7 +85,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   ignore should "find the correct nearest neighbors with grid partitioning" in { 
     val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(5, rddRaw),10)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
 	  
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -102,7 +102,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = TestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(5, rdd),10)
+    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5),10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -129,7 +129,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = TestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(5, rdd),10)
+    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5),10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -156,7 +156,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = TestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(5,rdd), 10)
+    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5), 10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -183,7 +183,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   ignore should "return a cluster result with all points with grid partitioning" in {
     val rdd1 = TestUtils.createRDD(sc)
-    val rdd = rdd1.liveIndex(new SpatialGridPartitioner(5,rdd1), 10)
+    val rdd = rdd1.liveIndex(new SpatialGridPartitioner(rdd1, 5), 10)
     
     val f = new java.io.File("clusterresult")
     TestUtils.rmrf(f) // delete output directory if existing to avoid write problems 

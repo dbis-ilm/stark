@@ -22,8 +22,26 @@ import dbis.stark.STObject
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[(G,V)],
     _sideLength: Double,
-    _maxCostPerPartition: Double = 1.0,
-    withExtent: Boolean = false) extends SpatialPartitioner(rdd) {
+    _maxCostPerPartition: Double,
+    withExtent: Boolean,
+    _minX: Double,
+    _maxX: Double,
+    _minY: Double,
+    _maxY: Double) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
+
+  def this(rdd: RDD[(G,V)],
+      _sideLength: Double,
+      _maxCostPerPartition: Double,
+      withExtent: Boolean, 
+      minMax: (Double, Double, Double, Double)) = 
+    this(rdd, _sideLength, _maxCostPerPartition, withExtent, minMax._1, minMax._2, minMax._3, minMax._4)  
+  
+  def this(rdd: RDD[(G,V)],
+      _sideLength: Double,
+      _maxCostPerPartition: Double,
+      withExtent: Boolean = false) = 
+    this(rdd, _sideLength, _maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
+
   
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength

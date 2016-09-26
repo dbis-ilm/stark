@@ -247,9 +247,16 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
 
   // LIVE
-
-  def liveIndex(partitioner: SpatialPartitioner[G,V], order: Int) = 
-    new LiveIndexedSpatialRDDFunctions(partitioner, rdd, order)
+  
+  def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, order)
+  
+  def liveIndex(partitioner: SpatialPartitioner[G,V], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = 
+    liveIndex(Some(partitioner), order)
+  
+  def liveIndex(partitioner: Option[SpatialPartitioner[G,V]], order: Int) = {
+    val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
+		new LiveIndexedSpatialRDDFunctions(reparted, order)
+  }
 
   
   

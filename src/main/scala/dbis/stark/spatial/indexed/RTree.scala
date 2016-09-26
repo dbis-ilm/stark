@@ -89,7 +89,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * Maybe we could use JTSPlus: https://github.com/jiayuasu/JTSplus
    * From the GeoSpark Guys  
    */
-  def kNN(geom: STObject, k: Int): List[D] = ???
+  def kNN(geom: STObject, k: Int): Iterator[D] = ???
 //    super.nearestNeighbour(geom.getEnvelopeInternal, geom, ItemDistance)
 }
 

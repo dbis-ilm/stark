@@ -15,22 +15,29 @@ import dbis.stark.spatial.SpatialPartition
  * @param oneParent The original RDD 
  */
 abstract class IndexedSpatialRDD[G <: STObject : ClassTag, V: ClassTag](
-    @transient private val _partitioner: SpatialPartitioner[G,V],
     @transient private val oneParent: RDD[(G,V)]
-  ) extends LiveIndexedRDD[G,V](oneParent, _partitioner) {
+  ) extends LiveIndexedRDD[G,V](oneParent) {
 
   /**
    * Implemented by subclasses to return the set of partitions in this RDD. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
-  override protected def getPartitions: Array[Partition] = {
-    // the partitioner, since it has to be set in the constructor it's safe to call get here
-    val parti = partitioner.get.asInstanceOf[SpatialPartitioner[G,V]]
-    
-    // create the partitions
-    Array.tabulate(parti.numPartitions){ idx =>
-      val bounds = parti.partitionBounds(idx)
-      new SpatialPartition(idx, bounds.extent)
-    }
-  }
+//  override protected def getPartitions: Array[Partition] = {
+//    // the partitioner, since it has to be set in the constructor it's safe to call get here
+//    val parti = partitioner.get.asInstanceOf[SpatialPartitioner[G,V]]
+//    
+//    partitioner.map { p => p match {
+//      case sp: SpatialPartitioner[G,V] => 
+//        Array.tabulate(parti.numPartitions){ idx =>
+//          val bounds = parti.partitionBounds(idx)
+//          new SpatialPartition(idx, bounds.extent)
+//        }
+//      case _ => oneParent.get
+//    }
+//      
+//    }
+//    
+//    // create the partitions
+//    
+//  }
 }

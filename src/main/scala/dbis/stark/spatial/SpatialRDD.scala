@@ -41,6 +41,8 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
   def this(@transient oneParent: RDD[(G,V)]) =
     this(oneParent.context , List(new OneToOneDependency(oneParent)))
 
+  override val partitioner = firstParent[(G,V)].partitioner  
+    
   /**
    * We do not repartition our data.
    */

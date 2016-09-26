@@ -94,13 +94,13 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     	val map = SpatialRDD.createExternalMap[G,V,V2]        
 
     	right.iterator(split.s2, context).foreach{ case (rg, rv) => 
-        tree.query(rg) 
-          .filter{ case (lg, _) => predicate(lg,rg) }
-          .map { case (lg, lv) => (lg, (lv, rv)) }
-          .foreach { case (g, v) => map.insert(g, v)  }
+        tree.query(rg)  // for each entry in right query the index
+          .filter{ case (lg, _) => predicate(lg,rg) } // index returns candidates only -> prune by checking predicate again
+          .map { case (lg, lv) => (lg, (lv, rv)) }    // transform to structure for the external map
+          .foreach { case (g, v) => map.insert(g, v)  } // insert into external map
     	}
     	
-    	map.iterator.flatMap{ case (g, l) => l}
+    	map.iterator.flatMap{ case (g, l) => l} // when done, return entries of the map
     	
     } else
       Iterator.empty

@@ -1,29 +1,25 @@
 package dbis.stark.spatial.indexed.persistent
 
-import org.apache.spark.rdd.CoGroupedRDD
-import dbis.stark.spatial.SpatialRDD
 import scala.reflect.ClassTag
-import org.apache.spark.rdd.RDD
-import org.apache.spark.Partition
-import org.apache.spark.TaskContext
-import org.apache.spark.rdd.CoGroupPartition
 import scala.collection.mutable.ArrayBuffer
-import org.apache.spark.OneToOneDependency
-import org.apache.spark.ShuffleDependency
-import org.apache.spark.SparkEnv
-import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.indexed.IndexedPartition
+import scala.collection.mutable.ListBuffer
+
 import java.io.IOException
 import java.io.ObjectOutputStream
-import dbis.stark.spatial.SpatialPartitioner
+
 import org.apache.spark.Dependency
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 import org.apache.spark.InterruptibleIterator
-import org.apache.spark.util.collection.ExternalAppendOnlyMap
-import scala.collection.mutable.ListBuffer
-import dbis.stark.spatial.SpatialGridPartitioner
-import dbis.stark.spatial.BSPartitioner
+
+import org.apache.spark.rdd.RDD
+import org.apache.spark.Partition
+import org.apache.spark.TaskContext
+import org.apache.spark.OneToOneDependency
+import org.apache.spark.SparkEnv
+
+import dbis.stark.spatial.SpatialRDD
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.STObject
 import dbis.stark.spatial.Utils
 

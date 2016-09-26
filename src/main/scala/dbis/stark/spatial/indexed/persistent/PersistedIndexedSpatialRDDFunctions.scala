@@ -5,7 +5,6 @@ import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 
 import dbis.stark.STObject
-import dbis.stark.spatial.indexed.live.IndexedSpatialRDD
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.Predicates
 import dbis.stark.spatial.SpatialRDDFunctions

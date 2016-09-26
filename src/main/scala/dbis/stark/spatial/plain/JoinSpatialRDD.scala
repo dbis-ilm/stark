@@ -1,23 +1,18 @@
 package dbis.stark.spatial.plain
 
 import scala.reflect.ClassTag
+import scala.collection.mutable.ListBuffer
+
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.DeveloperApi
-import dbis.stark.spatial.SpatialRDD
-import org.apache.spark.Dependency
-import org.apache.spark.OneToOneDependency
-import dbis.stark.spatial.indexed.persistent.JoinPartition
-import dbis.stark.spatial.indexed.persistent.NarrowIndexJoinSplitDep
-import org.apache.spark.util.collection.ExternalAppendOnlyMap
-import scala.collection.mutable.ListBuffer
 import org.apache.spark.InterruptibleIterator
+
+import dbis.stark.spatial.SpatialRDD
 import dbis.stark.STObject
 import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.Utils
-import org.apache.spark.NarrowDependency
-import dbis.stark.spatial.SpatialPartition
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 

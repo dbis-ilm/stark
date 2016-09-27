@@ -8,6 +8,10 @@ import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.Predicates
 import dbis.stark.spatial.SpatialRDDFunctions
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial.JoinPredicate._
+import dbis.stark.spatial.SpatialPartitioner
+import dbis.stark.spatial.SpatialPartitioner
 
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) extends Serializable {
@@ -34,8 +38,15 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     }
   }, true) // preserve partitioning
 
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
+  
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = 
+    new PersistentIndexedSpatialCartesianJoinRDD(rdd.sparkContext,rdd, other, pred) 
 
+  
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner[G,_]] = None) =    
+    new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
+  
+  
   def kNN(qry: G, k: Int) = {
     val nn = rdd.mapPartitions({ trees =>
         trees.flatMap { tree => 

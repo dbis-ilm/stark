@@ -1,4 +1,4 @@
-package dbis.stark.spatial.indexed.live
+package dbis.stark.spatial.indexed.persistent
 
 
 import java.io.{IOException, ObjectOutputStream}
@@ -11,21 +11,31 @@ import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.plain.CartesianPartition
 import dbis.stark.spatial.SpatialRDD
-import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.SpatialPartitioner
+import com.vividsolutions.jts.geom.Envelope
+import dbis.stark.spatial.Utils
 
 
-private[stark] class LiveIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag, G2 <: STObject: ClassTag, V: ClassTag, V2: ClassTag](
+private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag, G2 <: STObject: ClassTag, V: ClassTag, V2: ClassTag](
     sc: SparkContext,
-    var rdd1 : RDD[(G,V)],
+    var rdd1 : RDD[RTree[G,(G,V)]],
     var rdd2 : RDD[(G2,V2)],
-    predicate: JoinPredicate.JoinPredicate,
-    capacity: Int)
+    predicate: (G,G2) => Boolean)
   extends RDD[(V, V2)](sc, Nil)
   with Serializable {
 
   val numPartitionsInRdd2 = rdd2.partitions.length
 
-  val predicateFunction = JoinPredicate.predicateFunction(predicate)
+  private lazy val rightParti = {
+    val p = rdd2.partitioner 
+      if(p.isDefined) {
+        p.get match {
+          case sp: SpatialPartitioner[G2,V2] => Some(sp)
+          case _ => None
+        }
+      } else 
+        None
+  }
   
   override def getPartitions: Array[Partition] = {
     // create the cross product split
@@ -44,24 +54,33 @@ private[stark] class LiveIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag
 
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
     val currSplit = split.asInstanceOf[CartesianPartition]
-  
-    val tree = new RTree[G,(G,V)](capacity)
-    
-    rdd1.iterator(currSplit.s1, context).foreach{ case (g,v) => tree.insert(g,(g,v))}
-    
-    tree.build()
-    
+
     val map = SpatialRDD.createExternalMap[G,V,V2]
     
-    
-    
-    rdd2.iterator(currSplit.s2, context).foreach{ case (rg,rv) =>
-      tree.query(rg)
-          .filter { case (lg,_) => predicateFunction(lg,rg)}
-          .map{ case (lg,lv) => (lg,(lv,rv)) }
-          .foreach { case (g,v) => map.insert(g,v) }
-    }
-    
+    rdd1.iterator(currSplit.s1, context).foreach{ tree => 
+      
+      /*
+       * Returns:
+  		 * an Envelope (for STRtrees), an Interval (for SIRtrees), or other object 
+  		 * (for other subclasses of AbstractSTRtree)
+  		 * 
+  		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
+       */
+      val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
+      
+      val partitionCheck = rightParti.map { p => 
+            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
+      }.getOrElse(true)
+      
+      if(partitionCheck) {
+        rdd2.iterator(currSplit.s2, context).foreach{ case (rg,rv) =>
+          tree.query(rg)
+              .filter { case (lg,_) => predicate(lg,rg)}
+              .map{ case (lg,lv) => (lg,(lv,rv)) }
+              .foreach { case (g,v) => map.insert(g,v) }
+        }
+      }
+    }    
     
     val f = map.iterator.flatMap{ case (g, l) => l}
     

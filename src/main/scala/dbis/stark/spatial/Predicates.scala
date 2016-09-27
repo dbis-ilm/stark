@@ -6,6 +6,12 @@ import dbis.stark.STObject
 object JoinPredicate extends Enumeration {
   type JoinPredicate = Value
   val INTERSECTS, CONTAINS, CONTAINEDBY = Value
+  
+  def predicateFunction(pred: JoinPredicate): (STObject, STObject) => Boolean = pred match {
+    case INTERSECTS => Predicates.intersects _
+    case CONTAINS => Predicates.contains _
+    case CONTAINEDBY => Predicates.containedby _
+  }
 }
 
 object Predicates {
@@ -18,7 +24,7 @@ object Predicates {
    * @return Returns <code>true</code> if the two objects intersect, according to the definition in [[dbis.stark.STObject]],
    * otherwise <code>false</code>
    */
-  def intersects[G <: STObject : ClassTag, G2 <: STObject : ClassTag](g1: G, g2: G2) = g1.intersects(g2)
+  def intersects(g1: STObject, g2: STObject) = g1.intersects(g2)
   
   /**
    * Returns <code>true</code> if the left object contains the right object
@@ -28,7 +34,7 @@ object Predicates {
    * @return Returns <code>true</code> if the left object completely contains the right object, according to the definition in [[dbis.stark.STObject]],
    * otherwise <code>false</code>
    */
-  def contains[G <: STObject : ClassTag, G2 <: STObject : ClassTag](g1: G, g2: G2) = g1.contains(g2)
+  def contains(g1: STObject, g2: STObject) = g1.contains(g2)
   
   /**
    * Returns <code>true</code> if the left object is contained by the right object
@@ -38,7 +44,7 @@ object Predicates {
    * @return Returns <code>true</code> if the left object is completely contained by the right object, according to the definition in [[dbis.stark.STObject]],
    * otherwise <code>false</code>
    */
-  def containedby[G <: STObject : ClassTag, G2 <: STObject : ClassTag](g1: G, g2: G2) = g2.containedBy(g1)
+  def containedby(g1: STObject, g2: STObject) = g2.containedBy(g1)
   
   /**
    * Returns <code>true</code> if the two given objects are within a given distance, i.e.
@@ -52,9 +58,9 @@ object Predicates {
    * @return Returns <code>true</code> if the two objects are within a given maximum distance, according to the definition in [[dbis.stark.STObject]],
    * otherwise <code>false</code>
    */
-  def withinDistance[G <: STObject: ClassTag, G2 <: STObject : ClassTag](
+  def withinDistance(
       maxDist: Double, 
-      distFunc: (G, G2) => Double)
-      (g1: G, g2:G2) = distFunc(g1,g2) <= maxDist
+      distFunc: (STObject, STObject) => Double)
+      (g1: STObject, g2:STObject) = distFunc(g1,g2) <= maxDist
   
 }

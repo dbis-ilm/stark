@@ -18,13 +18,17 @@ import dbis.stark.spatial.SpatialRDD
 import dbis.stark.spatial.plain.CartesianPartition
 
 import com.vividsolutions.jts.geom.Envelope
+import dbis.stark.spatial.JoinPredicate
 
 class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
     @transient val right: RDD[(G,V2)],
-    predicate: (G,G) => Boolean,
+    predicate: JoinPredicate.JoinPredicate,
     capacity: Int
     )  extends RDD[(V,V2)](left.context, Nil) {
+  
+  val predicateFunction = JoinPredicate.predicateFunction(predicate)
+  
   
   override def getPartitions =  {
     val parts = ListBuffer.empty[CartesianPartition]
@@ -82,12 +86,9 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
      */
     val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
           
-    val partitionCheck = rightParti.map { p => p match {
-        case sp: SpatialPartitioner[G,V] => 
-          indexBounds.intersects(Utils.toEnvelope(sp.partitionExtent(split.s2.index)))
-        case _ => true
-      }
-    }.getOrElse(true)
+    val partitionCheck = rightParti.map { p => 
+            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))
+      }.getOrElse(true)
       
     
     val res = if(partitionCheck) {
@@ -95,7 +96,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
 
     	right.iterator(split.s2, context).foreach{ case (rg, rv) => 
         tree.query(rg)  // for each entry in right query the index
-          .filter{ case (lg, _) => predicate(lg,rg) } // index returns candidates only -> prune by checking predicate again
+          .filter{ case (lg, _) => predicateFunction(lg,rg) } // index returns candidates only -> prune by checking predicate again
           .map { case (lg, lv) => (lg, (lv, rv)) }    // transform to structure for the external map
           .foreach { case (g, v) => map.insert(g, v)  } // insert into external map
     	}

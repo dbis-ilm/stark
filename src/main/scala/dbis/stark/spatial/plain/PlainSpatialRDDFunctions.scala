@@ -144,33 +144,23 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   
   
   /**
-   * Join this SpatialRDD with another (spatial) RDD.
+   * Join this SpatialRDD with another (spatial) RDD.<br><br>
+   * <b>NOTE:</b> There will be no partition pruning and basically all cartesian combinations have to be checked
    *
    * @param other The other RDD to join with.
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-    def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = 
-      new CartesianSpatialJoinRDD(rdd.sparkContext,rdd, other, pred) 
-  
-    def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: SpatialPartitioner[G,_]) = {
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (STObject,STObject) => Boolean) = 
+    new CartesianSpatialJoinRDD(rdd.sparkContext,rdd, other, pred) 
+
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner[G,_]] = None) =      
+    new JoinSpatialRDD(
+        if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd , 
+        if(partitioner.isDefined) other.partitionBy(partitioner.get) else other, 
+        pred)
       
-      val predicate: (STObject,STObject) => Boolean = pred match {
-        case INTERSECTS => Predicates.intersects _
-        case CONTAINS => Predicates.contains _
-        case CONTAINEDBY => Predicates.containedby _
-        case _ => throw new IllegalArgumentException(s"pred is not implemented for join")
-      }
-      
-      
-      new JoinSpatialRDD(
-          rdd.partitionBy(partitioner) , 
-          other.partitionBy(partitioner), 
-          predicate)
-    }
-      
-  
-  
+
   /**
    * Cluster this SpatialRDD using DBSCAN
    *

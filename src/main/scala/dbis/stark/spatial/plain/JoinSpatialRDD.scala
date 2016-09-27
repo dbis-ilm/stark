@@ -13,14 +13,18 @@ import dbis.stark.spatial.SpatialRDD
 import dbis.stark.STObject
 import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.Utils
+import dbis.stark.spatial.JoinPredicate
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     @transient val left: RDD[(G,V)], 
     @transient val right: RDD[(G,V2)],
-    predicate: (STObject,STObject) => Boolean
+    predicate: (G,G) => Boolean
     )  extends RDD[(V,V2)](left.context, Nil) {
   
   val numPartitionsInRdd2 = right.getNumPartitions
+  
+  def this(left: RDD[(G,V)], right: RDD[(G,V2)], predicate: JoinPredicate.JoinPredicate) = 
+    this(left, right, JoinPredicate.predicateFunction(predicate))
   
   override def getPartitions = {
     val parts = ListBuffer.empty[CartesianPartition]

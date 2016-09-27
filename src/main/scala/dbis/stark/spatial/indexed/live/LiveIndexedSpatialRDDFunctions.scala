@@ -13,6 +13,7 @@ import dbis.stark.spatial.SpatialRDDFunctions
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.JoinPredicate._
 import dbis.stark.spatial.Utils
+import dbis.stark.spatial.plain.PlainSpatialRDDFunctions
 
 
 object LiveIndexedSpatialRDDFunctions {
@@ -144,22 +145,41 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd.sparkContext.parallelize(r)
   }
   
+  /**
+   * Perform a spatial join using the given predicate function.
+   * When using this variant partitions cannot not be pruned. And basically a cartesian product has
+   * to be computed and filtered<br><br>
+   * 
+   * <b>NOTE</b> This method will <b>NOT</b> use an index as the given predicate function may want to find elements that are not returned
+   * by the index query (which does an intersect)
+   * 
+   * @param other The other RDD to join with
+   * @param pred A function to compute the join predicate. The first parameter is the geometry of the left input RDD (i.e. the RDD on which this function is called)
+   * and the parameter is the geometry of <code>other</code>
+   * @return Returns an RDD containing the Join result
+   */
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (STObject,STObject) => Boolean) =
+    new PlainSpatialRDDFunctions(rdd).join(other, pred)
+//    new LiveIndexedSpatialCartesianJoinRDD(rdd.sparkContext, rdd, other, pred, capacity)
   
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) = 
-    new LiveIndexedSpatialCartesianJoinRDD(rdd.sparkContext, rdd, other, pred, capacity)
-  
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: SpatialPartitioner[G,_]) = {
-    val predicate: (STObject,STObject) => Boolean = pred match {
-        case INTERSECTS => Predicates.intersects _
-        case CONTAINS => Predicates.contains _
-        case CONTAINEDBY => Predicates.containedby _
-        case _ => throw new IllegalArgumentException(s"$pred is not implemented for join")
-      }
+  /**
+   * Perform a spatial join using the given predicate and a partitioner.
+   * The input RDDs are both partitioned using the provided partitioner. (If they were already partitoned by the same
+   * partitioner nothing is changed). 
+   * This method uses the fact of the same partitioning of both RDDs and prunes partitiones that cannot contribute to the
+   * join
+   * 
+   * @param other The other RDD to join with
+   * @param pred The join predicate
+   * @param partitioner The partitioner to partition both RDDs with
+   * @return Returns an RDD containing the Join result 
+   */
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner[G,_]] = None) = {
       
       new LiveIndexedJoinSpatialRDD(
-          rdd.partitionBy(partitioner),
-          other.partitionBy(partitioner),
-          predicate,
+          if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd,
+          if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
+          pred,
           capacity)  
   }
   

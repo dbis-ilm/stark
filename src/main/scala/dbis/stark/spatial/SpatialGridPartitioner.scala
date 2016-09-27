@@ -23,30 +23,35 @@ import dbis.stark.STObject
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     @transient private val rdd: RDD[(G,V)],
-    partitionsPerDimension: Int, 
+    partitionsPerDimension: Int,
+    withExtent: Boolean,
     _minX: Double,
     _maxX: Double,
     _minY: Double,
     _maxY: Double,
-    dimensions: Int = 2) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
+    dimensions: Int) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
   
   require(dimensions == 2, "Only 2 dimensions supported currently")
   
   def this(rdd: RDD[(G,V)],
-      partitionsPerDimension: Int, 
-      minMax: (Double, Double, Double, Double)) = 
-    this(rdd, partitionsPerDimension, minMax._1, minMax._2, minMax._3, minMax._4)  
+      partitionsPerDimension: Int,
+      withExtent: Boolean,
+      minMax: (Double, Double, Double, Double),
+      dimensions: Int) = 
+    this(rdd, partitionsPerDimension, withExtent, minMax._1, minMax._2, minMax._3, minMax._4, dimensions)  
   
   def this(rdd: RDD[(G,V)],
-      partitionsPerDimension: Int) = 
-    this(rdd, partitionsPerDimension, SpatialPartitioner.getMinMax(rdd))
+      partitionsPerDimension: Int,
+      withExtent: Boolean = false,
+      dimensions: Int = 2) = 
+    this(rdd, partitionsPerDimension, withExtent, SpatialPartitioner.getMinMax(rdd), dimensions)
   
   
   protected[this] val xLength = math.abs(maxX - minX) / partitionsPerDimension
   protected[this] val yLength = math.abs(maxY - minY) / partitionsPerDimension
   
   
-  private val partitions = Map.empty[Int, Cell]
+  private val partitions = new Array[Cell](numPartitions) //Map.empty[Int, Cell]
   
   protected[spatial] def getCellBounds(id: Int): Cell = {
     
@@ -105,17 +110,23 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
     val id = getCellId(p)
     
-    val env = g.getEnvelopeInternal
-    val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
     
-    if(partitions.contains(id)) {
-      val old = partitions(id)
-      val extent = old.extent.extend(gExtent)
-      partitions.update(id, Cell(old.range, extent))
-    } else {
-      val bounds = getCellBounds(id)
-      partitions.put(id, bounds)
+    
+    if(withExtent) {
+      if(partitions(id) != null) {
+    	  val env = g.getEnvelopeInternal
+			  val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+        val old = partitions(id)
+        val extent = old.extent.extend(gExtent)
+        partitions(id) = Cell(old.range, extent)
+      } else {
+        val bounds = getCellBounds(id)
+        partitions(id) = bounds
+      }
+    } else if(partitions(id) == null) {
+        partitions(id) = getCellBounds(id)
     }
+      
     
     
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")

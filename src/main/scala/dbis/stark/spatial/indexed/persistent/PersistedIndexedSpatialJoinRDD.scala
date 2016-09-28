@@ -111,8 +111,8 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 
   override def clearDependencies() {
     super.clearDependencies()
-    rdd1 = null
-    rdd2 = null
+    left = null
+    right = null
   }  
 }
 

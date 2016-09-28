@@ -56,7 +56,7 @@ case class PartitionStats(
  * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
  * cannot be further split.   
  */
-class BSP(_ll: Array[Double], _ur: Array[Double],
+class BSP(_ll: Array[Double], var _ur: Array[Double],
     _cellHistogram: Array[(Cell, Int)],
     _sideLength: Double,
     _maxCostPerPartition: Double,
@@ -83,6 +83,24 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
   private lazy val numXCells = math.ceil(( math.abs(_ur.head - _ll.head) ) / _sideLength).toInt
   
   def getCellsIn(r: NRectRange, minX: Double, minY: Double): Seq[Int] = {
+    
+	  require(r.ll.c.zipWithIndex.forall { case (c, idx) => c >= _ll(idx)} , s"""invalid LL of range for cells in range
+		  range: $r
+		  minX: $minX
+		  minY: $minY
+		  ll: ${_ll.mkString(",")}
+  	  ur: ${_ur.mkString(",")}
+	  """)  
+    
+	  require(r.ur.c.zipWithIndex.forall { case (c, idx) => c <= _ur(idx)} , s"""invalid UR of range for cells in range
+      range: $r
+      minX: $minX
+      minY: $minY
+      ll: ${_ll.mkString(",")}
+      ur: ${_ur.mkString(",")}
+    """)
+      
+    
     val numCells = cellsPerDimension(r)
     
     val llCellId = {
@@ -150,7 +168,7 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
      */
     
     cellsPerDimension(part.range).zipWithIndex      // index is the dimension
-                      .filter(_._1 > 1)       // filter for number of cells
+                      .filter(_._1 > 1)             // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
       var prevP1Range: Option[Cell] = None                    
@@ -177,7 +195,17 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
             
             val diffRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
             val diffRangeExtent = getCellsIn(diffRange,ll(0), ll(1))
-              .map { id => _cellHistogram(id)._1.extent }
+              .map { id => 
+                if(id >= _cellHistogram.size)
+                  throw new IllegalArgumentException(s"""p1 of $part
+                    ID: $id
+                    size: ${_cellHistogram.size}
+                    max idx: ${_cellHistogram.indices.max}
+                    diffRange: $diffRange
+                    ll(0): ${ll(0)}
+                    ll(1): ${ll(1)}
+                    """)
+                _cellHistogram(id)._1.extent }
               .foldLeft(diffRange){ (e1,e2) =>
                 e1.extend(e2)
               }
@@ -206,7 +234,17 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
           val cell = if(withExtent) {
             val thecells = getCellsIn(range, ll(0), ll(1))
             val extent = thecells
-              .map{ id => _cellHistogram(id)._1.extent }
+              .map{ id => 
+                if(id >= _cellHistogram.size)
+                  throw new IllegalArgumentException(s"""
+                    ID: $id
+                    size: ${_cellHistogram.size}
+                    max idx: ${_cellHistogram.indices.max}
+                    range: $range
+                    ll(0): ${ll(0)}
+                    ll(1): ${ll(1)}
+                    """)
+                _cellHistogram(id)._1.extent }
               .foldLeft(range){ (e1,e2) => e1.extend(e2)}
             Cell(range, extent)  
           } else {
@@ -255,11 +293,14 @@ class BSP(_ll: Array[Double], _ur: Array[Double],
 			  
 			  val cellsPerDim = cellsPerDimension(s.range)
 			  val newUr = _ur.zipWithIndex.map { case (value, dim) => 
-			  if(_ll(dim) + cellsPerDim(dim) * _sideLength > _ur(dim))
+			    if(_ll(dim) + cellsPerDim(dim) * _sideLength > _ur(dim))
 				  _ll(dim) + cellsPerDim(dim) * _sideLength
 				  else
 					  _ur(dim)
 	  }
+	  
+	  _ur = newUr
+	  
 	  // adjust start range
 	  Cell(NRectRange(0, s.range.ll, NPoint(newUr)))
     

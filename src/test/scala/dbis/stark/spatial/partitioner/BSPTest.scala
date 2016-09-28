@@ -101,6 +101,44 @@ class BSPTest extends FlatSpec with Matchers {
     cells2 should contain only (0,2)
   }
   
+  
+  it should "find cells in range" in {
+    
+    val sideLength = 1
+    val maxCost = 10
+    val numXCells = 360
+    val numYCells = 180
+    val llStartX = -180
+    val llStartY = -90
+    
+    val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    
+    withClue("generated ll wrong") { ll shouldBe NPoint(llStartX, llStartY)  }
+    withClue("generated ur wrong") { ur shouldBe NPoint(180, 90)  }
+    withClue("generated histogram wrong") { histo.size shouldBe 360*180 }
+    
+    
+    val bsp = new BSP(
+      ll,
+      ur,
+      histo,
+      sideLength,
+      maxCost      
+    )
+    
+    val cells = bsp.getCellsIn(
+        NRectRange(ll,ur), 
+        llStartX, 
+        llStartY)
+    
+//    cells should contain only ((0 until histo.size):_*)
+    cells.size shouldBe histo.size
+    
+    cells.foreach { cellId => 
+      noException should be thrownBy histo(cellId) 
+    } 
+  }
+  
   it should "create correct extent information" in {
     
     val cell1 = Cell(

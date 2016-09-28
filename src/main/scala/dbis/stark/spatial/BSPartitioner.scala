@@ -80,7 +80,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     (0 until numXCells * numYCells).map { i => 
       val cellBounds = getCellBounds(i)
       
-      val cell = Cell(cellBounds, cellBounds)
+      val cell = Cell(cellBounds)
       
       themap += (cell -> 0)
     }

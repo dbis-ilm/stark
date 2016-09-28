@@ -21,8 +21,8 @@ import com.vividsolutions.jts.geom.Envelope
 import dbis.stark.spatial.JoinPredicate
 
 class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
-    @transient val left: RDD[(G,V)], 
-    @transient val right: RDD[(G,V2)],
+    var left: RDD[(G,V)], 
+    var right: RDD[(G,V2)],
     predicate: JoinPredicate.JoinPredicate,
     capacity: Int
     )  extends RDD[(V,V2)](left.context, Nil) {
@@ -107,5 +107,11 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
       Iterator.empty
     
     new InterruptibleIterator(context, res)
+  }
+  
+  override def clearDependencies() {
+    super.clearDependencies()
+    left = null
+    right = null
   }
 }

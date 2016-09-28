@@ -16,8 +16,8 @@ import dbis.stark.spatial.Utils
 import dbis.stark.spatial.JoinPredicate
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
-    @transient val left: RDD[(G,V)], 
-    @transient val right: RDD[(G,V2)],
+    var left: RDD[(G,V)], 
+    var right: RDD[(G,V2)],
     predicate: (G,G) => Boolean
     )  extends RDD[(V,V2)](left.context, Nil) {
   
@@ -84,6 +84,10 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
   }
   
   
-  
+  override def clearDependencies() {
+    super.clearDependencies()
+    left = null
+    right = null
+  }
   
 }

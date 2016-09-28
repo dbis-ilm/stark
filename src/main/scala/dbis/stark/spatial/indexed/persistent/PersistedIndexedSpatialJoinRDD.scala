@@ -29,8 +29,8 @@ import com.vividsolutions.jts.geom.Envelope
 
 
 class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
-    @transient val left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
-    @transient val right: RDD[(G,V2)],
+    var left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
+    var right: RDD[(G,V2)],
     pred: JoinPredicate.JoinPredicate
     )  extends RDD[(V,V2)](left.context, Nil) {
   
@@ -111,6 +111,8 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 
   override def clearDependencies() {
     super.clearDependencies()
+    rdd1 = null
+    rdd2 = null
   }  
 }
 

@@ -82,20 +82,23 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   
   private lazy val numXCells = math.ceil(( math.abs(_ur.head - _ll.head) ) / _sideLength).toInt
   
-  def getCellsIn(r: NRectRange, minX: Double, minY: Double): Seq[Int] = {
+  protected[spatial] def cellId(p: NPoint) = {
+      
+      val x = math.ceil(math.abs(p(0) - ll(0)) / _sideLength).toInt
+      val y = math.ceil(math.abs(p(1) - ll(1)) / _sideLength).toInt
+      y * numXCells + x
+    }
+  
+  def getCellsIn(r: NRectRange): Seq[Int] = {
     
 	  require(r.ll.c.zipWithIndex.forall { case (c, idx) => c >= _ll(idx)} , s"""invalid LL of range for cells in range
 		  range: $r
-		  minX: $minX
-		  minY: $minY
-		  ll: ${_ll.mkString(",")}
+ 		  ll: ${_ll.mkString(",")}
   	  ur: ${_ur.mkString(",")}
 	  """)  
     
 	  require(r.ur.c.zipWithIndex.forall { case (c, idx) => c <= _ur(idx)} , s"""invalid UR of range for cells in range
       range: $r
-      minX: $minX
-      minY: $minY
       ll: ${_ll.mkString(",")}
       ur: ${_ur.mkString(",")}
     """)
@@ -103,12 +106,8 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     
     val numCells = cellsPerDimension(r)
     
-    val llCellId = {
-      
-      val x = math.ceil(math.abs(r.ll(0) - minX) / _sideLength).toInt
-      val y = math.ceil(math.abs(r.ll(1) - minY) / _sideLength).toInt
-      y * numXCells + x
-    }
+    // the cellId of the lower left point of the given range
+    val llCellId = cellId(r.ll)
     
     (0 until numCells(1)).flatMap { i =>
       (llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells )
@@ -133,6 +132,13 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim =>  
       math.ceil(part.lengths(dim) / _sideLength).toInt  
     }
+      
+  protected[spatial] def extentForRange(range: NRectRange) = {
+    getCellsIn(range)
+      .filter { id => id >= 0 && id < _cellHistogram.size } // FIXME: we should actually make sure cellInRange produces always valid cells
+      .map { id => _cellHistogram(id)._1.extent } // get the extent for the cells
+      .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent 
+  }
     
   /**
    * Split the given partition into two partitions so that 
@@ -156,10 +162,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     var minCostDiff = Double.PositiveInfinity
     
     // result variable with default value - will be overridden in any case
-    var parts: (Option[Cell], Option[Cell]) = (
-      Some(Cell(NRectRange(-1, NPoint(0,0),NPoint(0,0)))), 
-      Some(Cell(NRectRange(-1,NPoint(0,0),NPoint(0,0))))
-    ) 
+    var parts: (Option[Cell], Option[Cell]) = ( None, None ) 
     
     /* 
      * count how many cells we have in each dimension and
@@ -194,21 +197,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
              */
             
             val diffRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
-            val diffRangeExtent = getCellsIn(diffRange,ll(0), ll(1))
-              .map { id => 
-                if(id >= _cellHistogram.size)
-                  throw new IllegalArgumentException(s"""p1 of $part
-                    ID: $id
-                    size: ${_cellHistogram.size}
-                    max idx: ${_cellHistogram.indices.max}
-                    diffRange: $diffRange
-                    ll(0): ${ll(0)}
-                    ll(1): ${ll(1)}
-                    """)
-                _cellHistogram(id)._1.extent }
-              .foldLeft(diffRange){ (e1,e2) =>
-                e1.extend(e2)
-              }
+            val diffRangeExtent = extentForRange(diffRange)
             val extent = prevP1Range.map{ p => p.extent.extend(diffRangeExtent)}.getOrElse(diffRangeExtent)   
             Cell(range, extent)
           } else {
@@ -232,20 +221,8 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
           val range = NRectRange(NPoint(rll), part.range.ur.clone())
           
           val cell = if(withExtent) {
-            val thecells = getCellsIn(range, ll(0), ll(1))
-            val extent = thecells
-              .map{ id => 
-                if(id >= _cellHistogram.size)
-                  throw new IllegalArgumentException(s"""
-                    ID: $id
-                    size: ${_cellHistogram.size}
-                    max idx: ${_cellHistogram.indices.max}
-                    range: $range
-                    ll(0): ${ll(0)}
-                    ll(1): ${ll(1)}
-                    """)
-                _cellHistogram(id)._1.extent }
-              .foldLeft(range){ (e1,e2) => e1.extend(e2)}
+//            val thecells = getCellsIn(range, ll(0), ll(1))
+            val extent = extentForRange(range)
             Cell(range, extent)  
           } else {
             Cell(range)

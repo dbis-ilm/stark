@@ -63,177 +63,175 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
   }
   
-//  it should "find all elements contained by a query" in { 
-//    val rdd = TestUtils.createIndexedRDD(sc)
-//    
-//    val start = System.currentTimeMillis()
-//    val foundPoints = rdd.containedby(qry).flatten.collect()
-//    val end = System.currentTimeMillis()
-//    println(s"contaiedby + flatten: ${end - start} ms")
-//    
-//    withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
-//  }
-//  
-//  it should "find all elements that contain a given point" in { 
-//	  val rdd = TestUtils.createIndexedRDD(sc)
-//	  
-//	  // we look for all elements that contain a given point. 
-//	  // thus, the result should be all points in the RDD with the same coordinates
-//	  val q = STObject("POINT (53.483437 -2.2040706)")
-//	  val foundGeoms = rdd.contains(q).flatten.collect()
-//	  
-//	  foundGeoms.size shouldBe 6
-//	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
-//    
-//  }
-//  
-//  ignore should "find the correct nearest neighbors" in { 
-//    val rdd = TestUtils.createIndexedRDD(sc)
-//	  
-//	  val q: STObject = "POINT (53.483437 -2.2040706)"
-//	  val foundGeoms = rdd.kNN(q, 6).collect()
-//	  
-//	      
-//  } 
-//  
-//  it should "compute the correct (quasi) self-join result for points with intersects" in {
-//    
-//    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100)
-//    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
-//    
-//    /* perform the spatial join with intersects predicate
-//     * and then map the result to the STObject element (which is the same for left and right input)
-//     * This is done for comparison later
-//     */
-//    val spatialJoinResult = rdd1.join(rdd2, Predicates.intersects _).collect()
-//
-//    /* We compare the spatial join result to a normal join performed by traditional Spark
-//     * an the String representation of the STObject. Since we need a pair RDD, we use the
-//     * STObject's text/string representation as join key and a simple 1 as payload.
-//     * We also map the result to just the text of the respective STObject. 
-//     */
-//    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
-//    
-//    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
-//    
-//    // first of all, both sizes should be the same
-//    spatialJoinResult.size shouldBe plainJoinResult.size
-//    
-//    // and they both should contain the same elements (we don't care abour ordering)
-//    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
-//    
-//    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
-//      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
-//    }
-//  }
-//  
-//  it should "compute the correct (quasi) self-join result for points with contains" in {
-//    
-//    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100)
-//    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
-//    
-//    /* perform the spatial join with intersects predicate
-//     * and then map the result to the STObject element (which is the same for left and right input)
-//     * This is done for comparison later
-//     */
-//    val spatialJoinResult = rdd1.join(rdd2, Predicates.contains _).collect()
-//
-//    /* We compare the spatial join result to a normal join performed by traditional Spark
-//     * an the String representation of the STObject. Since we need a pair RDD, we use the
-//     * STObject's text/string representation as join key and a simple 1 as payload.
-//     * We also map the result to just the text of the respective STObject. 
-//     */
-//    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
-//    
-//    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
-//    
-//    // first of all, both sizes should be the same
-//    spatialJoinResult.size shouldBe plainJoinResult.size
-//    
-//    // and they both should contain the same elements (we don't care abour ordering)
-//    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
-//    
-//    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
-//      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
-//    }
-//  }
-//  
-//  it should "compute the correct (quasi) self-join result for points with containedBy" in {
-//    
-//    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100)
-//    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
-//    
-//    /* perform the spatial join with intersects predicate
-//     * and then map the result to the STObject element (which is the same for left and right input)
-//     * This is done for comparison later
-//     */
-//    val spatialJoinResult = rdd1.join(rdd2, Predicates.containedby _).collect()
-//
-//    /* We compare the spatial join result to a normal join performed by traditional Spark
-//     * an the String representation of the STObject. Since we need a pair RDD, we use the
-//     * STObject's text/string representation as join key and a simple 1 as payload.
-//     * We also map the result to just the text of the respective STObject. 
-//     */
-//    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
-//    
-//    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
-//    
-//    // first of all, both sizes should be the same
-//    spatialJoinResult.size shouldBe plainJoinResult.size
-//    
-//    // and they both should contain the same elements (we don't care abour ordering)
-//    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
-//    
-//    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
-//      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
-//    }
-//  }
-//  
-//  it should "compute the correct (quasi) self-join result for points with withinDistance" in {
-//    
-//    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100)
-//    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
-//    
-//    /* perform the spatial join with intersects predicate
-//     * and then map the result to the STObject element (which is the same for left and right input)
-//     * This is done for comparison later
-//     */
-//    val spatialJoinResult = rdd1.join(rdd2, Predicates.withinDistance(0, (s1,s2) => s1.getGeo.distance(s2.getGeo)) _).collect()
-//
-//    /* We compare the spatial join result to a normal join performed by traditional Spark
-//     * an the String representation of the STObject. Since we need a pair RDD, we use the
-//     * STObject's text/string representation as join key and a simple 1 as payload.
-//     * We also map the result to just the text of the respective STObject. 
-//     */
-//    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
-//    
-//    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
-//    
-//    // first of all, both sizes should be the same
-//    spatialJoinResult.size shouldBe plainJoinResult.size
-//    
-//    // and they both should contain the same elements (we don't care abour ordering)
-//    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
-//    
-//    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
-//      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
-//    }
-//  }
-//  
-//  it should "have correct types for chained executions" in  {
-//    val q = STObject("POINT (53.483437 -2.2040706)")
-//    val rdd1 = TestUtils.createIndexedRDD(sc)
-//    val res = rdd1.contains(q)
-//    
-//    res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
-//    
-//    val res2 = res.intersects(qry)
-//    res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
-//
-//    val res3 = res2.join(rdd1.flatten, (g1, g2) => false)
-//    
-//    res3.collect().size shouldBe 0
-//    
-//  }
+  it should "find all elements contained by a query" in { 
+    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+    
+    val start = System.currentTimeMillis()
+    val foundPoints = rdd.containedby(qry).flatten.collect()
+    val end = System.currentTimeMillis()
+    println(s"contaiedby + flatten: ${end - start} ms")
+    
+    withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
+  }
+  
+  it should "find all elements that contain a given point" in { 
+	  val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+	  
+	  // we look for all elements that contain a given point. 
+	  // thus, the result should be all points in the RDD with the same coordinates
+	  val q = STObject("POINT (53.483437 -2.2040706)")
+	  val foundGeoms = rdd.contains(q).flatten.collect()
+	  
+	  foundGeoms.size shouldBe 6
+	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
+    
+  }
+  
+  ignore should "find the correct nearest neighbors" in { 
+    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+	  
+	  val q: STObject = "POINT (53.483437 -2.2040706)"
+	  val foundGeoms = rdd.kNN(q, 6).collect()
+	  
+	      
+  } 
+  
+  it should "compute the correct (quasi) self-join result for points with intersects" in {
+    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
+    
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd2, Predicates.intersects _).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
+    
+    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
+    
+    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
+      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
+    }
+  }
+  
+  it should "compute the correct (quasi) self-join result for points with contains" in {
+    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
+    
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd2, Predicates.contains _).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
+    
+    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
+    
+    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
+      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
+    }
+  }
+  
+  it should "compute the correct (quasi) self-join result for points with containedBy" in {
+    
+    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
+    
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd2, Predicates.containedby _).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
+    
+    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
+    
+    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
+      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
+    }
+  }
+  
+  it should "compute the correct (quasi) self-join result for points with withinDistance" in {
+    
+    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, numParts = 4, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = TestUtils.createRDD(sc, distinct = true, numParts = 4)
+    
+    /* perform the spatial join with intersects predicate
+     * and then map the result to the STObject element (which is the same for left and right input)
+     * This is done for comparison later
+     */
+    val spatialJoinResult = rdd1.join(rdd2, Predicates.withinDistance(0, (s1,s2) => s1.getGeo.distance(s2.getGeo)) _).collect()
+
+    /* We compare the spatial join result to a normal join performed by traditional Spark
+     * an the String representation of the STObject. Since we need a pair RDD, we use the
+     * STObject's text/string representation as join key and a simple 1 as payload.
+     * We also map the result to just the text of the respective STObject. 
+     */
+    val rdd3 = TestUtils.createRDD(sc, distinct = true, numParts = 4).map{ case (st, v) => (st.toText(), 1) }
+    
+    val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
+    
+    // first of all, both sizes should be the same
+    spatialJoinResult.size shouldBe plainJoinResult.size
+    
+    // and they both should contain the same elements (we don't care abour ordering)
+    spatialJoinResult.map(_._1._4.toText()) should contain theSameElementsAs(plainJoinResult)
+    
+    spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
+      lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
+    }
+  }
+  
+  it should "have correct types for chained executions" in  {
+    val q = STObject("POINT (53.483437 -2.2040706)")
+    val rdd1 = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+    val res = rdd1.contains(q)
+    
+    res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
+    
+    val res2 = res.intersects(qry)
+    res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
+
+    val res3 = res2.join(rdd1.flatten, (g1, g2) => false)
+    
+    res3.collect().size shouldBe 0
+    
+  }
   
 }

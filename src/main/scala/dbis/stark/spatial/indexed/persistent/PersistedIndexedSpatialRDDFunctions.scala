@@ -16,7 +16,14 @@ import dbis.stark.spatial.SpatialPartitioner
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) extends Serializable {
 
-  def contains(qry: G) = rdd.mapPartitions({ trees => 
+  def contains(qry: G) = rdd.mapPartitions({ trees =>
+    trees.flatMap {tree =>
+      tree.query(qry).filter{ c => c._1.contains(qry) } 
+    }
+    
+  }, true)
+  
+  def containsRO(qry: G) = rdd.mapPartitions({ trees => 
     trees.map{ tree =>
       tree.queryRO(qry, Predicates.contains _)
       tree
@@ -25,6 +32,14 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     
 
   def containedby(qry: G) = rdd.mapPartitions({ trees => 
+    trees.flatMap{ tree =>
+//      tree.queryRO(qry, Predicates.containedby _)
+      tree.query(qry).filter{ c => c._1.containedBy(qry)}
+    }
+  }, true) // preserve partitioning
+  
+  
+  def containedbyRO(qry: G) = rdd.mapPartitions({ trees => 
     trees.map{ tree =>
       tree.queryRO(qry, Predicates.containedby _)
       tree
@@ -32,6 +47,12 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   }, true) // preserve partitioning
 
   def intersects(qry: G) = rdd.mapPartitions({ trees => 
+    trees.flatMap{ tree =>
+      tree.query(qry).filter{ c => c._1.intersects(qry)}
+    }
+  }, true) // preserve partitioning
+  
+  def intersectsRO(qry: G) = rdd.mapPartitions({ trees => 
     trees.map{ tree =>
       tree.queryRO(qry, Predicates.intersects _)
       tree
@@ -60,11 +81,21 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     rdd.sparkContext.parallelize(nn)
   }
   
-  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
+  def withinDistanceRO(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
     rdd.mapPartitions({ trees => 
     trees.map{ tree =>
-      tree.queryRO(qry, Predicates.withinDistance(maxDist, distFunc) _)
+      //tree.queryRO(qry, Predicates.withinDistance(maxDist, distFunc) _)
+      tree.withinDistanceRO(qry, distFunc, maxDist)
       tree
+    }
+  }, true) // preserve partitioning
+  
+  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
+    rdd.mapPartitions({ trees => 
+    trees.flatMap{ tree =>
+//      tree.query(qry, Predicates.withinDistance(maxDist, distFunc) _)
+      tree.withinDistance(qry, distFunc, maxDist)
+      
     }
   }, true) // preserve partitioning
   

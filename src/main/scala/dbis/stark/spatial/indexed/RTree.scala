@@ -11,6 +11,8 @@ import com.vividsolutions.jts.index.strtree.STRtree
 import dbis.stark.STObject
 import com.vividsolutions.jts.index.strtree.ItemDistance
 import com.vividsolutions.jts.index.ItemVisitor
+import com.vividsolutions.jts.geom.Envelope
+import com.vividsolutions.jts.geom.Coordinate
 
 protected[indexed] class Data[G,T](var ts: Int, val data: T, val so: G) extends Serializable
 
@@ -50,8 +52,30 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * 
    * A query only increases the timestamp of an item.
    */
-  def queryRO(qry: STObject, pred: (STObject, STObject) => Boolean) = { 
+  def queryRO(qry: STObject, pred: (STObject, STObject) => Boolean) = doQueryRO(qry, qry.getEnvelopeInternal, pred)
+  
+  def withinDistanceRO(qry: STObject, distFunc: (STObject,STObject) => Double, maxDist: Double) = {
+    val env = qry.getGeo.getEnvelopeInternal
+    val env2 = new Envelope(
+        new Coordinate(env.getMinX - maxDist - 1, env.getMinY - maxDist - 1), 
+        new Coordinate(env.getMaxX + maxDist + 1, env.getMaxY + maxDist + 1))
     
+    def pred(g1: STObject, g2: STObject) = distFunc(g1,g2) <= maxDist 
+    
+    doQueryRO(qry, env2, pred) 
+  }
+  
+  
+  def withinDistance(qry: STObject, distFunc: (STObject,STObject) => Double, maxDist: Double) = {
+    val env = qry.getGeo.getEnvelopeInternal
+    val env2 = new Envelope(
+        new Coordinate(env.getMinX - maxDist - 1, env.getMinY - maxDist - 1), 
+        new Coordinate(env.getMaxX + maxDist + 1, env.getMaxY + maxDist + 1))
+    
+    super.query(env2).map(_.asInstanceOf[Data[G,D]]).iterator.filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
+  }
+  
+  private def doQueryRO(qry: STObject, env: Envelope, pred: (STObject, STObject) => Boolean) = {
     class MyVisitor(ts: Int) extends ItemVisitor {
       
       override def visitItem(item: Any) {
@@ -61,9 +85,8 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
       }
     }
     
-    super.query(qry.getEnvelopeInternal, new MyVisitor(timestamp))
+    super.query(env, new MyVisitor(timestamp))
     timestamp += 1 // increment timestamp for next query
-    
   }
   
   private def unnest[T](l: java.util.ArrayList[_]): List[Data[G,D]] = 

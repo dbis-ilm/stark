@@ -90,7 +90,9 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   }
   
   override def partitionBounds(idx: Int) = getCellBounds(idx)//partitions(idx)
-  override def partitionExtent(idx: Int) = partitions(idx).extent
+  
+  // FIXME: this was null in cluster mode
+  override def partitionExtent(idx: Int) = if(partitions(idx) != null) partitions(idx).extent else getCellBounds(idx).extent
   
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 

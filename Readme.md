@@ -1,4 +1,4 @@
-# STARK - __S__patio-__T__emporal Data Analytics on Sp__ark__
+# STARK - **S**patio-**T**emporal Data Analytics on Sp**ark**
 
 STARK is a framework that tightly integrates with [Apache Spark](https://spark.apache.org) and add support for spatial and temporal data types and operations.
 

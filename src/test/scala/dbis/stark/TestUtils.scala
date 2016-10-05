@@ -5,6 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD._
 import org.apache.spark.SparkConf
+import dbis.stark.spatial.BSPartitioner
 
 
 object TestUtils {
@@ -58,9 +59,11 @@ object TestUtils {
       cellSize: Double = 1,
       file: String = "src/test/resources/new_eventful_flat_1000.csv", 
       sep: Char = ',', 
-      numParts: Int = 4) = {
+      numParts: Int = 4,
+      order: Int = 10) = {
     
-    TestUtils.createRDD(sc, file, sep, numParts, distinct).index(cost, cellSize)
+    val rdd = TestUtils.createRDD(sc, file, sep, numParts, distinct)
+    rdd.index(new BSPartitioner(rdd, cellSize, cost), order)
   } 
   
   def distinct[V](rdd: RDD[(STObject, V)]) = {

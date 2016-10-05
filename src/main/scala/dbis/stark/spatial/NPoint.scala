@@ -6,6 +6,9 @@ package dbis.stark.spatial
  * @param c: The array of coordinate values in each dimension
  */
 case class NPoint(c: Array[Double]) extends Cloneable {
+  
+  require(c.size >= 2, "dimension must be >= 2")
+  
 	def apply(idx:Int) = c(idx)
 
 	/**
@@ -13,6 +16,15 @@ case class NPoint(c: Array[Double]) extends Cloneable {
 	 */
 	def dim = c.size
 
+	
+	def mergeMin(other: NPoint) = NPoint(
+	    c.zip(other.c).map { case (l,r) => math.min(l, r) }
+    )
+  
+  def mergeMax(other: NPoint) = NPoint(
+      c.zip(other.c).map { case (l,r) => math.max(l, r) }
+    )
+	
 	/*
 	 * Override this because we need to compare "deep", i.e.
 	 * all values instead of just the reference, which may be 

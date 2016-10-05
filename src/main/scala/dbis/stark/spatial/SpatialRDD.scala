@@ -24,6 +24,8 @@ import dbis.stark.STObject
 import dbis.stark.spatial.plain._
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
+import org.apache.spark.util.collection.ExternalAppendOnlyMap
+import scala.collection.mutable.ListBuffer
 
 
 /**
@@ -39,6 +41,8 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
   def this(@transient oneParent: RDD[(G,V)]) =
     this(oneParent.context , List(new OneToOneDependency(oneParent)))
 
+  override val partitioner = firstParent[(G,V)].partitioner  
+    
   /**
    * We do not repartition our data.
    */
@@ -91,6 +95,22 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
  */
 object SpatialRDD {
 
+  protected[stark] def createExternalMap[G : ClassTag, V : ClassTag, V2: ClassTag](): ExternalAppendOnlyMap[G, (V,V2), ListBuffer[(V,V2)]] = {
+    
+    type ValuePair = (V,V2)
+    type Combiner = ListBuffer[ValuePair]
+    
+    val createCombiner: ( ValuePair => Combiner) = pair => ListBuffer(pair)
+    
+    val mergeValue: (Combiner, ValuePair) => Combiner = (list, value) => list += value
+    
+    val mergeCombiners: ( Combiner, Combiner ) => Combiner = (c1, c2) => c1 ++= c2
+    
+    new ExternalAppendOnlyMap[G, ValuePair, Combiner](createCombiner, mergeValue, mergeCombiners)
+    
+  }  
+  
+  
   /**
    * Convert an RDD to a "plain" spatial RDD which uses no indexing.
    *

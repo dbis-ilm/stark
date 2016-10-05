@@ -22,6 +22,7 @@ import dbis.stark.STObject
 import dbis.stark.STObject._
 import dbis.stark.TestUtils
 import dbis.stark.spatial.Predicates
+import dbis.stark.spatial.SpatialGridPartitioner
 
 object SpatialRDDLiveIndexedTestCase {
   
@@ -46,9 +47,10 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   }
   
   
-  "A LIVE indexed SpatialRDD" should "find the correct intersection result for points" in { 
+  "A LIVE indexed SpatialRDD" should "find the correct intersection result for points with grid partitioning" in { 
     
-    val rdd = TestUtils.createRDD(sc).liveIndex(5,10)
+    val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
     
     val foundPoints = rdd.intersects(qry).collect()
     
@@ -58,8 +60,9 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
   }
   
-  it should "find all elements contained by a query" in { 
-    val rdd = TestUtils.createRDD(sc).liveIndex(5,10)
+  it should "find all elements contained by a query with grid partitioning"  in { 
+    val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
     
     val foundPoints = rdd.containedby(qry).collect()
     
@@ -67,7 +70,8 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   }
   
   it should "find all elements that contain a given point" in { 
-	  val rdd = TestUtils.createRDD(sc).liveIndex(5,10)
+	  val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -79,8 +83,9 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
   }
   
-  ignore should "find the correct nearest neighbors" in { 
-    val rdd = TestUtils.createRDD(sc).liveIndex(5,10)
+  ignore should "find the correct nearest neighbors with grid partitioning" in { 
+    val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
 	  
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -93,11 +98,11 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   } 
   
   
-  it should "find correct self-join result for points with intersect" in {
+  it should "find correct self-join result for points with intersect with grid partitioning" in {
     
     val rdd = TestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(5,10)
+    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5),10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -120,22 +125,24 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     spatialJoinResult should contain theSameElementsAs(plainJoinResult)
   }
   
-  it should "find correct self-join result for points with contains" in {
+  it should "find correct self-join result for points with contains with grid partitioning" in {
     
-    val rdd1 = TestUtils.createRDD(sc, distinct = true).cache()
+    val rdd = TestUtils.createRDD(sc, distinct = true).cache()
+    
+    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5),10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, Predicates.contains _).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd, Predicates.contains _).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd1.map{ case (st, v) => (st.toText(), 1) }
+    val rdd2 = rdd.map{ case (st, v) => (st.toText(), 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -145,22 +152,24 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     spatialJoinResult should contain theSameElementsAs(plainJoinResult)
   }
   
-  it should "find correct self-join result for points with withinDistance" in {
+  it should "find correct self-join result for points with withinDistance with grid partitioning" in {
     
-    val rdd1 = TestUtils.createRDD(sc, distinct = true).cache()
+    val rdd = TestUtils.createRDD(sc, distinct = true).cache()
+    
+    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5), 10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, Predicates.withinDistance(0, (g1,g2) => g1.getGeo.distance(g2.getGeo)) _).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd, Predicates.withinDistance(0, (g1,g2) => g1.getGeo.distance(g2.getGeo)) _).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd1.map{ case (st, v) => (st.toText(), 1) }
+    val rdd2 = rdd.map{ case (st, v) => (st.toText(), 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -172,8 +181,9 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
   }
   
-  it should "return a cluster result with all points" in {
-    val rdd = TestUtils.createRDD(sc)
+  ignore should "return a cluster result with all points with grid partitioning" in {
+    val rdd1 = TestUtils.createRDD(sc)
+    val rdd = rdd1.liveIndex(new SpatialGridPartitioner(rdd1, 5), 10)
     
     val f = new java.io.File("clusterresult")
     TestUtils.rmrf(f) // delete output directory if existing to avoid write problems 
@@ -181,7 +191,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     
 
-    val res = rdd.cluster(
+    val res = rdd1.cluster(
         keyExtractor = { case (_,(id, _, _,_)) => id } , // key extractor to extract point IDs from tuple //keyExtractor = _._2._1,
         minPts = 10, 
         epsilon = 5.0,  
@@ -189,6 +199,6 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
         includeNoise = true,
         outfile = Some(f.toString()))
     
-    res.count() shouldBe rdd.count() 
+    res.count() shouldBe rdd1.count() 
   }
 }

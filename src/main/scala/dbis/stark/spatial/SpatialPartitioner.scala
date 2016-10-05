@@ -6,14 +6,9 @@ import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import dbis.stark.STObject
 
-abstract class SpatialPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[(G,V)]
-  ) extends Partitioner {
+object SpatialPartitioner {
   
-  private type MinMax = (Double, Double, Double, Double)
-  
-  protected[spatial] lazy val (minX, maxX, minY, maxY)  = {
-    
+  protected[stark] def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]) = {
     val (minX, maxX, minY, maxY) = rdd.map{ case (g,_) =>
       val env = g.getEnvelopeInternal
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
@@ -30,7 +25,18 @@ abstract class SpatialPartitioner[G <: STObject : ClassTag, V: ClassTag](
     // do +1 for the max values to achieve right open intervals 
     (minX, maxX + 1, minY, maxY + 1)
   }
+}
+
+abstract class SpatialPartitioner[G <: STObject : ClassTag, V: ClassTag](
+    rdd: RDD[(G,V)], _minX: Double, _maxX: Double, _minY: Double, _maxY: Double
+  ) extends Partitioner {
+
+  def minX = _minX
+  def maxX = _maxX
+  def minY = _minY
+  def maxY = _maxY
   
-  def partitionBounds(idx: Int): NRectRange
+  def partitionBounds(idx: Int): Cell
+  def partitionExtent(idx: Int): NRectRange
 }
 

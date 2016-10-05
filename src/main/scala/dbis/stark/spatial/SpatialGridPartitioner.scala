@@ -3,6 +3,7 @@ package dbis.stark.spatial
 import org.apache.spark.rdd.RDD
 import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
+import scala.collection.mutable.Map
 import com.vividsolutions.jts.io.WKTReader
 import com.vividsolutions.jts.geom.Envelope
 
@@ -21,16 +22,38 @@ import dbis.stark.STObject
  * @param dimensions The dimensionality of the input data 
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    partitionsPerDimension: Int, 
-    rdd: RDD[(G,V)], 
-    dimensions: Int = 2) extends SpatialPartitioner(rdd) {
+    @transient private val rdd: RDD[(G,V)],
+    partitionsPerDimension: Int,
+    withExtent: Boolean,
+    _minX: Double,
+    _maxX: Double,
+    _minY: Double,
+    _maxY: Double,
+    dimensions: Int) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
   
   require(dimensions == 2, "Only 2 dimensions supported currently")
   
-  protected[this] val xLength = (maxX - minX) / partitionsPerDimension
-  protected[this] val yLength = (maxY - minY) / partitionsPerDimension
+  def this(rdd: RDD[(G,V)],
+      partitionsPerDimension: Int,
+      withExtent: Boolean,
+      minMax: (Double, Double, Double, Double),
+      dimensions: Int) = 
+    this(rdd, partitionsPerDimension, withExtent, minMax._1, minMax._2, minMax._3, minMax._4, dimensions)  
   
-  protected[spatial] def getCellBounds(id: Int): NRectRange = {
+  def this(rdd: RDD[(G,V)],
+      partitionsPerDimension: Int,
+      withExtent: Boolean = false,
+      dimensions: Int = 2) = 
+    this(rdd, partitionsPerDimension, withExtent, SpatialPartitioner.getMinMax(rdd), dimensions)
+  
+  
+  protected[this] val xLength = math.abs(maxX - minX) / partitionsPerDimension
+  protected[this] val yLength = math.abs(maxY - minY) / partitionsPerDimension
+  
+  
+  private val partitions = new Array[Cell](numPartitions) //Map.empty[Int, Cell]
+  
+  protected[spatial] def getCellBounds(id: Int): Cell = {
     
     require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
     
@@ -43,7 +66,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     val urx = llx + xLength
     val ury = lly + yLength
       
-    NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
+    Cell(NRectRange(id, NPoint(llx, lly), NPoint(urx, ury)))
   }
   /**
    * Compute the cell id of a data point
@@ -53,11 +76,10 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
    */
   private def getCellId(p: NPoint): Int = {
     
-    
     require(p(0) >= minX && p(0) <= maxX || p(1) >= minY || p(1) <= maxY, s"$p out of range!")
       
-    val newX = p(0) - minX
-    val newY = p(1) - minY
+    val newX = math.abs(p(0) - minX)
+    val newY = math.abs(p(1) - minY)
     
     val x = (newX.toInt / xLength).toInt
     val y = (newY.toInt / yLength).toInt
@@ -67,7 +89,8 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     cellId
   }
   
-  override def partitionBounds(idx: Int): NRectRange = getCellBounds(idx)
+  override def partitionBounds(idx: Int) = getCellBounds(idx)//partitions(idx)
+  override def partitionExtent(idx: Int) = partitions(idx).extent
   
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 
@@ -80,11 +103,31 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * @return The Index of the partition 
    */
   override def getPartition(key: Any): Int = {
-    val center = key.asInstanceOf[G].getCentroid
+    val g = key.asInstanceOf[G]
     
+    val center = g.getCentroid
     val p = NPoint(center.getX, center.getY)
     
     val id = getCellId(p)
+    
+    
+    
+    if(withExtent) {
+      if(partitions(id) != null) {
+    	  val env = g.getEnvelopeInternal
+			  val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+        val old = partitions(id)
+        val extent = old.extent.extend(gExtent)
+        partitions(id) = Cell(old.range, extent)
+      } else {
+        val bounds = getCellBounds(id)
+        partitions(id) = bounds
+      }
+    } else if(partitions(id) == null) {
+        partitions(id) = getCellBounds(id)
+    }
+      
+    
     
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
     

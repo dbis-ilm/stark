@@ -109,8 +109,22 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  distFunc: (STObject,STObject) => Double
 	  ) = rdd.mapPartitions({iter =>
       // we don't know how the distance function looks like and thus have to scan all partitions
-      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.withinDistance(maxDist, distFunc) _, capacity)
-  
+//      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.withinDistance(maxDist, distFunc) _, capacity)
+	    
+	    val indexTree = new RTree[G,(G,V)](capacity)
+    
+      // Build our index live on-the-fly
+      iter.foreach{ case (geom, data) =>
+        /* we insert a pair of (geom, data) because we want the tupled
+         * structure as a result so that subsequent RDDs build from this 
+         * result can also be used as SpatialRDD
+         */
+        indexTree.insert(geom, (geom,data))
+      }
+      indexTree.build()
+      
+      indexTree.withinDistance(qry, distFunc, maxDist)
+      
     }) 
   
   

@@ -51,7 +51,7 @@ object Interval {
   
   def apply(o: Interval): Interval= Interval(Instant(o.start), Instant(o.end))
   
-  def apply(start: Long, end: Long): Interval = Interval(Instant(start), Instant(end))
+  def apply(start: Long, end: Long): Interval = Interval(Instant(start), Some(Instant(end)))
   
   def apply(start: Instant, end: Instant): Interval = Interval(start, Some(end))
   

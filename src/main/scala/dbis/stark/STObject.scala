@@ -90,6 +90,10 @@ object STObject {
   def apply(g: GeoType): STObject = this(g, None)
   def apply(g: GeoType, t: TemporalExpression): STObject = this(g, Some(t))
   
+  def apply(g: GeoType, time: Long): STObject = this(g, Some(Instant(time)))
+  def apply(g: GeoType, start: Long, stop: Long): STObject = this(g, Some(Interval(start, stop)))
+//  def apply(g: GeoType, start: Long, stop: Option[Long]): STObject = this(g, Some(Interval(start, Instant(stop))))
+  
   type GeoType = Geometry
   
   implicit def getInternal(s: STObject): GeoType = s.g

@@ -91,17 +91,17 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   
   def getCellsIn(r: NRectRange): Seq[Int] = {
     
-	  require(r.ll.c.zipWithIndex.forall { case (c, idx) => c >= _ll(idx)} , s"""invalid LL of range for cells in range
-		  range: $r
- 		  ll: ${_ll.mkString(",")}
-  	  ur: ${_ur.mkString(",")}
-	  """)  
-    
-	  require(r.ur.c.zipWithIndex.forall { case (c, idx) => c <= _ur(idx)} , s"""invalid UR of range for cells in range
-      range: $r
-      ll: ${_ll.mkString(",")}
-      ur: ${_ur.mkString(",")}
-    """)
+//	  require(r.ll.c.zipWithIndex.forall { case (c, idx) => c >= _ll(idx)} , s"""invalid LL of range for cells in range
+//		  range: $r
+// 		  ll: ${_ll.mkString(",")}
+//  	  ur: ${_ur.mkString(",")}
+//	  """)  
+//    
+//	  require(r.ur.c.zipWithIndex.forall { case (c, idx) => c <= _ur(idx)} , s"""invalid UR of range for cells in range
+//      range: $r
+//      ll: ${_ll.mkString(",")}
+//      ur: ${_ur.mkString(",")}
+//    """)
       
     
     val numCells = cellsPerDimension(r)
@@ -122,12 +122,12 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * 
    * @param part The partition 
    */
-  def costEstimation(part: Cell): Double =
-    _cellHistogram
-      // consider only cells that really contains data and that belong to the given range/region
-      .filter { case (cell, cnt) => cnt > 0 && part.range.contains(cell.range) }  
-      .map(_._2) // project to count value (number of elements in cell)
-      .sum       // sum up 
+  def costEstimation(part: Cell): Double = getCellsIn(part.range).map{id => _cellHistogram(id)._2}.sum
+//    _cellHistogram
+//      // consider only cells that really contains data and that belong to the given range/region
+//      .filter { case (cell, cnt) => cnt > 0 && part.range.contains(cell.range) }  
+//      .map(_._2) // project to count value (number of elements in cell)
+//      .sum       // sum up 
     
   protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim =>  
       math.ceil(part.lengths(dim) / _sideLength).toInt  

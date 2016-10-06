@@ -10,6 +10,27 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.STObject
 
+
+object BSPartitioner {
+  /**
+   * Compute the bounds of a cell with the given ID
+   * @param id The ID of the cell to compute the bounds for
+   */
+  protected[spatial] def getCellBounds(id: Int, xCells: Int, yCells: Int, _sideLength: Double, minX: Double, minY: Double): NRectRange = {
+      
+    val dy = id / xCells
+    val dx = id % yCells
+    
+    val llx = dx * _sideLength + minX
+    val lly = dy * _sideLength + minY
+    
+    val urx = llx + _sideLength
+    val ury = lly + _sideLength
+      
+    NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
+  }
+}
+
 /**
  * A cost based binary space partitioner based on the paper
  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
@@ -20,7 +41,7 @@ import dbis.stark.STObject
  * @param maxCostPerPartition Maximum cost a partition should have - here: number of elements  
  */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    @transient private val rdd: RDD[(G,V)],
+    rdd: RDD[(G,V)],
     _sideLength: Double,
     _maxCostPerPartition: Double,
     withExtent: Boolean,
@@ -46,26 +67,10 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
   
-  protected[spatial] val numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
-  protected[spatial] val numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
+  protected[spatial] var numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
+  protected[spatial] var numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
   
-  /**
-   * Compute the bounds of a cell with the given ID
-   * @param id The ID of the cell to compute the bounds for
-   */
-  protected[spatial] def getCellBounds(id: Int): NRectRange = {
-      
-    val dy = id / numXCells
-    val dx = id % numXCells
-    
-    val llx = dx * _sideLength + minX
-    val lly = dy * _sideLength + minY
-    
-    val urx = llx + _sideLength
-    val ury = lly + _sideLength
-      
-    NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
-  }
+  
   
   /**
    * The cells which contain elements and the number of elements
@@ -73,12 +78,12 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simply aggregate by cell
    */
-  protected[spatial] val cells: Array[(Cell, Int)] = {
+  protected[spatial] var cells: Array[(Cell, Int)] = {
     
     val themap = Map.empty[Cell, Int]
     
-    (0 until numXCells * numYCells).map { i => 
-      val cellBounds = getCellBounds(i)
+    (0 until numXCells * numYCells).foreach { i => 
+      val cellBounds = BSPartitioner.getCellBounds(i, numXCells, numYCells, _sideLength, minX, minY)
       
       val cell = Cell(cellBounds)
       
@@ -91,11 +96,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       val env = g.getEnvelopeInternal
       val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
       
-      val newX = math.abs(p.getX - minX)
-      val newY = math.abs(p.getY - minY)
-    
-      val x = (newX.toInt / _sideLength).toInt
-      val y = (newY.toInt / _sideLength).toInt
+      val x = (math.abs(p.getX - minX).toInt / _sideLength).toInt
+      val y = (math.abs(p.getY - minY).toInt / _sideLength).toInt
       
       val cellId = y * numXCells + x
       
@@ -109,8 +111,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       (cnt, extent)
       
     }
+    .map { case (id, cntAndExtent) => (BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY), cntAndExtent) }
     .collect
-    .map { case (id, cntAndExtent) => (getCellBounds(id), cntAndExtent) }
     .foreach { case (cellBounds, (cnt,extent)) =>
       val cell = Cell(cellBounds, extent)
       themap(cell) += cnt 
@@ -120,16 +122,16 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   }
 
   
-  protected[spatial] val bsp = new BSP(
-      NPoint(minX, minY), 
-      NPoint(maxX, maxY), 
+  protected[spatial] var bsp = new BSP(
+      Array(minX, minY), 
+      Array(maxX, maxY), 
       cells, // for BSP we only need calculated cell sizes and their respective counts 
       _sideLength, 
       _maxCostPerPartition,
       withExtent)  
     
   override def partitionBounds(idx: Int) = bsp.partitions(idx)
-  override def partitionExtent(idx: Int) = partitionBounds(idx).extent
+  override def partitionExtent(idx: Int) = bsp.partitions(idx).extent
   
   def printPartitions(fName: java.nio.file.Path) {
     val list = bsp.partitions.map(_.range).map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
@@ -158,29 +160,31 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
      * which by definition is immutable and the partitions should cover the complete data space 
      * of the RDD's content
      */
-    val part = bsp.partitions.filter{ p =>
+//    bsp.partitions.find { x => ??? }
+    
+    val part = bsp.partitions.find{ p =>
       val c = g.getCentroid
       p.range.contains(NPoint(c.getX, c.getY)) 
-    }.headOption
+    }
     
-    part match {
-      case None => 
-        println(bsp.partitions.mkString("\n"))
-        println(bsp.partitionStats)
-        val histoFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_histogram", null)
-        val partitionFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_partitions", null)
-        
-        println(s"saving historgram to $histoFile")
-        printHistogram(histoFile)
-        
-        println(s"saving partitions to $partitionFile")
-        printPartitions(partitionFile)
-        
-        
-        throw new IllegalStateException(s"$g is not in any partition!")
-      case Some(part) =>  
-        part.range.id
+    
+    if(part.isEmpty) {
+    
+      println(bsp.partitions.mkString("\n"))
+      println(bsp.partitionStats)
+      val histoFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_histogram", null)
+      val partitionFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_partitions", null)
       
+      println(s"saving historgram to $histoFile")
+      printHistogram(histoFile)
+      
+      println(s"saving partitions to $partitionFile")
+      printPartitions(partitionFile)
+      
+      
+      throw new IllegalStateException(s"$g is not in any partition!")
+    } else {
+        part.get.range.id
     }
     
     

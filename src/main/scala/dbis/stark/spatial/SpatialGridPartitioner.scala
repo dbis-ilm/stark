@@ -22,7 +22,7 @@ import dbis.stark.STObject
  * @param dimensions The dimensionality of the input data 
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    @transient private val rdd: RDD[(G,V)],
+    rdd: RDD[(G,V)],
     partitionsPerDimension: Int,
     withExtent: Boolean,
     _minX: Double,
@@ -50,8 +50,25 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[this] val xLength = math.abs(maxX - minX) / partitionsPerDimension
   protected[this] val yLength = math.abs(maxY - minY) / partitionsPerDimension
   
-  
-  private val partitions = new Array[Cell](numPartitions) //Map.empty[Int, Cell]
+//  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
+  private var partitions = {
+    val arr = Array.tabulate(numPartitions){ i => getCellBounds(i) }
+    
+    if(withExtent) {
+      rdd.foreach{ case (g,_) =>
+        val center = g.getCentroid
+      
+        val id = getCellId(center.getX, center.getY)
+        
+        val env = g.getEnvelopeInternal
+  		  val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+        
+  		  arr(id) = Cell(arr(id).range, arr(id).extent.extend(gExtent))
+      } 
+    }
+    
+    arr
+  }
   
   protected[spatial] def getCellBounds(id: Int): Cell = {
     
@@ -74,20 +91,21 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * @param point The point to compute the cell id for
    * @returns Returns the number (ID) of the cell the given point lies in
    */
-  private def getCellId(p: NPoint): Int = {
+  private def getCellId(p: NPoint): Int = getCellId(p(0), p(1))
     
-    require(p(0) >= minX && p(0) <= maxX || p(1) >= minY || p(1) <= maxY, s"$p out of range!")
+
+  
+  private def getCellId(_x: Double, _y: Double) = {
+    //    require(p(0) >= minX && p(0) <= maxX || p(1) >= minY || p(1) <= maxY, s"$p out of range!")
       
-    val newX = math.abs(p(0) - minX)
-    val newY = math.abs(p(1) - minY)
-    
-    val x = (newX.toInt / xLength).toInt
-    val y = (newY.toInt / yLength).toInt
+    val x = (math.abs(_x - minX).toInt / xLength).toInt
+    val y = (math.abs(_y - minY).toInt / yLength).toInt
     
     val cellId = y * partitionsPerDimension + x
     
     cellId
-  }
+  }    
+  
   
   override def partitionBounds(idx: Int) = getCellBounds(idx)//partitions(idx)
   
@@ -108,28 +126,8 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     val g = key.asInstanceOf[G]
     
     val center = g.getCentroid
-    val p = NPoint(center.getX, center.getY)
     
-    val id = getCellId(p)
-    
-    
-    
-    if(withExtent) {
-      if(partitions(id) != null) {
-    	  val env = g.getEnvelopeInternal
-			  val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-        val old = partitions(id)
-        val extent = old.extent.extend(gExtent)
-        partitions(id) = Cell(old.range, extent)
-      } else {
-        val bounds = getCellBounds(id)
-        partitions(id) = bounds
-      }
-    } else if(partitions(id) == null) {
-        partitions(id) = getCellBounds(id)
-    }
-      
-    
+    val id = getCellId(center.getX, center.getY)
     
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
     

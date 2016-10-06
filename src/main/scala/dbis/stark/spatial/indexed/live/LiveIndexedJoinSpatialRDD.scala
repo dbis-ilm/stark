@@ -86,8 +86,21 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
      */
     val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
           
+    if(indexBounds == null)
+      throw new IllegalStateException("tree root bounds is null")
+    
     val partitionCheck = rightParti.map { p => 
-            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))
+//            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))
+        if(leftParti.isDefined) {
+          val lextent = leftParti.get.partitionExtent(split.s1.index)
+          val rextent = p.partitionExtent(split.s2.index)
+          
+          val lenv = Utils.toEnvelope(lextent)
+          val renv = Utils.toEnvelope(rextent)
+          
+          lenv.intersects(renv)
+        } else
+          true
       }.getOrElse(true)
       
     

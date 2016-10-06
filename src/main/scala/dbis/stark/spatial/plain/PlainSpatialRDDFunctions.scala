@@ -75,7 +75,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = rdd.filter{ case (g,_) => qry.containedBy(g)  } 
+  def containedby(qry: G) = rdd.filter{ case (g,_) => g.containedBy(qry)  } 
 //    rdd.mapPartitionsWithIndex({(idx,iter) =>
 //    
 //    val partitionCheck = rdd.partitioner.map { p =>

@@ -16,48 +16,54 @@ import dbis.stark.spatial.SpatialPartitioner
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[RTree[G, (G,V)]]) extends Serializable {
 
-  def contains(qry: G) = rdd.mapPartitions({ trees =>
-    trees.flatMap {tree =>
-      tree.query(qry).filter{ c => c._1.contains(qry) } 
-    }
-    
-  }, true)
+  def contains(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } } 
+//    rdd.mapPartitions({ trees =>
+//    trees.flatMap {tree =>
+//      tree.query(qry).filter{ c => c._1.contains(qry) } 
+//    }
+//    
+//  }, true)
   
-  def containsRO(qry: G) = rdd.mapPartitions({ trees => 
-    trees.map{ tree =>
-      tree.queryRO(qry, Predicates.contains _)
-      tree
-    }
-  }, true) // preserve partitioning
+  def containsRO(qry: G) = rdd.map { tree => tree.queryRO(qry, Predicates.contains _) ; tree }
+//    rdd.mapPartitions({ trees => 
+//    trees.map{ tree =>
+//      tree.queryRO(qry, Predicates.contains _)
+//      tree
+//    }
+//  }, true) // preserve partitioning
     
 
-  def containedby(qry: G) = rdd.mapPartitions({ trees => 
-    trees.flatMap{ tree =>
+  def containedby(qry: G) = rdd.flatMap{ tree => tree.query(qry).filter{ c => c._1.containedBy(qry)} } 
+//    rdd.mapPartitions({ trees => 
+//    trees.flatMap{ tree =>
+////      tree.queryRO(qry, Predicates.containedby _)
+//      tree.query(qry).filter{ c => c._1.containedBy(qry)}
+//    }
+//  }, true) // preserve partitioning
+  
+  
+  def containedbyRO(qry: G) = rdd.map { tree => tree.queryRO(qry, Predicates.containedby _); tree}
+//    rdd.mapPartitions({ trees => 
+//    trees.map{ tree =>
 //      tree.queryRO(qry, Predicates.containedby _)
-      tree.query(qry).filter{ c => c._1.containedBy(qry)}
-    }
-  }, true) // preserve partitioning
-  
-  
-  def containedbyRO(qry: G) = rdd.mapPartitions({ trees => 
-    trees.map{ tree =>
-      tree.queryRO(qry, Predicates.containedby _)
-      tree
-    }
-  }, true) // preserve partitioning
+//      tree
+//    }
+//  }, true) // preserve partitioning
 
-  def intersects(qry: G) = rdd.mapPartitions({ trees => 
-    trees.flatMap{ tree =>
-      tree.query(qry).filter{ c => c._1.intersects(qry)}
-    }
-  }, true) // preserve partitioning
+  def intersects(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.intersects(qry)} } 
+//    rdd.mapPartitions({ trees => 
+//    trees.flatMap{ tree =>
+//      tree.query(qry).filter{ c => c._1.intersects(qry)}
+//    }
+//  }, true) // preserve partitioning
   
-  def intersectsRO(qry: G) = rdd.mapPartitions({ trees => 
-    trees.map{ tree =>
-      tree.queryRO(qry, Predicates.intersects _)
-      tree
-    }
-  }, true) // preserve partitioning
+  def intersectsRO(qry: G) = rdd.map { tree => tree.queryRO(qry, Predicates.intersects _); tree} 
+//    rdd.mapPartitions({ trees => 
+//    trees.map{ tree =>
+//      tree.queryRO(qry, Predicates.intersects _)
+//      tree
+//    }
+//  }, true) // preserve partitioning
 
   
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = 

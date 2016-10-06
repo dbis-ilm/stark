@@ -92,21 +92,23 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
       
     
     val res = if(partitionCheck) {
-    	val map = SpatialRDD.createExternalMap[G,V,V2]        
+//    	val map = SpatialRDD.createExternalMap[G,V,V2]        
 
-    	right.iterator(split.s2, context).foreach{ case (rg, rv) => 
+    	right.iterator(split.s2, context).flatMap{ case (rg, rv) => 
         tree.query(rg)  // for each entry in right query the index
           .filter{ case (lg, _) => predicateFunction(lg,rg) } // index returns candidates only -> prune by checking predicate again
-          .map { case (lg, lv) => (lg, (lv, rv)) }    // transform to structure for the external map
-          .foreach { case (g, v) => map.insert(g, v)  } // insert into external map
+          .map { case (_, lv) => (lv,rv) }
+//          .map { case (lg, lv) => (lg, (lv, rv)) }    // transform to structure for the external map
+//          .foreach { case (g, v) => map.insert(g, v)  } // insert into external map
     	}
     	
-    	map.iterator.flatMap{ case (g, l) => l} // when done, return entries of the map
+//    	map.iterator.flatMap{ case (g, l) => l} // when done, return entries of the map
     	
     } else
       Iterator.empty
     
-    new InterruptibleIterator(context, res)
+//    new InterruptibleIterator(context, res)
+      res
   }
   
   override def clearDependencies() {

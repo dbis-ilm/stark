@@ -68,7 +68,7 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[CartesianPartition]
     
-    val map = SpatialRDD.createExternalMap[G,V,V2]
+//    val map = SpatialRDD.createExternalMap[G,V,V2]
     
     
     val pairs = for(
@@ -76,11 +76,12 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
         r <- right.iterator(split.s2, context)
         if(predicate(l._1, r._1))) yield(l._1, (l._2,r._2))
         
-    map.insertAll(pairs)
+//    map.insertAll(pairs)
     
-    val f = map.iterator.flatMap{ case (g, l) => l}
+//    val f = map.iterator.flatMap{ case (g, l) => l}
     
-    new InterruptibleIterator(context, f)
+//    new InterruptibleIterator(context, f)
+      pairs.map{ case (_, p) => p }
   }
   
   

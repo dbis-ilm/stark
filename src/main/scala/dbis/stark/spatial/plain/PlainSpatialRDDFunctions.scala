@@ -36,91 +36,114 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that intersect with a given query geometry
    */
-  def intersects(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
+  def intersects(qry: G) = {
+    // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
+    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner[G,V]]) {
+      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner[G,V]]
+      
+      rdd.mapPartitionsWithIndex({ case (idx, iter) => 
+        if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal))
+          iter.filter{ case (g,_) => qry.intersects(g) }
+        else
+          Iterator.empty
+      })
+    } else {
     
-    val partitionCheck = rdd.partitioner.map { p =>
-      p match {
-        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-        case _ => true
-      }
-    }.getOrElse(true)
+      rdd.filter{ case (g,_) => qry.intersects(g) }
+    }
+  }
     
-    if(partitionCheck)
-      iter.filter { case (g,_) => qry.intersects(g) }
-    else
-      Iterator.empty
-  })
+  
+  
+  
+//    rdd.mapPartitionsWithIndex({(idx,iter) =>
+//    
+//    val partitionCheck = rdd.partitioner.map { p =>
+//      p match {
+//        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+//        case _ => true
+//      }
+//    }.getOrElse(true)
+//    
+//    if(partitionCheck)
+//      iter.filter { case (g,_) => qry.intersects(g) }
+//    else
+//      Iterator.empty
+//  })
     
 
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    
-    val partitionCheck = rdd.partitioner.map { p =>
-      p match {
-        case sp: SpatialPartitioner[G,V] => qry.getGeo.getEnvelopeInternal.contains(Utils.toEnvelope(sp.partitionBounds(idx).extent))
-        case _ => true
-      }
-    }.getOrElse(true)
-    
-    if(partitionCheck)
-      iter.filter { case (g,_) => qry.intersects(g) }
-    else
-      Iterator.empty
-  })
+  def containedby(qry: G) = rdd.filter{ case (g,_) => qry.containedBy(g)  } 
+//    rdd.mapPartitionsWithIndex({(idx,iter) =>
+//    
+//    val partitionCheck = rdd.partitioner.map { p =>
+//      p match {
+//        case sp: SpatialPartitioner[G,V] => qry.getGeo.getEnvelopeInternal.contains(Utils.toEnvelope(sp.partitionBounds(idx).extent))
+//        case _ => true
+//      }
+//    }.getOrElse(true)
+//    
+//    if(partitionCheck)
+//      iter.filter { case (g,_) => qry.intersects(g) }
+//    else
+//      Iterator.empty
+//  })
 
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(o: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    
-    val partitionCheck = rdd.partitioner.map { p =>
-      p match {
-        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(o.getGeo.getEnvelopeInternal)
-        case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
-      }
-    }.getOrElse(true)
-    
-    if(partitionCheck)
-      iter.filter { case (g,_) => g.contains(o) }
-    else
-      Iterator.empty
-  })
-
-  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
-    rdd.mapPartitionsWithIndex({(idx,iter) =>
-    
+  def contains(o: G) = rdd.filter{ case (g,_) => g.contains(o) } 
+//    rdd.mapPartitionsWithIndex({(idx,iter) =>
+//    
 //    val partitionCheck = rdd.partitioner.map { p =>
 //      p match {
-//        case sp: SpatialPartitioner[G,V] => {
-//          val qryEnv = qry.getGeo.getEnvelopeInternal
-//          val r = NRectRange(
-//              NPoint(qryEnv.getMinX - maxDist - 1, qryEnv.getMinY - maxDist - 1), 
-//              NPoint(qryEnv.getMaxX + maxDist + 1, qryEnv.getMaxY + maxDist + 1))
-// 
-//          val bounds = sp.partitionBounds(idx)
-//          
-////          Utils.toEnvelope(r).intersects(Utils.toEnvelope(bounds))
-//          
-//          
-//        }
-//        case _ => true
+//        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(o.getGeo.getEnvelopeInternal)
+//        case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
 //      }
 //    }.getOrElse(true)
-      
-    /* FIXME: We cannot check if we have to process a partition, because of the distance function. 
-     * We would have to apply the distance function on the partition bounds to see if the partition is 
-     * matches the distance function criteria. However, the dist func is defined on STObject but the
-     * partitions are of NRectRange... 
-     */
-    val partitionCheck = true
-    
-    if(partitionCheck)
-      iter.filter { case (g,_) => distFunc(g,qry) <= maxDist }
-    else
-      Iterator.empty
-  })
+//    
+//    if(partitionCheck)
+//      iter.filter { case (g,_) => g.contains(o) }
+//    else
+//      Iterator.empty
+//  })
+
+  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
+    rdd.filter{ case (g,_) => distFunc(qry,g) <= maxDist }
+//    rdd.mapPartitionsWithIndex({(idx,iter) =>
+//    
+////    val partitionCheck = rdd.partitioner.map { p =>
+////      p match {
+////        case sp: SpatialPartitioner[G,V] => {
+////          val qryEnv = qry.getGeo.getEnvelopeInternal
+////          val r = NRectRange(
+////              NPoint(qryEnv.getMinX - maxDist - 1, qryEnv.getMinY - maxDist - 1), 
+////              NPoint(qryEnv.getMaxX + maxDist + 1, qryEnv.getMaxY + maxDist + 1))
+//// 
+////          val bounds = sp.partitionBounds(idx)
+////          
+//////          Utils.toEnvelope(r).intersects(Utils.toEnvelope(bounds))
+////          
+////          
+////        }
+////        case _ => true
+////      }
+////    }.getOrElse(true)
+//      
+//    /* FIXME: We cannot check if we have to process a partition, because of the distance function. 
+//     * We would have to apply the distance function on the partition bounds to see if the partition is 
+//     * matches the distance function criteria. However, the dist func is defined on STObject but the
+//     * partitions are of NRectRange... 
+//     */
+//    val partitionCheck = true
+//    
+//    if(partitionCheck)
+//      iter.filter { case (g,_) => distFunc(g,qry) <= maxDist }
+//    else
+//      Iterator.empty
+//  })
     
       
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {

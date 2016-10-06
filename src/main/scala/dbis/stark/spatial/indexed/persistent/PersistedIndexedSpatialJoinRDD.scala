@@ -67,9 +67,9 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
     val currSplit = split.asInstanceOf[CartesianPartition]
 
-    val map = SpatialRDD.createExternalMap[G,V,V2]
+//    val map = SpatialRDD.createExternalMap[G,V,V2]
     
-    left.iterator(currSplit.s1, context).foreach{ tree => 
+    val theIter = left.iterator(currSplit.s1, context).flatMap{ tree => 
       
       /*
        * Returns:
@@ -85,18 +85,23 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
       }.getOrElse(true)
       
       if(partitionCheck) {
-        right.iterator(currSplit.s2, context).foreach{ case (rg,rv) =>
-          tree.query(rg)
-              .filter { case (lg,_) => predicateFunction(lg,rg)}
-              .map{ case (lg,lv) => (lg,(lv,rv)) }
-              .foreach { case (g,v) => map.insert(g,v) }
+        right.iterator(currSplit.s2, context)
+                .flatMap { case (rg,rv) =>
+                  tree.query(rg)
+                    .filter { case (lg,_) => predicateFunction(lg,rg)}
+                    .map{ case (_,lv) => (lv,rv) }
+//                    .map{ case (lg,lv) => (lg,(lv,rv)) }
+//              .foreach { case (g,v) => map.insert(g,v) }
+                }
+        } else {
+          Iterator.empty
         }
       }
-    }    
     
-    val f = map.iterator.flatMap{ case (g, l) => l}
+//    val f = map.iterator.flatMap{ case (g, l) => l}
     
-    new InterruptibleIterator(context, f)
+//    new InterruptibleIterator(context, theIter)
+    theIter
     
   }
 

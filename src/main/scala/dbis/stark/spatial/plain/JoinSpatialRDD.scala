@@ -46,7 +46,7 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     val p = left.partitioner 
       if(p.isDefined) {
         p.get match {
-          case sp: SpatialPartitioner[G,V] => Some(sp)
+          case sp: SpatialPartitioner => Some(sp)
           case _ => None
         }
       } else 
@@ -56,7 +56,7 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     val p = right.partitioner 
       if(p.isDefined) {
         p.get match {
-          case sp: SpatialPartitioner[G,V2] => Some(sp)
+          case sp: SpatialPartitioner => Some(sp)
           case _ => None
         }
       } else 

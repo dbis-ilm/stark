@@ -27,8 +27,8 @@ object SpatialPartitioner {
   }
 }
 
-abstract class SpatialPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[(G,V)], _minX: Double, _maxX: Double, _minY: Double, _maxY: Double
+abstract class SpatialPartitioner/*[G <: STObject : ClassTag, V: ClassTag]*/(
+    private val _minX: Double, private val _maxX: Double, private val _minY: Double, private val _maxY: Double
   ) extends Partitioner {
 
   def minX = _minX

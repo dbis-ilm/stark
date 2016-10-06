@@ -61,7 +61,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     
     val partitionCheck = rdd.partitioner.map { p =>
       p match {
-        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(qry.getGeo.getEnvelopeInternal)
+        case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(qry.getGeo.getEnvelopeInternal)
         case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
       }
     }.getOrElse(true)
@@ -76,7 +76,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def contains(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
     val partitionCheck = rdd.partitioner.map { p =>
       p match {
-        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+        case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
         case _ => true
       }
     }.getOrElse(true)
@@ -91,7 +91,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
     val partitionCheck = rdd.partitioner.map { p =>
       p match {
-        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+        case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
         case _ => true
       }
     }.getOrElse(true)
@@ -132,7 +132,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val r = rdd.mapPartitionsWithIndex({(idx,iter) =>
               val partitionCheck = rdd.partitioner.map { p =>
                 p match {
-                  case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+                  case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
                   case _ => true
                 }
               }.getOrElse(true)
@@ -188,7 +188,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param partitioner The partitioner to partition both RDDs with
    * @return Returns an RDD containing the Join result 
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner[G,_]] = None) = {
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) = {
       
       new LiveIndexedJoinSpatialRDD(
           if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd,

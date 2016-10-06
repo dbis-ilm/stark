@@ -30,7 +30,7 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
     val p = rdd2.partitioner 
       if(p.isDefined) {
         p.get match {
-          case sp: SpatialPartitioner[G2,V2] => Some(sp)
+          case sp: SpatialPartitioner => Some(sp)
           case _ => None
         }
       } else 

@@ -122,7 +122,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * 
    * @param part The partition 
    */
-  def costEstimation(part: Cell): Double = getCellsIn(part.range).map{id => _cellHistogram(id)._2}.sum
+  def costEstimation(part: Cell): Double = getCellsIn(part.range).filter{id => id >= 0 && id < _cellHistogram.size && _cellHistogram(id)._2 > 0}.map{id => _cellHistogram(id)._2}.sum
 //    _cellHistogram
 //      // consider only cells that really contains data and that belong to the given range/region
 //      .filter { case (cell, cnt) => cnt > 0 && part.range.contains(cell.range) }  
@@ -259,7 +259,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     parts
   }  
   
-  protected[spatial] lazy val start = {
+  protected[spatial] var start = {
 	  /* start with a partition covering the complete data space
 	   * If the last cell ends beyond the max values created from
 	   * the data points, adjust it to completely cover the last cell, 
@@ -288,7 +288,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * 
    * This is a lazy value    
    */
-  lazy val partitions = {
+  var partitions = {
     
     // add it to processing queue
     val queue = Queue(start)

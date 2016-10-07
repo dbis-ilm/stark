@@ -19,6 +19,9 @@ import dbis.stark.spatial.plain.CartesianPartition
 
 import com.vividsolutions.jts.geom.Envelope
 import dbis.stark.spatial.JoinPredicate
+import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.Dependency
+import org.apache.spark.NarrowDependency
 
 class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     var left: RDD[(G,V)], 
@@ -28,10 +31,10 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     )  extends RDD[(V,V2)](left.context, Nil) {
   
   val predicateFunction = JoinPredicate.predicateFunction(predicate)
-  
+  val numPartitionsInRdd2 = right.getNumPartitions
   
   override def getPartitions =  {
-    val parts = ListBuffer.empty[CartesianPartition]
+    val parts = ArrayBuffer.empty[CartesianPartition]
     
     val checkPartitions = leftParti.isDefined && rightParti.isDefined
     var idx = 0
@@ -77,52 +80,31 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
 
     tree.build()
     
-    /*
-     * Returns:
-		 * an Envelope (for STRtrees), an Interval (for SIRtrees), or other object 
-		 * (for other subclasses of AbstractSTRtree)
-		 * 
-		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
-     */
-//    val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
-//          
-//    if(indexBounds == null)
-//      throw new IllegalStateException("tree root bounds is null")
-//    
-//    val partitionCheck = rightParti.map { p => 
-////            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))
-//        if(leftParti.isDefined) {
-//          val lextent = leftParti.get.partitionExtent(split.s1.index)
-//          val rextent = p.partitionExtent(split.s2.index)
-//          
-//          val lenv = Utils.toEnvelope(lextent)
-//          val renv = Utils.toEnvelope(rextent)
-//          
-//          lenv.intersects(renv)
-//        } else
-//          true
-//      }.getOrElse(true)
-//      
-//    
-//    val res = if(partitionCheck) {
-//    	val map = SpatialRDD.createExternalMap[G,V,V2]        
 
-    	right.iterator(split.s2, context).flatMap{ case (rg, rv) => 
-        tree.query(rg)  // for each entry in right query the index
-          .filter{ case (lg, _) => predicateFunction(lg,rg) } // index returns candidates only -> prune by checking predicate again
-          .map { case (_, lv) => (lv,rv) }
+  	val res = right.iterator(split.s2, context).flatMap{ case (rg, rv) => 
+      tree.query(rg)  // for each entry in right query the index
+        .filter{ case (lg, _) => predicateFunction(lg,rg) } // index returns candidates only -> prune by checking predicate again
+        .map { case (_, lv) => (lv,rv) }
 //          .map { case (lg, lv) => (lg, (lv, rv)) }    // transform to structure for the external map
 //          .foreach { case (g, v) => map.insert(g, v)  } // insert into external map
-    	}
+  	}
     	
-//    	map.iterator.flatMap{ case (g, l) => l} // when done, return entries of the map
-//    	
-//    } else
-//      Iterator.empty
-//    
-//    //new InterruptibleIterator(context, res)
-//      res
+    res
   }
+  
+  override def getPreferredLocations(split: Partition): Seq[String] = {
+    val currSplit = split.asInstanceOf[CartesianPartition]
+    (left.preferredLocations(currSplit.s1) ++ right.preferredLocations(currSplit.s2)).distinct
+  }
+  
+  override def getDependencies: Seq[Dependency[_]] = List(
+    new NarrowDependency(left) {
+      def getParents(id: Int): Seq[Int] = List(id / numPartitionsInRdd2)
+    },
+    new NarrowDependency(right) {
+      def getParents(id: Int): Seq[Int] = List(id % numPartitionsInRdd2)
+    }
+  )
   
   override def clearDependencies() {
     super.clearDependencies()

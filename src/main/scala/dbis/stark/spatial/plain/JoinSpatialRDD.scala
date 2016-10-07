@@ -14,6 +14,8 @@ import dbis.stark.STObject
 import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.Utils
 import dbis.stark.spatial.JoinPredicate
+import org.apache.spark.Dependency
+import org.apache.spark.NarrowDependency
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     var left: RDD[(G,V)], 
@@ -62,6 +64,20 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
       } else 
         None
   }
+  
+  override def getPreferredLocations(split: Partition): Seq[String] = {
+    val currSplit = split.asInstanceOf[CartesianPartition]
+    (left.preferredLocations(currSplit.s1) ++ right.preferredLocations(currSplit.s2)).distinct
+  }
+  
+  override def getDependencies: Seq[Dependency[_]] = List(
+    new NarrowDependency(left) {
+      def getParents(id: Int): Seq[Int] = List(id / numPartitionsInRdd2)
+    },
+    new NarrowDependency(right) {
+      def getParents(id: Int): Seq[Int] = List(id % numPartitionsInRdd2)
+    }
+  )
   
   
   @DeveloperApi

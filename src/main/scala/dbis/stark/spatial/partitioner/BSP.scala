@@ -302,7 +302,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
 
     val resultPartitions = new ArrayBuffer[Cell](BSP.DEFAULT_PARTITION_BUFF_SIZE)
     
-    val nonempty = _cellHistogram.filter{ case (_, cnt) => cnt != 0 }.map(_._1)
+    val nonempty = _cellHistogram.filter{ case (_, cnt) => cnt > 0 }.map(_._1)
     
     if(nonempty.size <= numCellThreshold) {
       println(s"found ${nonempty.size} cells --> return them as partitions (threshold is $numCellThreshold)")

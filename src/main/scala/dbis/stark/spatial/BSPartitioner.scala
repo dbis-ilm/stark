@@ -9,6 +9,7 @@ import org.apache.spark.rdd.RDD
 
 import dbis.stark.spatial.partitioner.BSP
 import dbis.stark.STObject
+import dbis.stark.spatial.partitioner.BSPBinary
 
 
 object BSPartitioner {
@@ -112,8 +113,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
         val env = g.getEnvelopeInternal
         val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
         
-        val x = (math.abs(p.getX - minX).toInt / _sideLength).toInt
-        val y = (math.abs(p.getY - minY).toInt / _sideLength).toInt
+        val x = math.ceil(math.abs(p.getX - minX) / _sideLength).toInt
+        val y = math.ceil(math.abs(p.getY - minY) / _sideLength).toInt
         
         val cellId = y * numXCells + x
         
@@ -139,18 +140,14 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       val tc = rdd.map{ case (g,_) =>
         val p = g.getGeo.getCentroid  
         
-        val x = (math.abs(p.getX - minX).toInt / _sideLength).toInt
-        val y = (math.abs(p.getY - minY).toInt / _sideLength).toInt
+        val x = math.ceil(math.abs(p.getX - minX) / _sideLength).toInt
+        val y = math.ceil(math.abs(p.getY - minY) / _sideLength).toInt
         
         val cellId = y * numXCells + x
         
         (cellId, 1)
       }
-//      println(s"# distinct cells ${tc.map(_._1).distinct().cache().count()}  with ${_sideLength}")
-//      val distincts = tc.map(_._1).distinct().collect
-//      println(s"distinct cells are ${distincts.mkString("  ")}")
-      
-      tc.reduceByKey(_ + _)
+      .reduceByKey(_ + _)
       .map { case (id, cnt) => 
         val range = BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY) 
         (Cell(range), cnt) }
@@ -173,7 +170,17 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       _sideLength, 
       _maxCostPerPartition,
       withExtent,
-      BSPartitioner.numCellThreshold)  
+      BSPartitioner.numCellThreshold)
+  
+//  protected[spatial] var bsp = new BSPBinary(
+//      Array(minX, minY), 
+//      Array(maxX, maxY), 
+//      100,
+//      cells, // for BSP we only need calculated cell sizes and their respective counts 
+//      _sideLength, 
+//      _maxCostPerPartition,
+//      withExtent,
+//      BSPartitioner.numCellThreshold)
     
   override def partitionBounds(idx: Int) = bsp.partitions(idx)
   override def partitionExtent(idx: Int) = bsp.partitions(idx).extent
@@ -216,7 +223,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     if(part.isEmpty) {
     
       println(bsp.partitions.mkString("\n"))
-      println(bsp.partitionStats)
+//      println(bsp.partitionStats)
       val histoFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_histogram", null)
       val partitionFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_partitions", null)
       

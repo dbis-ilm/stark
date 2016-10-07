@@ -50,7 +50,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     val p = left.partitioner 
       if(p.isDefined) {
         p.get match {
-          case sp: SpatialPartitioner[G,V] => Some(sp)
+          case sp: SpatialPartitioner => Some(sp)
           case _ => None
         }
       } else 
@@ -60,7 +60,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     val p = right.partitioner 
       if(p.isDefined) {
         p.get match {
-          case sp: SpatialPartitioner[G,V2] => Some(sp)
+          case sp: SpatialPartitioner => Some(sp)
           case _ => None
         }
       } else 
@@ -84,25 +84,27 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
 		 * 
 		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
      */
-   // val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
-          
-    
-    val partitionCheck = rightParti.map { p => 
-//            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))
-        if(leftParti.isDefined) {
-          val lextent = leftParti.get.partitionExtent(split.s1.index)
-          val rextent = p.partitionExtent(split.s2.index)
-          
-          val lenv = Utils.toEnvelope(lextent)
-          val renv = Utils.toEnvelope(rextent)
-          
-          lenv.intersects(renv)
-        } else
-          true
-      }.getOrElse(true)
-      
-    
-    val res = if(partitionCheck) {
+//    val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
+//          
+//    if(indexBounds == null)
+//      throw new IllegalStateException("tree root bounds is null")
+//    
+//    val partitionCheck = rightParti.map { p => 
+////            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))
+//        if(leftParti.isDefined) {
+//          val lextent = leftParti.get.partitionExtent(split.s1.index)
+//          val rextent = p.partitionExtent(split.s2.index)
+//          
+//          val lenv = Utils.toEnvelope(lextent)
+//          val renv = Utils.toEnvelope(rextent)
+//          
+//          lenv.intersects(renv)
+//        } else
+//          true
+//      }.getOrElse(true)
+//      
+//    
+//    val res = if(partitionCheck) {
 //    	val map = SpatialRDD.createExternalMap[G,V,V2]        
 
     	right.iterator(split.s2, context).flatMap{ case (rg, rv) => 
@@ -114,12 +116,12 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     	}
     	
 //    	map.iterator.flatMap{ case (g, l) => l} // when done, return entries of the map
-    	
-    } else
-      Iterator.empty
-    
-//    new InterruptibleIterator(context, res)
-      res
+//    	
+//    } else
+//      Iterator.empty
+//    
+//    //new InterruptibleIterator(context, res)
+//      res
   }
   
   override def clearDependencies() {

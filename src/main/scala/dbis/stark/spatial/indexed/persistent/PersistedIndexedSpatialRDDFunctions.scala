@@ -70,7 +70,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     new PersistentIndexedSpatialCartesianJoinRDD(rdd.sparkContext,rdd, other, pred) 
 
   
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner[G,_]] = None) =    
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) =    
     new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
   
   

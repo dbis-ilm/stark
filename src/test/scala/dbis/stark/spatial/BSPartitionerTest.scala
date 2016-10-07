@@ -37,8 +37,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { case (string, id) => (new WKTReader().read(string), id) 
   }
   
-//  "The BSP partitioner"
-  it should "find correct min/max values" in {
+  "The BSP partitioner" should "find correct min/max values" in {
     
     val rdd = createRDD()    
     

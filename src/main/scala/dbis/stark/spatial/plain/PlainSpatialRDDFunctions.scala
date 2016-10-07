@@ -38,8 +38,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    */
   def intersects(qry: G) = {
     // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
-    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner[G,V]]) {
-      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner[G,V]]
+    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
+      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
       
       rdd.mapPartitionsWithIndex({ case (idx, iter) => 
         if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal))
@@ -177,7 +177,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (STObject,STObject) => Boolean) = 
     new CartesianSpatialJoinRDD(rdd.sparkContext,rdd, other, pred) 
 
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner[G,_]] = None) =      
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) =      
     new JoinSpatialRDD(
         if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd , 
         if(partitioner.isDefined) other.partitionBy(partitioner.get) else other, 
@@ -263,10 +263,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   
   def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, order)
   
-  def liveIndex(partitioner: SpatialPartitioner[G,V], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = 
+  def liveIndex(partitioner: SpatialPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] = 
     liveIndex(Some(partitioner), order)
   
-  def liveIndex(partitioner: Option[SpatialPartitioner[G,V]], order: Int) = {
+  def liveIndex(partitioner: Option[SpatialPartitioner], order: Int) = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
 		new LiveIndexedSpatialRDDFunctions(reparted, order)
   }
@@ -274,7 +274,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   
   
   
-  def index(partitioner: SpatialPartitioner[G,V], order: Int = 10) = {
+  def index(partitioner: SpatialPartitioner, order: Int = 10) = {
     makeIdx(rdd.partitionBy(partitioner), order)
   }
 //    makeIdx(new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(5, rdd)))

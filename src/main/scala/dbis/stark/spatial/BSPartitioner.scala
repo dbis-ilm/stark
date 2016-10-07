@@ -65,8 +65,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     _minX: Double,
     _maxX: Double,
     _minY: Double,
-    _maxY: Double
-    ) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
+    _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   def this(rdd: RDD[(G,V)],
       _sideLength: Double,
@@ -81,7 +80,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       withExtent: Boolean = false) = 
     this(rdd, _sideLength, _maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
 
-    
+  
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
   

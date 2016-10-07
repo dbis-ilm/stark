@@ -29,7 +29,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     _maxX: Double,
     _minY: Double,
     _maxY: Double,
-    dimensions: Int) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
+    dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
   
   require(dimensions == 2, "Only 2 dimensions supported currently")
   

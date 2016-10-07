@@ -42,7 +42,18 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
     val p = right.partitioner 
       if(p.isDefined) {
         p.get match {
-          case sp: SpatialPartitioner[G,V2] => Some(sp)
+          case sp: SpatialPartitioner => Some(sp)
+          case _ => None
+        }
+      } else 
+        None
+  }
+  
+  private lazy val leftParti = {
+    val p = left.partitioner 
+      if(p.isDefined) {
+        p.get match {
+          case sp: SpatialPartitioner => Some(sp)
           case _ => None
         }
       } else 
@@ -50,13 +61,27 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   }
   
   override def getPartitions: Array[Partition] = {
-    // create the cross product split
-    val array = new Array[Partition](left.partitions.length * right.partitions.length)
-    for (s1 <- left.partitions; s2 <- right.partitions) {
-      val idx = s1.index * numPartitionsInright + s2.index
-      array(idx) = new CartesianPartition(idx, left, right, s1.index, s2.index)
+//    // create the cross product split
+//    val array = new Array[Partition](left.partitions.length * right.partitions.length)
+//    for (s1 <- left.partitions; s2 <- right.partitions) {
+//      val idx = s1.index * numPartitionsInright + s2.index
+//      array(idx) = new CartesianPartition(idx, left, right, s1.index, s2.index)
+//    }
+//    array
+    
+    val parts = ListBuffer.empty[CartesianPartition]
+    
+    val checkPartitions = leftParti.isDefined && rightParti.isDefined
+    var idx = 0
+    for (
+        s1 <- left.partitions; 
+        s2 <- right.partitions
+        if(!checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index)))) {
+      
+      parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
+      idx += 1
     }
-    array
+    parts.toArray
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
@@ -78,13 +103,13 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   		 * 
   		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
-      val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
-      
-      val partitionCheck = rightParti.map { p => 
-            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
-      }.getOrElse(true)
-      
-      if(partitionCheck) {
+//      val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
+//      
+//      val partitionCheck = rightParti.map { p => 
+//            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
+//      }.getOrElse(true)
+//      
+//      if(partitionCheck) {
         right.iterator(currSplit.s2, context)
                 .flatMap { case (rg,rv) =>
                   tree.query(rg)
@@ -93,9 +118,9 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 //                    .map{ case (lg,lv) => (lg,(lv,rv)) }
 //              .foreach { case (g,v) => map.insert(g,v) }
                 }
-        } else {
-          Iterator.empty
-        }
+//        } else {
+//          Iterator.empty
+//        }
       }
     
 //    val f = map.iterator.flatMap{ case (g, l) => l}

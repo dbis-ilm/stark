@@ -75,40 +75,44 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = rdd.filter{ case (g,_) => g.containedBy(qry)  } 
-//    rdd.mapPartitionsWithIndex({(idx,iter) =>
-//    
-//    val partitionCheck = rdd.partitioner.map { p =>
-//      p match {
-//        case sp: SpatialPartitioner[G,V] => qry.getGeo.getEnvelopeInternal.contains(Utils.toEnvelope(sp.partitionBounds(idx).extent))
-//        case _ => true
-//      }
-//    }.getOrElse(true)
-//    
-//    if(partitionCheck)
-//      iter.filter { case (g,_) => qry.intersects(g) }
-//    else
-//      Iterator.empty
-//  })
+  def containedby(qry: G) = //rdd.filter{ case (g,_) => g.containedBy(qry)  } 
+    {
+    // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
+    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
+      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
+      
+      rdd.mapPartitionsWithIndex({ case (idx, iter) => 
+        if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal))
+          iter.filter{ case (g,_) => g.containedBy(qry) }
+        else
+          Iterator.empty
+      })
+    } else {
+    
+      rdd.filter{ case (g,_) => g.containedBy(qry) }
+    }
+  }
 
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(o: G) = rdd.filter{ case (g,_) => g.contains(o) } 
-//    rdd.mapPartitionsWithIndex({(idx,iter) =>
-//    
-//    val partitionCheck = rdd.partitioner.map { p =>
-//      p match {
-//        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(o.getGeo.getEnvelopeInternal)
-//        case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
-//      }
-//    }.getOrElse(true)
-//    
-//    if(partitionCheck)
-//      iter.filter { case (g,_) => g.contains(o) }
-//    else
-//      Iterator.empty
-//  })
+  def contains(o: G) = // rdd.filter{ case (g,_) => g.contains(o) } 
+    {
+    // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
+    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
+      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
+      
+      rdd.mapPartitionsWithIndex({ case (idx, iter) => 
+        if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(o.getGeo.getEnvelopeInternal))
+          iter.filter{ case (g,_) => g.contains(o) }
+        else
+          Iterator.empty
+      })
+    } else {
+    
+      rdd.filter{ case (g,_) => g.contains(o) }
+    }
+  }
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
     rdd.filter{ case (g,_) => distFunc(qry,g) <= maxDist }

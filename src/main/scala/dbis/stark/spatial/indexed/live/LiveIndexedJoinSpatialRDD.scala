@@ -84,10 +84,8 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
 		 * 
 		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
      */
-    val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
+   // val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
           
-    if(indexBounds == null)
-      throw new IllegalStateException("tree root bounds is null")
     
     val partitionCheck = rightParti.map { p => 
 //            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(split.s2.index)))

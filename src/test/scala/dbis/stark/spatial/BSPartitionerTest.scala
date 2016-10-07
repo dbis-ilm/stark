@@ -22,7 +22,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   private var sc: SparkContext = _
   
   override def beforeAll() {
-    val conf = new SparkConf().setMaster("local").setAppName("paritioner_test2")
+    val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2")
     sc = new SparkContext(conf)
   }
   
@@ -37,7 +37,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { case (string, id) => (new WKTReader().read(string), id) 
   }
   
-  "The BSP partitioner" should "find correct min/max values" in {
+//  "The BSP partitioner"
+  it should "find correct min/max values" in {
     
     val rdd = createRDD()    
     
@@ -189,21 +190,43 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
   }
   
-//  it should "create correct partitions for world data" in {
-//    
-//    val rdd = sc.textFile("src/test/resources/world3.csv", 4)
-//      .map { line => line.split(";") }
-//      .map { arr => (arr(0).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt,arr(4), STObject(arr(5))) }
-//      .keyBy(_._6)
-//    
+  it should "find use cells as partitions for taxi"  in {
+    val rdd = sc.textFile("src/test/resources/yellow_ny_1.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}
+      
 //    val parti = new BSPartitioner(rdd, 2, 100, withExtent= true)
-//    
-//    println(s"cells: ${parti.cells.size}")
-//    println(s"partitions: ${parti.numPartitions}")
-//    println(s"x: ${parti.minX}    ${parti.maxX}")
-//    println(s"y: ${parti.minY}    ${parti.maxY}")
-//    
-//    
-//  }
+      val minMax = SpatialPartitioner.getMinMax(rdd)
+      BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
+      val parti = BSPartitioner.withGridPPD(rdd, 1000, 1000*1000, false, minMax._1, minMax._2, minMax._3, minMax._4)
+      
+//      println(s"distinct: ${rdd.map(_._1.getGeo).distinct.count()}")
+      
+      parti.numPartitions shouldBe 3
+      
+      rdd.sample(false, 0.01).foreach { case (st, name) =>
+        val pNum = parti.getPartition(st)
+        pNum shouldBe oneOf(0, 1, 2)
+      }
+      
+      
+  }
+  
+  it should "create correct partitions for world data" in {
+    
+    val rdd = sc.textFile("src/test/resources/world3.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (arr(0).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt,arr(4), STObject(arr(5))) }
+      .keyBy(_._6)
+    
+    val parti = new BSPartitioner(rdd, 2, 100, withExtent= true)
+    
+    println(s"cells: ${parti.cells.size}")
+    println(s"partitions: ${parti.numPartitions}")
+    println(s"x: ${parti.minX}    ${parti.maxX}")
+    println(s"y: ${parti.minY}    ${parti.maxY}")
+    
+    
+  }
   
 }

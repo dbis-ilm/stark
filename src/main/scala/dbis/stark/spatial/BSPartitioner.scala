@@ -29,6 +29,23 @@ object BSPartitioner {
       
     NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
   }
+  
+  def withGridPPD[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
+    _gridPPD: Double,
+    _maxCostPerPartition: Double,
+    withExtent: Boolean,
+    _minX: Double,
+    _maxX: Double,
+    _minY: Double,
+    _maxY: Double) = {
+    
+    val _sideLength = (( math.min(math.abs(_maxX - _minX), math.abs(_maxY - _minY))) / _gridPPD)
+    
+    new BSPartitioner(rdd, _sideLength, _maxCostPerPartition, withExtent, _minX, _maxX, _minY, _maxY)
+    
+  }
+  
+  var numCellThreshold: Int = -1
 }
 
 /**
@@ -48,7 +65,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     _minX: Double,
     _maxX: Double,
     _minY: Double,
-    _maxY: Double) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
+    _maxY: Double
+    ) extends SpatialPartitioner(rdd, _minX, _maxX, _minY, _maxY) {
 
   def this(rdd: RDD[(G,V)],
       _sideLength: Double,
@@ -63,7 +81,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       withExtent: Boolean = false) = 
     this(rdd, _sideLength, _maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
 
-  
+    
   lazy val maxCostPerPartition = _maxCostPerPartition
   lazy val sideLength = _sideLength
   
@@ -80,45 +98,72 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
    */
   protected[spatial] var cells: Array[(Cell, Int)] = {
     
-    val themap = Map.empty[Cell, Int]
-    
-    (0 until numXCells * numYCells).foreach { i => 
+    val histo = Array.tabulate(numXCells * numYCells){ i =>
       val cellBounds = BSPartitioner.getCellBounds(i, numXCells, numYCells, _sideLength, minX, minY)
       
-      val cell = Cell(cellBounds)
-      
-      themap += (cell -> 0)
+      (Cell(cellBounds), 0)
     }
     
-    rdd.map { case (g,v) =>
-      val p = g.getCentroid
+//    println("computing histo")
+    if(withExtent) {
+    
+      rdd.map { case (g,v) =>
+        val p = g.getCentroid
+        
+        val env = g.getEnvelopeInternal
+        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+        
+        val x = (math.abs(p.getX - minX).toInt / _sideLength).toInt
+        val y = (math.abs(p.getY - minY).toInt / _sideLength).toInt
+        
+        val cellId = y * numXCells + x
+        
+        (cellId,(1, extent))
+      }
+      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) => 
+        val cnt = lCnt + rCnt
+        
+        val extent = lExtent.extend(rExtent)
+        
+        (cnt, extent)
+        
+      }
+      .map { case (id, (cnt, extent)) => 
+        val range = BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY) 
+        (Cell(range, extent), cnt) }
+      .collect
+      .foreach{case (cell, cnt) => histo(cell.range.id) = (cell, cnt) }
       
-      val env = g.getEnvelopeInternal
-      val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
       
-      val x = (math.abs(p.getX - minX).toInt / _sideLength).toInt
-      val y = (math.abs(p.getY - minY).toInt / _sideLength).toInt
       
-      val cellId = y * numXCells + x
+    } else {
+      val tc = rdd.map{ case (g,_) =>
+        val p = g.getGeo.getCentroid  
+        
+        val x = (math.abs(p.getX - minX).toInt / _sideLength).toInt
+        val y = (math.abs(p.getY - minY).toInt / _sideLength).toInt
+        
+        val cellId = y * numXCells + x
+        
+        (cellId, 1)
+      }
+//      println(s"# distinct cells ${tc.map(_._1).distinct().cache().count()}  with ${_sideLength}")
+//      val distincts = tc.map(_._1).distinct().collect
+//      println(s"distinct cells are ${distincts.mkString("  ")}")
       
-      (cellId,(1, extent))
-    }
-    .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) => 
-      val cnt = lCnt + rCnt
+      tc.reduceByKey(_ + _)
+      .map { case (id, cnt) => 
+        val range = BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY) 
+        (Cell(range), cnt) }
+      .collect
+      .foreach{ case (cell, cnt) => histo(cell.range.id) = (cell, cnt)}
       
-      val extent = lExtent.extend(rExtent)
+//      println(s"sizes: ${distincts.map { i => histo(i)._2 }.mkString("  ")}")
       
-      (cnt, extent)
-      
-    }
-    .map { case (id, cntAndExtent) => (BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY), cntAndExtent) }
-    .collect
-    .foreach { case (cellBounds, (cnt,extent)) =>
-      val cell = Cell(cellBounds, extent)
-      themap(cell) += cnt 
     }
     
-    themap.toArray.sortBy(_._1.range.id)
+//    println(s"finished histo: ${histo.size}")
+    histo
   }
 
   
@@ -128,13 +173,14 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       cells, // for BSP we only need calculated cell sizes and their respective counts 
       _sideLength, 
       _maxCostPerPartition,
-      withExtent)  
+      withExtent,
+      BSPartitioner.numCellThreshold)  
     
   override def partitionBounds(idx: Int) = bsp.partitions(idx)
   override def partitionExtent(idx: Int) = bsp.partitions(idx).extent
   
   def printPartitions(fName: java.nio.file.Path) {
-    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.asJava    
+    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.toList.asJava    
     java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
       
   } 

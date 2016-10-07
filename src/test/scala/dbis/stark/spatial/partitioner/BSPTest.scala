@@ -46,8 +46,8 @@ class BSPTest extends FlatSpec with Matchers {
     val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)	  
 	  
     val bsp = new BSP(
-      ll,
-      ur,
+      ll.c,
+      ur.c,
       histo,
       sideLength,
       maxCost      
@@ -73,8 +73,8 @@ class BSPTest extends FlatSpec with Matchers {
     val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 	  
     val bsp = new BSP(
-      ll,
-      ur,
+      ll.c,
+      ur.c,
       histo,
       sideLength,
       maxCost      

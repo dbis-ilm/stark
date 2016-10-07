@@ -5,6 +5,7 @@ import scala.collection.mutable.ListBuffer
 import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
 import dbis.stark.spatial.Cell
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * A data class to store information about the created partitioning
@@ -42,6 +43,12 @@ case class PartitionStats(
     """
 }
   
+object BSP {
+  
+  val DEFAULT_PARTITION_BUFF_SIZE = 100
+  
+}
+
 /**
  * A binary space partitioning algorithm implementation based on 
  * 
@@ -60,7 +67,8 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     _cellHistogram: Array[(Cell, Int)],
     _sideLength: Double,
     _maxCostPerPartition: Double,
-    withExtent: Boolean
+    withExtent: Boolean = false,
+    numCellThreshold: Int = -1
   ) extends Serializable {
   
   require(_ll.size > 0, "zero dimension is not supported")
@@ -69,9 +77,10 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   require(_maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
   require(_sideLength > 0, "cell side length must not be negative or zero")
   
-  def this(_ll: NPoint, _ur: NPoint, hist: Array[(Cell, Int)], l: Double, cost: Double, withExtent: Boolean = false) = 
+  def this(_ll: NPoint, _ur: NPoint, hist: Array[(Cell, Int)], l: Double, cost: Double, withExtent: Boolean) = 
     this(_ll.c, _ur.c, hist, l, cost, withExtent)
   
+    
   
   // getter methods for external classes  
   def ll = _ll
@@ -260,6 +269,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   }  
   
   protected[spatial] var start = {
+    
 	  /* start with a partition covering the complete data space
 	   * If the last cell ends beyond the max values created from
 	   * the data points, adjust it to completely cover the last cell, 
@@ -289,45 +299,53 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * This is a lazy value    
    */
   var partitions = {
-    
-    // add it to processing queue
-    val queue = Queue(start)
 
-    val resultPartitions = ListBuffer.empty[Cell]
+    val resultPartitions = new ArrayBuffer[Cell](BSP.DEFAULT_PARTITION_BUFF_SIZE)
     
+    val nonempty = _cellHistogram.filter{ case (_, cnt) => cnt != 0 }.map(_._1)
     
-    while(queue.nonEmpty) {
-      val part = queue.dequeue()
+    if(nonempty.size <= numCellThreshold) {
+      println(s"found ${nonempty.size} cells --> return them as partitions (threshold is $numCellThreshold)")
+      resultPartitions ++= nonempty //.zipWithIndex.foreach { case (r, i) => r.range.id = i}
+    } else {
+    
+      // add it to processing queue
+      val queue = Queue(start)
       
-      /* if the partition to process is more expensive (= has more elements) than max cost
-       * AND it is still larger than one cell, split it
-       * Otherwise we use it as a result partition
-       * 
-       * It may happen that a cell (which is our finest granularity) contains more elements
-       * than max cost allows, however, since we cannot split a cell, we have to live with this
-       */
+      while(queue.nonEmpty) {
+        val part = queue.dequeue()
+        
+        /* if the partition to process is more expensive (= has more elements) than max cost
+         * AND it is still larger than one cell, split it
+         * Otherwise we use it as a result partition
+         * 
+         * It may happen that a cell (which is our finest granularity) contains more elements
+         * than max cost allows, however, since we cannot split a cell, we have to live with this
+         */
+        
+        if((costEstimation(part) > _maxCostPerPartition) && (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
+          
+          val (p1, p2) = costBasedSplit(part)
+          
+          // if the generated partition was empty, do not add it
+          if(p1.isDefined)
+          	queue.enqueue(p1.get)
+          	
+          if(p2.isDefined)
+          	queue.enqueue(p2.get)
+          	
+        } else
+          resultPartitions += part
+      }
       
-      if((costEstimation(part) > _maxCostPerPartition) && (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
-        
-        val (p1, p2) = costBasedSplit(part)
-        
-        // if the generated partition was empty, do not add it
-        if(p1.isDefined)
-        	queue.enqueue(p1.get)
-        	
-        if(p2.isDefined)
-        	queue.enqueue(p2.get)
-        	
-      } else
-        resultPartitions += part
     }
     
     // index is the ID of the partition
     resultPartitions.zipWithIndex.foreach { case (r, i) => 
       r.range.id = i  
     }
-
-    resultPartitions.toList
+    
+    resultPartitions.toArray
   }  
   
   /** 

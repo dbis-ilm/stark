@@ -53,30 +53,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
   }
     
-  
-  
-  
-//    rdd.mapPartitionsWithIndex({(idx,iter) =>
-//    
-//    val partitionCheck = rdd.partitioner.map { p =>
-//      p match {
-//        case sp: SpatialPartitioner[G,V] => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-//        case _ => true
-//      }
-//    }.getOrElse(true)
-//    
-//    if(partitionCheck)
-//      iter.filter { case (g,_) => qry.intersects(g) }
-//    else
-//      Iterator.empty
-//  })
-    
-
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = //rdd.filter{ case (g,_) => g.containedBy(qry)  } 
-    {
+  def containedby(qry: G) = {
     // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
     if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
       val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
@@ -96,8 +76,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(o: G) = // rdd.filter{ case (g,_) => g.contains(o) } 
-    {
+  def contains(o: G) = {
     // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
     if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
       val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
@@ -116,39 +95,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
     rdd.filter{ case (g,_) => distFunc(qry,g) <= maxDist }
-//    rdd.mapPartitionsWithIndex({(idx,iter) =>
-//    
-////    val partitionCheck = rdd.partitioner.map { p =>
-////      p match {
-////        case sp: SpatialPartitioner[G,V] => {
-////          val qryEnv = qry.getGeo.getEnvelopeInternal
-////          val r = NRectRange(
-////              NPoint(qryEnv.getMinX - maxDist - 1, qryEnv.getMinY - maxDist - 1), 
-////              NPoint(qryEnv.getMaxX + maxDist + 1, qryEnv.getMaxY + maxDist + 1))
-//// 
-////          val bounds = sp.partitionBounds(idx)
-////          
-//////          Utils.toEnvelope(r).intersects(Utils.toEnvelope(bounds))
-////          
-////          
-////        }
-////        case _ => true
-////      }
-////    }.getOrElse(true)
-//      
-//    /* FIXME: We cannot check if we have to process a partition, because of the distance function. 
-//     * We would have to apply the distance function on the partition bounds to see if the partition is 
-//     * matches the distance function criteria. However, the dist func is defined on STObject but the
-//     * partitions are of NRectRange... 
-//     */
-//    val partitionCheck = true
-//    
-//    if(partitionCheck)
-//      iter.filter { case (g,_) => distFunc(g,qry) <= maxDist }
-//    else
-//      Iterator.empty
-//  })
-    
       
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
     // compute k NN for each partition individually --> n * k results
@@ -275,27 +221,21 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		new LiveIndexedSpatialRDDFunctions(reparted, order)
   }
 
-  
-  
-  
-  def index(partitioner: SpatialPartitioner, order: Int = 10) = {
-    makeIdx(rdd.partitionBy(partitioner), order)
-  }
-//    makeIdx(new ShuffledRDD[G,V,V](rdd, new SpatialGridPartitioner(5, rdd)))
-
   /**
-   * Index the given RDD on its geometry component using an R-Tree
+   * Create an index for each partition. 
+   * 
+   * This puts all data items of a partition into an Index structure, e.g., R-tree
+   * and thus changes the type of the RDD from RDD[(STObject, V)] to RDD[RTree[STObject, (STObject, V)]]
    */
-  private def makeIdx(rdd: RDD[(G,V)], treeCapacity: Int) = rdd.mapPartitions( iter => {
-    val tree = new RTree[G,(G,V)](treeCapacity)
+  def index(partitioner: SpatialPartitioner, order: Int = 10) = rdd.partitionBy(partitioner).mapPartitions( iter => {
+    val tree = new RTree[G,(G,V)](order)
 
     for((g,v) <- iter) {
       tree.insert(g, (g,v))
     }
 
-    List(tree).toIterator
+    Iterator.single(tree)
   } ,
   true) // preserve partitioning
-
 
 }

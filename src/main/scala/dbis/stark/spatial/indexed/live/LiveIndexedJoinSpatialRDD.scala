@@ -2,7 +2,7 @@ package dbis.stark.spatial.indexed.live
 
 
 import scala.reflect.ClassTag
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.Partition
 import org.apache.spark.TaskContext
@@ -12,17 +12,19 @@ import org.apache.spark.InterruptibleIterator
 
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.Utils
 import dbis.stark.spatial.SpatialPartitioner
-import dbis.stark.spatial.SpatialRDD
 import dbis.stark.spatial.plain.CartesianPartition
-
-import com.vividsolutions.jts.geom.Envelope
 import dbis.stark.spatial.JoinPredicate
-import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.Dependency
 import org.apache.spark.NarrowDependency
 
+
+/**
+ * A live indexed spatial join. 
+ * <br><br>
+ * Entries from left RDD are put into an R-tree upon execution. This tree
+ * is queried for each STObject in right RDD.
+ */
 class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     var left: RDD[(G,V)], 
     var right: RDD[(G,V2)],
@@ -33,10 +35,17 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
   val predicateFunction = JoinPredicate.predicateFunction(predicate)
   val numPartitionsInRdd2 = right.getNumPartitions
   
+  /**
+   * Get the partitions by this operator. We create the cartesian product for all
+   * partition combinations of left and right RDDs and prune those combinations
+   * that cannot contain join results, i.e., partitions that do not intersect 
+   */
   override def getPartitions =  {
     val parts = ArrayBuffer.empty[CartesianPartition]
     
     val checkPartitions = leftParti.isDefined && rightParti.isDefined
+    
+    logDebug(s"apply partition pruning: $checkPartitions")
     var idx = 0
     for (
         s1 <- left.partitions; 
@@ -46,6 +55,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
       parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
       idx += 1
     }
+    logDebug(s"partition combinations: ${parts.size} (of ${left.partitions.size * right.partitions.size})")
     parts.toArray
   }
   
@@ -81,15 +91,11 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     tree.build()
     
 
-  	val res = right.iterator(split.s2, context).flatMap{ case (rg, rv) => 
+  	right.iterator(split.s2, context).flatMap{ case (rg, rv) => 
       tree.query(rg)  // for each entry in right query the index
         .filter{ case (lg, _) => predicateFunction(lg,rg) } // index returns candidates only -> prune by checking predicate again
-        .map { case (_, lv) => (lv,rv) }
-//          .map { case (lg, lv) => (lg, (lv, rv)) }    // transform to structure for the external map
-//          .foreach { case (g, v) => map.insert(g, v)  } // insert into external map
+        .map { case (_, lv) => (lv,rv) } // emit join pairs
   	}
-    	
-    res
   }
   
   override def getPreferredLocations(split: Partition): Seq[String] = {

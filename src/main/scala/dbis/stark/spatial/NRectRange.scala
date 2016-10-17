@@ -17,7 +17,7 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
     
   require(ll.dim >= 2, "dimension must be >= 2")
 	require(ll.dim == ur.dim, "ll and ur points must be of same dimension")
-//  require(ll.c.zipWithIndex.forall { case (e,i) => e < ur(i) }, "ll must be smaller than ur")
+//  require(ll.c.zipWithIndex.forall { case (e,i) => e < ur(i) }, s"ll must be smaller than ur (ll: $ll  ur: $ur)")
   
   /**
    * Check if this range contains a given point.
@@ -38,8 +38,9 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
   
   def intersects(r: NRectRange): Boolean = points.exists { p => r.contains(p) }
   
-  def points = Array(ll, ur, NPoint(ll(0),ur(1)), NPoint(ur(0),ll(1)))
-    
+  def points = Array(ll, NPoint(ur(0),ll(1)),ur, NPoint(ll(0),ur(1)))
+  
+  def getWKTString() = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))" 
   
   def extend(other: NRectRange) = NRectRange(
       this.ll.mergeMin(other.ll).mergeMin(other.ur),

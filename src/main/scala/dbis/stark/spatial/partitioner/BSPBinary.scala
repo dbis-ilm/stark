@@ -128,7 +128,7 @@ class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
    * @return Returns the two created partitions. If one of them is empty, it is <code>None</code>
    */
   protected[spatial] def split(part: Cell, depth: Int): ArrayBuffer[Cell] = {
-    println(s"splitting ${part.range} at level $depth")
+//    println(s"splitting ${part.range} at level $depth")
     
     val cost = costEstimation(part)
     val res = if(depth > 0 && cost  > _maxCostPerPartition) {

@@ -97,14 +97,17 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * cell it belongs and then simply aggregate by cell
    */
   protected[spatial] var cells: Array[(Cell, Int)] = {
-    
+
+    // create the array we want to store the cells in
     val histo = Array.tabulate(numXCells * numYCells){ i =>
       val cellBounds = BSPartitioner.getCellBounds(i, numXCells, numYCells, _sideLength, minX, minY)
       
       (Cell(cellBounds), 0)
     }
     
-//    println("computing histo")
+    /* fill the array. If with extent, we need to keep the exent of each element and combine it later
+     * to create the extent of a cell based on the extents of its contained objects     
+     */
     if(withExtent) {
     
       rdd.map { case (g,v) =>
@@ -113,8 +116,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
         val env = g.getEnvelopeInternal
         val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
         
-        val x = math.ceil(math.abs(p.getX - minX) / _sideLength).toInt
-        val y = math.ceil(math.abs(p.getY - minY) / _sideLength).toInt
+        val x = math.floor(math.abs(p.getX - minX) / _sideLength).toInt
+        val y = math.floor(math.abs(p.getY - minY) / _sideLength).toInt
         
         val cellId = y * numXCells + x
         
@@ -137,11 +140,11 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       
       
     } else {
-      val tc = rdd.map{ case (g,_) =>
+      rdd.map{ case (g,_) =>
         val p = g.getGeo.getCentroid  
         
-        val x = math.ceil(math.abs(p.getX - minX) / _sideLength).toInt
-        val y = math.ceil(math.abs(p.getY - minY) / _sideLength).toInt
+        val x = math.floor(math.abs(p.getX - minX) / _sideLength).toInt
+        val y = math.floor(math.abs(p.getY - minY) / _sideLength).toInt
         
         val cellId = y * numXCells + x
         
@@ -154,11 +157,9 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       .collect
       .foreach{ case (cell, cnt) => histo(cell.range.id) = (cell, cnt)}
       
-//      println(s"sizes: ${distincts.map { i => histo(i)._2 }.mkString("  ")}")
-      
     }
+
     
-//    println(s"finished histo: ${histo.size}")
     histo
   }
 
@@ -175,7 +176,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 //  protected[spatial] var bsp = new BSPBinary(
 //      Array(minX, minY), 
 //      Array(maxX, maxY), 
-//      100,
+//      20,
 //      cells, // for BSP we only need calculated cell sizes and their respective counts 
 //      _sideLength, 
 //      _maxCostPerPartition,
@@ -194,8 +195,6 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   def printHistogram(fName: java.nio.file.Path) {
     
     println(s"num in hist: ${cells.map(_._2).sum}")
-    
-    
     val list = cells.map(_._1.range).map { case c => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
     java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
       
@@ -212,8 +211,6 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
      * which by definition is immutable and the partitions should cover the complete data space 
      * of the RDD's content
      */
-//    bsp.partitions.find { x => ??? }
-    
     val part = bsp.partitions.find{ p =>
       val c = g.getCentroid
       p.range.contains(NPoint(c.getX, c.getY)) 

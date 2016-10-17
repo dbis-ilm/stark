@@ -281,7 +281,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
 			  val cellsPerDim = cellsPerDimension(s.range)
 			  val newUr = _ur.zipWithIndex.map { case (value, dim) => 
 			    if(_ll(dim) + cellsPerDim(dim) * _sideLength > _ur(dim))
-				  _ll(dim) + cellsPerDim(dim) * _sideLength
+				    _ll(dim) + cellsPerDim(dim) * _sideLength
 				  else
 					  _ur(dim)
 	  }
@@ -303,10 +303,15 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     val resultPartitions = new ArrayBuffer[Cell](BSP.DEFAULT_PARTITION_BUFF_SIZE)
     
     val nonempty = _cellHistogram.filter{ case (_, cnt) => cnt > 0 }.map(_._1)
-    
+    println(s"NONEMPTY cells: ${nonempty.size}")
     if(nonempty.size <= numCellThreshold) {
       println(s"found ${nonempty.size} cells --> return them as partitions (threshold is $numCellThreshold)")
-      resultPartitions ++= nonempty //.zipWithIndex.foreach { case (r, i) => r.range.id = i}
+      resultPartitions ++= nonempty
+      
+//      resultPartitions.map { c => c.range.getWKTString() }.foreach(println)
+//      println
+//      println
+//      resultPartitions.map { c => c.extent.getWKTString() }.foreach(println)
     } else {
     
       // add it to processing queue
@@ -340,8 +345,10 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
       
     }
     
+//    println(s"res size: ${resultPartitions.size}")
     // index is the ID of the partition
-    resultPartitions.zipWithIndex.foreach { case (r, i) => 
+    resultPartitions.zipWithIndex.foreach { case (r, i) =>
+//      println(s"setting id $i for ${r.range}")
       r.range.id = i  
     }
     

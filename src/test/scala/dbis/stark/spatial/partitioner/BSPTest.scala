@@ -19,7 +19,7 @@ class BSPTest extends FlatSpec with Matchers {
           val ur = NPoint(ll(0) + sideLength, ll(1) + sideLength)
           
           val id = y * numXCells + x
-          (Cell(NRectRange(id, ll,ur)), cost)
+          (Cell(id, NRectRange(ll,ur)), cost)
         }
       }.toArray
       
@@ -136,20 +136,20 @@ class BSPTest extends FlatSpec with Matchers {
   }
   
   it should "find correct cells per dimension" in {
-    val cell1 = Cell(
-      range = NRectRange(0,NPoint(-4,-4), NPoint(0,0)),
+    val cell1 = Cell(0,
+      range = NRectRange(NPoint(-4,-4), NPoint(0,0)),
       extent = NRectRange(NPoint(-7,-5), NPoint(0,1)))
     
-		val cell2 = Cell(
-			range = NRectRange(2,NPoint(0,-4), NPoint(4,0)),
+		val cell2 = Cell(2,
+			range = NRectRange(NPoint(0,-4), NPoint(4,0)),
 			extent = NRectRange(NPoint(-1,-4), NPoint(3,-1)))
 
-		val cell3 = Cell(
-      range = NRectRange(1,NPoint(-4,0), NPoint(0,4)),
+		val cell3 = Cell(1,
+      range = NRectRange(NPoint(-4,0), NPoint(0,4)),
       extent = NRectRange(NPoint(-2,3), NPoint(2,6)))
       
-    val cell4 = Cell(
-      range = NRectRange(3,NPoint(0,0), NPoint(4,4)),
+    val cell4 = Cell(3,
+      range = NRectRange(NPoint(0,0), NPoint(4,4)),
       extent = NRectRange(NPoint(-1,-1), NPoint(6,6)))
       
     val histo = Array(
@@ -182,20 +182,20 @@ class BSPTest extends FlatSpec with Matchers {
   
   it should "create correct extent information" in {
     
-    val cell1 = Cell(
-      range = NRectRange(0,NPoint(-4,-4), NPoint(0,0)),
+    val cell1 = Cell(0,
+      range = NRectRange(NPoint(-4,-4), NPoint(0,0)),
       extent = NRectRange(NPoint(-7,-5), NPoint(0,1)))
     
-		val cell2 = Cell(
-			range = NRectRange(2,NPoint(0,-4), NPoint(4,0)),
+		val cell2 = Cell(2,
+			range = NRectRange(NPoint(0,-4), NPoint(4,0)),
 			extent = NRectRange(NPoint(-1,-4), NPoint(3,-1)))
 
-		val cell3 = Cell(
-      range = NRectRange(1,NPoint(-4,0), NPoint(0,4)),
+		val cell3 = Cell(1,
+      range = NRectRange(NPoint(-4,0), NPoint(0,4)),
       extent = NRectRange(NPoint(-2,3), NPoint(2,6)))
       
-    val cell4 = Cell(
-      range = NRectRange(3,NPoint(0,0), NPoint(4,4)),
+    val cell4 = Cell(3,
+      range = NRectRange(NPoint(0,0), NPoint(4,4)),
       extent = NRectRange(NPoint(-1,-1), NPoint(6,6)))
       
     val histo = Array(

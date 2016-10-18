@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -25,15 +27,15 @@ def draw_points(themap, filename, geomCol):
 	lats = []
 
 	with open(filename) as csvFile:
-		reader = csv.reader(csvFile, delimiter=",")
+		reader = csv.reader(csvFile, delimiter=";")
 		rows = 0
 		for row in reader:
 			# remove the WKT details
-			s = str.replace(str.replace(row[geomCol], "POINT(", ""), ")", "").split()
+			s = str.replace(str.replace(row[geomCol], "POINT (", ""), ")", "").split()
 			rows += 1
 			# latitude is in first position
-			lats.append(float(s[0]))
-			lons.append(float(s[1]))
+			lats.append(float(s[1]))
+			lons.append(float(s[0]))
 
 	x, y = themap(lons,lats)
 	themap.scatter(x,y,10,marker='o',color='red')

@@ -20,7 +20,7 @@ object BSPartitioner {
   protected[spatial] def getCellBounds(id: Int, xCells: Int, yCells: Int, _sideLength: Double, minX: Double, minY: Double): NRectRange = {
       
     val dy = id / xCells
-    val dx = id % yCells
+    val dx = id % xCells
     
     val llx = dx * _sideLength + minX
     val lly = dy * _sideLength + minY
@@ -28,7 +28,7 @@ object BSPartitioner {
     val urx = llx + _sideLength
     val ury = lly + _sideLength
       
-    NRectRange(id, NPoint(llx, lly), NPoint(urx, ury))
+    NRectRange(NPoint(llx, lly), NPoint(urx, ury))
   }
   
   def withGridPPD[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
@@ -88,21 +88,18 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[spatial] var numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
   protected[spatial] var numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
   
-  
-  
   /**
    * The cells which contain elements and the number of elements
    * 
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simply aggregate by cell
    */
-  protected[spatial] var cells: Array[(Cell, Int)] = {
+  protected[spatial] val cells: Array[(Cell, Int)] = {
 
     // create the array we want to store the cells in
-    val histo = Array.tabulate(numXCells * numYCells){ i =>
+    val histo = Array.tabulate(numXCells * numYCells){ i => //(0 until numXCells * numYCells).map{ i => //
       val cellBounds = BSPartitioner.getCellBounds(i, numXCells, numYCells, _sideLength, minX, minY)
-      
-      (Cell(cellBounds), 0)
+      (Cell(i,cellBounds), 0)
     }
     
     /* fill the array. If with extent, we need to keep the exent of each element and combine it later
@@ -131,13 +128,10 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
         (cnt, extent)
         
       }
-      .map { case (id, (cnt, extent)) => 
-        val range = BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY) 
-        (Cell(range, extent), cnt) }
       .collect
-      .foreach{case (cell, cnt) => histo(cell.range.id) = (cell, cnt) }
-      
-      
+      .foreach{case (cellId, (cnt,ex)) => 
+        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
+      }
       
     } else {
       rdd.map{ case (g,_) =>
@@ -151,18 +145,17 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
         (cellId, 1)
       }
       .reduceByKey(_ + _)
-      .map { case (id, cnt) => 
-        val range = BSPartitioner.getCellBounds(id, numXCells, numYCells, _sideLength, minX, minY) 
-        (Cell(range), cnt) }
       .collect
-      .foreach{ case (cell, cnt) => histo(cell.range.id) = (cell, cnt)}
+      .foreach{ case (cellId, cnt) => 
+        histo(cellId) = (histo(cellId)._1, cnt)
+      }
       
     }
-
-    
     histo
   }
 
+  
+  
   
   protected[spatial] var bsp = new BSP(
       Array(minX, minY), 
@@ -187,16 +180,27 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   override def partitionExtent(idx: Int) = bsp.partitions(idx).extent
   
   def printPartitions(fName: java.nio.file.Path) {
-    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(0)},${p.ll(1)},${p.ur(0)},${p.ur(1)}" }.toList.asJava    
-    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
-      
+    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(1)},${p.ll(0)},${p.ur(1)},${p.ur(0)}" }.toList.asJava    
+    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING) 
+    
+    val list2 = bsp.partitions.map{ cell => s"${cell.id};${cell.range.getWKTString()}"}.toList.asJava
+    java.nio.file.Files.write(fName.getParent.resolve("partitions_wkt.csv"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+    
+//    val list3 = bsp.partitions.map{ cell => s"${cell.range.id};${cell.extent.getWKTString()}"}.toList.asJava
+//    java.nio.file.Files.write(fName.getParent.resolve("partitions_wkt_extent.csv"), list3, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
   } 
     
   def printHistogram(fName: java.nio.file.Path) {
     
-    println(s"num in hist: ${cells.map(_._2).sum}")
-    val list = cells.map(_._1.range).map { case c => s"${c.ll(0)},${c.ll(1)},${c.ur(0)},${c.ur(1)}" }.toList.asJava    
-    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE) 
+//    println(s"num in hist: ${cells.map(_._2).sum}")
+    val list = cells.map(_._1.range).map { case c => s"${c.ll(1)},${c.ll(0)},${c.ur(1)},${c.ur(0)}" }.toList.asJava    
+    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+    
+    val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.getWKTString()};$cnt"}.toList.asJava
+    java.nio.file.Files.write(fName.getParent.resolve("histogram_wkt.csv"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+    
+//    val list3 = cells.map{ case (cell,cnt) => s"${cell.range.id};${cell.extent.getWKTString()}"}.toList.asJava
+//    java.nio.file.Files.write(fName.getParent.resolve("histo_wkt_extent.csv"), list3, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
       
   } 
   
@@ -204,7 +208,6 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
-//    println(s"get partition for key $g")
 
     /* XXX: This will throw an error if the geometry is outside of our partitions!
      * However, this should not happen, because the partitioner is specially for a given RDD
@@ -218,11 +221,10 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
     
     if(part.isEmpty) {
-    
+      println("error: no partition found")
       println(bsp.partitions.mkString("\n"))
-//      println(bsp.partitionStats)
-      val histoFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_histogram", null)
-      val partitionFile = java.nio.file.Files.createTempFile(new java.io.File(System.getProperty("user.home")).toPath(), "stark_partitions", null)
+      val histoFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_histogram")
+      val partitionFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_partitions")
       
       println(s"saving historgram to $histoFile")
       printHistogram(histoFile)
@@ -233,7 +235,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       
       throw new IllegalStateException(s"$g is not in any partition!")
     } else {
-        part.get.range.id
+        part.get.id
     }
     
     

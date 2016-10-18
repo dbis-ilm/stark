@@ -15,7 +15,7 @@ object CellHistogram {
 
   def zero(mbbs: List[MBB]): CellHistogram = {
     val buckets = new Array[(NRectRange, Int)](mbbs.size)
-    mbbs.zipWithIndex.foreach{ case (mbb, i) => buckets(i) = (NRectRange(i, mbb.minVec, mbb.maxVec), 0)}
+    mbbs.zipWithIndex.foreach{ case (mbb, i) => buckets(i) = (NRectRange(mbb.minVec, mbb.maxVec), 0)}
     CellHistogram(buckets)
   }
 

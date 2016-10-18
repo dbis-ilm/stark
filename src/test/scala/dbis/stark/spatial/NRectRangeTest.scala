@@ -170,4 +170,10 @@ class NRectRangeTest extends FlatSpec with Matchers {
     diff shouldBe diff2
   }
   
+  it should "have the correct center point" in {
+    val rect1 = NRectRange(NPoint(-14,-13), NPoint(0,0))
+    val center = NPoint(-7, -6.5)
+    rect1.center shouldBe center
+  }
+  
 }

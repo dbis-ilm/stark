@@ -12,7 +12,7 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   var conf: SparkConf = _
 
   before {
-    // to avoid Akka rebinding to the same port, since it doesn't unbind
+    // to avoid Akka rebinding to the same port, since ignore doesn't unbind
     // immediately after shutdown
     System.clearProperty("spark.driver.port")
     System.clearProperty("spark.hostPort")
@@ -29,7 +29,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     System.clearProperty("spark.hostPort")
   }
 
-  "BSPartitioner" should "derive a partitioning" in {
+//  "BSPartitioner"
+  ignore  should "derive a partitioning" in {
     val data = sc.textFile("src/test/resources/labeled_data.csv")
       .map(line => line.split(","))
       .map(t => (Vectors.dense(t(0).toDouble, t(1).toDouble)))
@@ -47,7 +48,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     println(s"${partitions.length} partitions: ---> ${partitions.mkString(",")}")
   }
 
-  "SparkDBScan" should "find a clustering with grid partitioning" in {
+//  "SparkDBScan"
+  ignore  should "find a clustering with grid partitioning" in {
     TestUtils.rmrf("grid-results")
     TestUtils.rmrf("grid-mbbs")
 
@@ -74,7 +76,7 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     */
   }
 
-  it should "find a clustering with binary space partitioning" in {
+  ignore should "find a clustering with binary space partitioning" in {
     TestUtils.rmrf("bsp-results")
     TestUtils.rmrf("bsp-mbbs")
 

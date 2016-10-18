@@ -35,7 +35,7 @@ object SpatialGridPartitioner {
     val urx = llx + xLength
     val ury = lly + yLength
       
-    Cell(NRectRange(id, NPoint(llx, lly), NPoint(urx, ury)))
+    Cell(id, NRectRange(NPoint(llx, lly), NPoint(urx, ury)))
   }
   
    private def getCellId(_x: Double, _y: Double, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double, partitionsPerDimension: Int) = {

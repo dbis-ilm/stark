@@ -13,7 +13,7 @@ package dbis.stark.spatial
  * @param ll The lower left point (min value of each dimension)
  * @param ur The upper right point (max value in each dimension)
  */
-case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
+case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable {
     
   require(ll.dim >= 2, "dimension must be >= 2")
 	require(ll.dim == ur.dim, "ll and ur points must be of same dimension")
@@ -71,13 +71,9 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
         bigger.ur.clone()
       )
     }
-    
-    
-    
-  }  
+  }
   
-  
-  
+  lazy val center = NPoint(Array.tabulate(dim){ i => ll(i) + (lengths(i) / 2) })
     
   /** 
    *  Dimensionality of the geometry
@@ -102,15 +98,11 @@ case class NRectRange(var id: Int, ll: NPoint, ur: NPoint) {
    * The ID is <emph>NOT</emph> considered for equality check!  
    */
   override def equals(that: Any): Boolean = that match {
-    case NRectRange(id, l, u) => (this.ll equals l) && (this.ur equals u)
+    case NRectRange(l, u) => (this.ll equals l) && (this.ur equals u)
     case _ => false
   }
   
   override def hashCode() = (ll,ur).hashCode() // hashcode of a pair of points ll & ur
-}
-
-object NRectRange {
   
-  def apply(ll: NPoint, ur: NPoint): NRectRange = NRectRange(-1, ll, ur)
-  
+  override def clone(): NRectRange = NRectRange(ll.clone(), ur.clone())
 }

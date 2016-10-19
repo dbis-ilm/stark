@@ -324,23 +324,23 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       val res = new LiveIndexedSpatialRDDFunctions(rdd, 5).join(rddtaxi, JoinPredicate.CONTAINS, None)
   }
   
-  it should "create correct partitions for world data" in {
-    
-    val rdd = sc.textFile("src/test/resources/world3.csv", 4)
-      .map { line => line.split(";") }
-      .map { arr => (arr(0).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt,arr(4), STObject(arr(5))) }
-      .keyBy(_._6)
-    
-    val parti = new BSPartitioner(rdd, 2, 100, withExtent= true)
-    
-//    println(s"cells: ${parti.cells.size}")
-//    println(s"partitions: ${parti.numPartitions}")
-//    println(s"x: ${parti.minX}    ${parti.maxX}")
-//    println(s"y: ${parti.minY}    ${parti.maxY}")
-      
-      // it just should not throw any exception
-    
-    
-  }
+//  it should "create correct partitions for world data" in {
+//    
+//    val rdd = sc.textFile("src/test/resources/world3.csv", 4)
+//      .map { line => line.split(";") }
+//      .map { arr => (arr(0).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt,arr(4), STObject(arr(5))) }
+//      .keyBy(_._6)
+//    
+//    val parti = new BSPartitioner(rdd, 2, 100, withExtent= true)
+//    
+////    println(s"cells: ${parti.cells.size}")
+////    println(s"partitions: ${parti.numPartitions}")
+////    println(s"x: ${parti.minX}    ${parti.maxX}")
+////    println(s"y: ${parti.minY}    ${parti.maxY}")
+//      
+//      // it just should not throw any exception
+//    
+//    
+//  }
   
 }

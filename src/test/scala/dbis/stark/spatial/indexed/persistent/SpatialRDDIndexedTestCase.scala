@@ -126,7 +126,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
   }
   
-  ignore should "find the correct nearest neighbors" in { 
+  it should "find the correct nearest neighbors" in { 
     val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
 	  
 	  val q: STObject = "POINT (53.483437 -2.2040706)"

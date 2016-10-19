@@ -13,8 +13,11 @@ import com.vividsolutions.jts.index.strtree.ItemDistance
 import com.vividsolutions.jts.index.ItemVisitor
 import com.vividsolutions.jts.geom.Envelope
 import com.vividsolutions.jts.geom.Coordinate
+import com.vividsolutions.jts.index.strtree.STRtreePlus
+import com.vividsolutions.jts.index.strtree.GeometryItemDistance
+import com.vividsolutions.jts.index.strtree.ItemBoundable
 
-protected[indexed] class Data[G,T](var ts: Int, val data: T, val so: G) extends Serializable
+protected[indexed] class Data[G <: STObject,T](var ts: Int, val data: T, val so: G) extends Serializable
 
 /**
  * A R-Tree abstraction based on VividSolution's ST R-Tree implementation
@@ -23,7 +26,7 @@ protected[indexed] class Data[G,T](var ts: Int, val data: T, val so: G) extends 
  */
 class RTree[G <: STObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
-  ) extends STRtree(capacity)  {
+  ) extends STRtreePlus[Data[G,D]](capacity)  {
 
   private var timestamp = 0
   protected[indexed] def ts = timestamp
@@ -112,7 +115,25 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * Maybe we could use JTSPlus: https://github.com/jiayuasu/JTSplus
    * From the GeoSpark Guys  
    */
-  def kNN(geom: STObject, k: Int): Iterator[D] = ???
-//    super.nearestNeighbour(geom.getEnvelopeInternal, geom, ItemDistance)
+  def kNN(geom: STObject, k: Int): Iterator[D] = 
+    super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance, k).map(_.asInstanceOf[Data[G,D]].data).iterator
+}
+
+protected[stark] object DataDistance {
+  def getGeo(o: AnyRef): Geometry = o match {
+      case so: STObject => so.getGeo
+      case d: Data[_,_] => d.so.getGeo
+      case _ => throw new IllegalArgumentException(s"unsupported type: ${o.getClass}")
+    } 
+}
+protected[stark] class DataDistance[G <: STObject,D] extends ItemDistance {
+  def distance(a: ItemBoundable, b: ItemBoundable): Double = {
+  
+    val dataA = DataDistance.getGeo(a.getItem)
+    val dataB = DataDistance.getGeo(b.getItem)
+    
+    dataA.distance(dataB)
+    
+  }
 }
 

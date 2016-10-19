@@ -83,7 +83,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
   }
   
-  ignore should "find the correct nearest neighbors with grid partitioning" in { 
+  it should "find the correct nearest neighbors with grid partitioning" in { 
     val rddRaw = TestUtils.createRDD(sc)
     val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
 	  

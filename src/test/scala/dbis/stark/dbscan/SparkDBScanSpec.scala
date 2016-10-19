@@ -51,7 +51,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     val partitions = partitioner.computePartitioning()
 //    println(s"${partitions.length} partitions: ---> \n${partitions.mkString("\n")}")
     partitioner.cellHistogram.size shouldBe 196
-    partitions.size shouldBe 24
+    partitions.size shouldBe 26
+    
   }
 
 //  "SparkDBScan"

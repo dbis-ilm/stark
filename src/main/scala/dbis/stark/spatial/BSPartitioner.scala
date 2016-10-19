@@ -17,7 +17,7 @@ object BSPartitioner {
    * Compute the bounds of a cell with the given ID
    * @param id The ID of the cell to compute the bounds for
    */
-  protected[spatial] def getCellBounds(id: Int, xCells: Int, yCells: Int, _sideLength: Double, minX: Double, minY: Double): NRectRange = {
+  protected[spatial] def getCellBounds(id: Int, xCells: Int, _sideLength: Double, minX: Double, minY: Double): NRectRange = {
       
     val dy = id / xCells
     val dx = id % xCells
@@ -94,11 +94,11 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simply aggregate by cell
    */
-  protected[spatial] val cells: Array[(Cell, Int)] = {
+  protected[spatial] var cells: Array[(Cell, Int)] = {
 
     // create the array we want to store the cells in
     val histo = Array.tabulate(numXCells * numYCells){ i => //(0 until numXCells * numYCells).map{ i => //
-      val cellBounds = BSPartitioner.getCellBounds(i, numXCells, numYCells, _sideLength, minX, minY)
+      val cellBounds = BSPartitioner.getCellBounds(i, numXCells, sideLength, minX, minY)
       (Cell(i,cellBounds), 0)
     }
     
@@ -220,7 +220,11 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     }
     
     
-    if(part.isEmpty) {
+    if(part.isDefined) {
+      // return the partition ID
+      part.get.id 
+      
+    } else {
       println("error: no partition found")
       println(bsp.partitions.mkString("\n"))
       val histoFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_histogram")
@@ -232,10 +236,10 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       println(s"saving partitions to $partitionFile")
       printPartitions(partitionFile)
       
+      println("you can use the script/plotpoints.py script to visualize points, cells, and partitions")
       
       throw new IllegalStateException(s"$g is not in any partition!")
-    } else {
-        part.get.id
+        
     }
     
     

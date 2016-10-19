@@ -5,6 +5,7 @@ import org.scalatest.Matchers
 import dbis.stark.spatial.NPoint
 import dbis.stark.spatial.Cell
 import dbis.stark.spatial.NRectRange
+import org.scalatest.tagobjects.Slow
 
 class BSPTest extends FlatSpec with Matchers {
 
@@ -100,7 +101,7 @@ class BSPTest extends FlatSpec with Matchers {
   }
   
   
-  it should "find cells in range" in {
+  it should "find cells in range" taggedAs(Slow) in {
     
     val sideLength = 1
     val maxCost = 10
@@ -240,7 +241,7 @@ class BSPTest extends FlatSpec with Matchers {
     
   }
   
-  it should "process a large number of cells" in {
+  it should "process a large number of cells"taggedAs(Slow)  in {
     val sideLength = 0.1
     val maxCost = 10
     val numXCells = 500

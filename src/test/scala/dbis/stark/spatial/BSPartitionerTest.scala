@@ -19,6 +19,7 @@ import dbis.stark.STObject
 import org.apache.spark.rdd.ShuffledRDD
 import dbis.stark.TestUtils
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
+import org.scalatest.tagobjects.Slow
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
@@ -247,15 +248,15 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     }
   }
   
-  it should "use cells as partitions for taxi"  in {
-    val rdd = sc.textFile("src/test/resources/taxi_sample.csv", Runtime.getRuntime.availableProcessors())
+  it should "use cells as partitions for taxi" in {
+    val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
       
       val minMax = SpatialPartitioner.getMinMax(rdd)
       
-      BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-      val parti = new BSPartitioner(rdd, 0.1, 10*1000, false, minMax._1, minMax._2, minMax._3, minMax._4)
+      BSPartitioner.numCellThreshold = 8
+      val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4)
       
       val nonempty = parti.cells.filter(_._2 > 0)
       nonempty.size shouldBe 7
@@ -264,6 +265,53 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       val cnt = rdd.count()
       
       nonempty.map(_._2).sum shouldBe cnt 
+      
+      rdd.collect().foreach { case (st, name) =>
+        try {
+          val pNum = parti.getPartition(st)
+          withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
+        } catch {
+        case e:IllegalStateException =>
+          
+          val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
+          val yOk = st.getGeo.getCentroid.getY >= minMax._3 && st.getGeo.getCentroid.getY <= minMax._4
+          
+          parti.bsp.partitions.foreach { cell => 
+            
+            val xOk = st.getGeo.getCentroid.getX >= cell.range.ll(0) && st.getGeo.getCentroid.getX <= cell.range.ur(0)
+            val yOk = st.getGeo.getCentroid.getY >= cell.range.ur(1) && st.getGeo.getCentroid.getY <= cell.range.ur(1)
+            
+            println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
+          }
+          
+          val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))).headOption
+          if(containingCell.isDefined) {
+            println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+          } else {
+            println("No cell contains this point!")
+          }
+          
+          
+          
+          fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
+        }
+        
+      }
+      
+      
+  }
+  
+  it should "create real partitions correctly for taxi" taggedAs(Slow) in {
+    val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}
+      
+      val minMax = SpatialPartitioner.getMinMax(rdd)
+      
+      BSPartitioner.numCellThreshold = -1
+      val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4)
+      
+      parti.numPartitions shouldBe 9
       
       rdd.collect().foreach { case (st, name) =>
         try {

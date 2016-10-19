@@ -301,7 +301,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * This is a lazy value    
    */
   var partitions = {
-
+//    val startTime = System.currentTimeMillis()
     val resultPartitions = new ArrayBuffer[Cell](BSP.DEFAULT_PARTITION_BUFF_SIZE)
     
     val nonempty = _cellHistogram.filter{ case (_, cnt) => cnt > 0 }.map(_._1)
@@ -323,9 +323,6 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
          * than max cost allows, however, since we cannot split a cell, we have to live with this
          */
         
-        val cost = costEstimation(part)
-        val lengths = part.range.lengths.find ( _ > _sideLength )
-        
         if((costEstimation(part) > _maxCostPerPartition) && 
             (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
           
@@ -338,14 +335,23 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
            * The second case may happen if one partition was empty 
            * 
            */
-          if(p1.isDefined && p1.get != part)
-          	queue.enqueue(p1.get)
+          if(p1.isDefined) {
+            if(p1.get != part)
+          	  queue.enqueue(p1.get)
+          	else
+          	  resultPartitions += p1.get
+          }
           	
-          if(p2.isDefined && p2.get != part)
-          	queue.enqueue(p2.get)
+          if(p2.isDefined) {
+            if(p2.get != part)
+          	  queue.enqueue(p2.get)
+          	else
+          	  resultPartitions += p2.get
+          }
+          	
           	
         } else {
-          resultPartitions += part
+          resultPartitions += part.clone()
       
         }
       }
@@ -356,6 +362,8 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
       p.id = i  
     }
     
+//    val endTime = System.currentTimeMillis()
+//    println(s"partitioning took ${endTime - startTime} ms")
     resultPartitions.toArray
   }  
   

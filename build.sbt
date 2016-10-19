@@ -10,6 +10,7 @@ libraryDependencies ++= Seq(
    "org.apache.spark"  %% "spark-mllib" % "2.0.0" % "provided",
    "fm.void.jetm" % "jetm" % "1.2.3",
    "org.scalatest" %% "scalatest" % "3.0.0" % "test" withSources(),
+   "org.scalacheck" %% "scalacheck" % "1.13.2" % "test",
    "com.assembla.scala-incubator" %% "graph-core" % "1.11.0",
    "com.github.scopt" %% "scopt" % "3.5.0"
 )

@@ -8,7 +8,7 @@ import dbis.stark.spatial.NRectRange
 
 class BSPTest extends FlatSpec with Matchers {
 
-  private def createCells(sideLength: Int, cost: Int = 10, numXCells: Int, numYCells: Int, llStartX: Double, llStartY: Double) = {
+  private def createCells(sideLength: Double, cost: Int = 10, numXCells: Int, numYCells: Int, llStartX: Double, llStartY: Double) = {
 	  
     val histo = {
       
@@ -237,6 +237,22 @@ class BSPTest extends FlatSpec with Matchers {
     
     withClue("p2 range") { p2.get.range shouldBe expP2.range }
     withClue("p2 extent") { p2.get.extent shouldBe expP2.extent }
+    
+  }
+  
+  it should "process a large number of cells" in {
+    val sideLength = 0.1
+    val maxCost = 10
+    val numXCells = 500
+    val numYCells = 500
+    val llStartX = -180
+    val llStartY = -90
+    
+    val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    
+    val bsp = new BSP(ll,ur,histo,sideLength,100,false)
+    
+    bsp.partitions.size should be > 0
     
   }
 }

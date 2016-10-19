@@ -12,7 +12,7 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   var conf: SparkConf = _
 
   before {
-    // to avoid Akka rebinding to the same port, since ignore doesn't unbind
+    // to avoid Akka rebinding to the same port, since it doesn't unbind
     // immediately after shutdown
     System.clearProperty("spark.driver.port")
     System.clearProperty("spark.hostPort")
@@ -30,26 +30,32 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
 //  "BSPartitioner"
-  ignore  should "derive a partitioning" in {
+  it  should "derive a partitioning" in {
     val data = sc.textFile("src/test/resources/labeled_data.csv")
       .map(line => line.split(","))
       .map(t => (Vectors.dense(t(0).toDouble, t(1).toDouble)))
 
-    val dbscan = new DBScan[Long,Int]().setEpsilon(0.3).setMinPts(10)
+    val cellSize = 0.3
+      
+    val dbscan = new DBScan[Long,Int]().setEpsilon(cellSize).setMinPts(10)
     val mbb = dbscan.getGlobalMBB(data)
 
     val cdata = data.zipWithUniqueId().map{ case (v,id) => ClusterPoint[Long, Int](id, v, payload = Some(0))}
     val partitioner = new BSPartitioner()
       .setMBB(mbb)
-      .setCellSize(0.3)
+      .setCellSize(cellSize)
       .setMaxNumPoints(50)
-      .computeHistogam(cdata, 0.3)
+      .computeHistogam(cdata, cellSize)
+    
+      
     val partitions = partitioner.computePartitioning()
-    println(s"${partitions.length} partitions: ---> ${partitions.mkString(",")}")
+//    println(s"${partitions.length} partitions: ---> \n${partitions.mkString("\n")}")
+    partitioner.cellHistogram.size shouldBe 196
+    partitions.size shouldBe 24
   }
 
 //  "SparkDBScan"
-  ignore  should "find a clustering with grid partitioning" in {
+  it  should "find a clustering with grid partitioning" in {
     TestUtils.rmrf("grid-results")
     TestUtils.rmrf("grid-mbbs")
 
@@ -76,7 +82,7 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
     */
   }
 
-  ignore should "find a clustering with binary space partitioning" in {
+  it should "find a clustering with binary space partitioning" in {
     TestUtils.rmrf("bsp-results")
     TestUtils.rmrf("bsp-mbbs")
 

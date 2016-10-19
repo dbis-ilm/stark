@@ -178,7 +178,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
      * i.e. we could split, actually
      */
     
-    cellsPerDimension(part.range).zipWithIndex      // index is the dimension
+    cellsPerDimension(part.range).zipWithIndex      // index is the dimension -- (numCells, dim)
                       .filter(_._1 > 1)             // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
@@ -214,7 +214,9 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
           
           cell
         }
-        prevP1Range = Some(p1)
+        if(withExtent) {
+          prevP1Range = Some(p1)
+        }
         
         
         val p2 = {
@@ -239,6 +241,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
           cell
         }
         
+        require(p1.range.extend(p2.range) == part.range, "created partitions must completely cover input partition")
         
         // calculate costs in each candidate partition
         val p1Cost = costEstimation(p1)
@@ -309,7 +312,6 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     
       // add it to processing queue
       val queue = Queue(start)
-      
       while(queue.nonEmpty) {
         val part = queue.dequeue()
         
@@ -321,21 +323,32 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
          * than max cost allows, however, since we cannot split a cell, we have to live with this
          */
         
-        if((costEstimation(part) > _maxCostPerPartition) && (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
+        val cost = costEstimation(part)
+        val lengths = part.range.lengths.find ( _ > _sideLength )
+        
+        if((costEstimation(part) > _maxCostPerPartition) && 
+            (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
           
           val (p1, p2) = costBasedSplit(part)
-          
-          // if the generated partition was empty, do not add it
-          if(p1.isDefined)
+
+          /* Do not add partition for further processing if 
+           *  - the generated partition was empty
+           *  - or it is the same as the input partition 
+           * 
+           * The second case may happen if one partition was empty 
+           * 
+           */
+          if(p1.isDefined && p1.get != part)
           	queue.enqueue(p1.get)
           	
-          if(p2.isDefined)
+          if(p2.isDefined && p2.get != part)
           	queue.enqueue(p2.get)
           	
-        } else
+        } else {
           resultPartitions += part
-      }
       
+        }
+      }
     }
     
     // index is the ID of the partition

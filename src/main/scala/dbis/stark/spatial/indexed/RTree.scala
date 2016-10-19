@@ -13,6 +13,8 @@ import com.vividsolutions.jts.index.strtree.ItemDistance
 import com.vividsolutions.jts.index.ItemVisitor
 import com.vividsolutions.jts.geom.Envelope
 import com.vividsolutions.jts.geom.Coordinate
+import com.vividsolutions.jts.index.strtree.STRtreePlus
+import com.vividsolutions.jts.index.strtree.GeometryItemDistance
 
 protected[indexed] class Data[G,T](var ts: Int, val data: T, val so: G) extends Serializable
 
@@ -23,7 +25,7 @@ protected[indexed] class Data[G,T](var ts: Int, val data: T, val so: G) extends 
  */
 class RTree[G <: STObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
-  ) extends STRtree(capacity)  {
+  ) extends STRtreePlus[Data[G,D]](capacity)  {
 
   private var timestamp = 0
   protected[indexed] def ts = timestamp
@@ -112,7 +114,8 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * Maybe we could use JTSPlus: https://github.com/jiayuasu/JTSplus
    * From the GeoSpark Guys  
    */
-  def kNN(geom: STObject, k: Int): Iterator[D] = ???
+  def kNN(geom: STObject, k: Int): Iterator[D] = //???
 //    super.nearestNeighbour(geom.getEnvelopeInternal, geom, ItemDistance)
+    super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new GeometryItemDistance(), k).map(_.asInstanceOf[Data[G,D]].data).iterator
 }
 

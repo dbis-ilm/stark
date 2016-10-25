@@ -138,7 +138,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return all points for one partition" in {
     
-    val rdd: RDD[(STObject, (String, Int, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 1000) 
@@ -151,7 +151,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return all points for two partitions" in {
     
-    val rdd: RDD[(STObject, (String, Int, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, _maxCostPerPartition = 500) 
@@ -167,7 +167,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return all points for max cost 100 & sidelength = 1" in {
     
-    val rdd: RDD[(STObject, (String, Int, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 1, _maxCostPerPartition = 100) 
@@ -183,7 +183,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it should "return only one partition if max cost equals input size" in {
     
-    val rdd: RDD[(STObject, (String, Int, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
     
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 1, _maxCostPerPartition = 1000) 

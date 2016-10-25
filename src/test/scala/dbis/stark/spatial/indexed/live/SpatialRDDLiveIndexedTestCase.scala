@@ -23,6 +23,8 @@ import dbis.stark.STObject._
 import dbis.stark.TestUtils
 import dbis.stark.spatial.Predicates
 import dbis.stark.spatial.SpatialGridPartitioner
+import dbis.stark.spatial.BSPartitioner
+import dbis.stark.Interval
 
 object SpatialRDDLiveIndexedTestCase {
   
@@ -85,7 +87,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   it should "find the correct nearest neighbors with grid partitioning" in { 
     val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5),10)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, partitionsPerDimension = 5), order= 5)
 	  
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -96,6 +98,19 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
     
   } 
+  
+  it should "find the correct nearest neighbors with BSP" in { 
+    val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new BSPartitioner(rddRaw,  1, 100), order= 5) // 0.5
+	  
+	  // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+	  val q: STObject = "POINT (53.483437 -2.2040706)"
+	  val foundGeoms = rdd.kNN(q, 6).collect()
+	  
+	  foundGeoms.size shouldBe 6
+	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
+  }
   
   
   it should "find correct self-join result for points with intersect with grid partitioning" in {
@@ -200,5 +215,49 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
         outfile = Some(f.toString()))
     
     res.count() shouldBe rdd1.count() 
+  }
+  
+  it should "intersect with temporal instant" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val qryT = STObject(qry.getGeo, Interval(TestUtils.makeTimeStamp(2013, 1, 1), TestUtils.makeTimeStamp(2013, 1, 31)))
+    
+    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5), 10).intersects(qryT)
+    
+    res.count() shouldBe 1    
+  }
+  
+  it should "contain with temporal instant" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
+    
+    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5), 10).contains(q)
+    
+    res.count() shouldBe 2
+  }
+  
+  it should "containedby with temporal instant" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
+    
+    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5), 10).containedby(q)
+    
+    res.count() shouldBe 2
+  }
+  
+  it should "containedby with temporal interval" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Interval(TestUtils.makeTimeStamp(2013, 6, 1),TestUtils.makeTimeStamp(2013, 6, 30) ))
+    
+    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5), 10).containedby(q)
+    
+    res.count() shouldBe 4
   }
 }

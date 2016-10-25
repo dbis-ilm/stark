@@ -21,6 +21,8 @@ import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.STObject
 import dbis.stark.STObject._
 import dbis.stark.TestUtils
+import dbis.stark.Interval
+import dbis.stark.Instant
 
 object SpatialRDDTestCase {
   
@@ -187,5 +189,49 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     res.count() shouldBe rdd.count() 
   } 
   
+  
+  it should "intersect with temporal instant" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val qryT = STObject(qry.getGeo, Interval(TestUtils.makeTimeStamp(2013, 1, 1), TestUtils.makeTimeStamp(2013, 1, 31)))
+    
+    val res = rdd.intersects(qryT)
+    
+    res.count() shouldBe 1    
+  }
+  
+  it should "contain with temporal instant" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
+    
+    val res = rdd.contains(q)
+    
+    res.count() shouldBe 2
+  }
+  
+  it should "containedby with temporal instant" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
+    
+    val res = rdd.containedby(q)
+    
+    res.count() shouldBe 2
+  }
+  
+  it should "containedby with temporal interval" in {
+    
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Interval(TestUtils.makeTimeStamp(2013, 6, 1),TestUtils.makeTimeStamp(2013, 6, 30) ))
+    
+    val res = rdd.containedby(q)
+    
+    res.count() shouldBe 4
+  }
   
 }

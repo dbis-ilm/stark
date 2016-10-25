@@ -6,6 +6,8 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD._
 import org.apache.spark.SparkConf
 import dbis.stark.spatial.BSPartitioner
+import java.util.Date
+import java.time.LocalDate
 
 
 object TestUtils {
@@ -43,7 +45,10 @@ object TestUtils {
     
     val rdd = sc.textFile(file, if(distinct) 1 else numParts) // let's start with only one partition and repartition later
       .map { line => line.split(sep) }
-      .map { arr => (arr(0), arr(1).toInt, arr(2), STObject(arr(7))) }
+      .map { arr => 
+        val ts = makeTimeStamp(arr(1).toInt, arr(2).toInt, arr(3).toInt)
+        // we don't add the ts directly to STObject to allow tests without a temporal component
+        (arr(0), ts , s"${arr.slice(1, 4).mkString("-")}", STObject(arr(7))) } 
       .keyBy( _._4)
       
     if(distinct)
@@ -51,6 +56,9 @@ object TestUtils {
     else
       rdd
   }
+  
+  def makeTimeStamp(year: Int, month: Int, day: Int) = LocalDate.of(year, month, day).toEpochDay()
+  
   
   def createIndexedRDD(
       sc: SparkContext, 

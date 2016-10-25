@@ -87,6 +87,9 @@ case class STObject(private val g: GeoType, time: Option[TemporalExpression]) ex
 object STObject {
   
   def apply(wkt: String): STObject = this(new WKTReader().read(wkt))
+  def apply(wkt: String, ts: Long): STObject = STObject(new WKTReader().read(wkt), ts)
+  def apply(wkt: String, ts: Instant): STObject = this(new WKTReader().read(wkt), ts)
+  def apply(wkt: String, temp: Interval): STObject = this(new WKTReader().read(wkt), temp)
   def apply(g: GeoType): STObject = this(g, None)
   def apply(g: GeoType, t: TemporalExpression): STObject = this(g, Some(t))
   

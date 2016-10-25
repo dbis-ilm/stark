@@ -26,7 +26,7 @@ protected[indexed] class Data[G <: STObject,T](var ts: Int, val data: T, val so:
  */
 class RTree[G <: STObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
-  ) extends STRtreePlus[Data[G,D]](capacity)  {
+  ) extends STRtreePlus[Data[G,D]](capacity)  { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
   private var timestamp = 0
   protected[indexed] def ts = timestamp
@@ -92,12 +92,24 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
     timestamp += 1 // increment timestamp for next query
   }
   
+  /**
+   * Helper method to convert and unnest a list of Data elements into 
+   * a flat list of Data items
+   * 
+   * @param l The list that contains plain elements and other lists
+   * @return Returns a flat list Data
+   */
   private def unnest[T](l: java.util.ArrayList[_]): List[Data[G,D]] = 
     l.flatMap { e => e match {
       case d: Data[G,D] => List(d)
       case a: java.util.ArrayList[_] => unnest(a) 
     }}.toList
   
+  /**
+   * Get all items in the tree
+   * 
+   * @return Returns a list containing all Data items in the tree
+   */
   protected[indexed] def items = super.itemsTree()
       .flatMap{ l => (l: @unchecked) match {
         case d: Data[G,D] => List(d)
@@ -105,20 +117,31 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
         } 
       } 
   
+  /**
+   * If the tree was queried using the *RO methods you can use this method
+   * to retreive the final result of the tree.
+   * 
+   * @return Returns the list of elements that are the result of previous queries  
+   */
   def result = items.filter { d => d.ts == timestamp - 1 }.map(_.data).toList
   
   /**
    * Query the tree to find k nearest neighbors.
    * 
-   * Not implemented yet 
-   * 
-   * Maybe we could use JTSPlus: https://github.com/jiayuasu/JTSplus
-   * From the GeoSpark Guys  
+   * @param geom The reference object
+   * @param k The number of neighbors  
    */
-  def kNN(geom: STObject, k: Int): Iterator[D] = 
-    super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance, k).map(_.asInstanceOf[Data[G,D]].data).iterator
+  def kNN(geom: STObject, k: Int): Iterator[D] = {
+    if(size <= 0)
+      Iterator.empty
+    else
+      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance, k).map(_.data).iterator
+  }
 }
 
+/**
+ * Companion object containing helper method
+ */
 protected[stark] object DataDistance {
   def getGeo(o: AnyRef): Geometry = o match {
       case so: STObject => so.getGeo
@@ -126,6 +149,10 @@ protected[stark] object DataDistance {
       case _ => throw new IllegalArgumentException(s"unsupported type: ${o.getClass}")
     } 
 }
+
+/**
+ * A distance metric that is used internally by the STRtree for comparing entries 
+ */
 protected[stark] class DataDistance[G <: STObject,D] extends ItemDistance {
   def distance(a: ItemBoundable, b: ItemBoundable): Double = {
   

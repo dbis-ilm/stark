@@ -27,10 +27,10 @@ class NRectRangeCheck extends Properties("NRectRange") {
   
   
   val rectGen = for {
-    x1 <- Gen.choose(-180,178)
-    y1 <- Gen.choose(-90, 88)
-    x2 <- Gen.choose(x1+1,180)
-    y2 <- Gen.choose(y1+1, 90)
+    x1 <- Gen.choose(-180.0,178.0)
+    y1 <- Gen.choose(-90.0, 88.0)
+    x2 <- Gen.choose(x1+1,180.0)
+    y2 <- Gen.choose(y1+1, 90.0)
   } yield NRectRange(NPoint(x1,y1), NPoint(x2,y2))
 
   implicit lazy val arbRect: Arbitrary[NRectRange] = Arbitrary(rectGen)

@@ -5,7 +5,89 @@ import org.scalatest.Matchers
 
 import TemporalExpressionMatchers._
 import InstantTest._
+import org.scalacheck.{Gen,Properties}
+import org.scalacheck.Prop.{forAll, BooleanOperators, atLeastOne}
+import org.scalacheck.Arbitrary
   
+class InstantCheck extends Properties("Instant") {
+  
+  val instantGen = for {
+    x <- Gen.choose(Long.MinValue, Long.MaxValue)
+  } yield Instant(x)
+  implicit lazy val arbInstant = Arbitrary(instantGen) 
+  
+  val optinalInstantGen = for {
+    y <- Gen.option(instantGen)
+  } yield y
+  implicit lazy val arbOptInstant = Arbitrary(optinalInstantGen) 
+  
+  property("contain itself") = forAll { (r: Instant) => 
+      r.contains(r)
+  }
+  
+  property("containedBy itself") = forAll { (r: Instant) => 
+      r.containedBy(r)
+  }
+  
+  property("intersect itself") = forAll { (r: Instant) => 
+      r.intersects(r)
+  }
+  
+  property("center") = forAll { (r: Instant) => 
+      r.center == Some(r)
+  }
+  
+  property("==") = forAll { (r: Instant) => 
+      r == r
+  }
+  
+  property("<= self") = forAll { (r: Instant) => 
+      r <= r
+  }
+  
+  property(">= self") = forAll { (r: Instant) => 
+      r >= r
+  }
+  
+  property(">=") = forAll { (l: Long, r: Long) => 
+      ((l >= r) ==> Instant(l) >= Instant(r)) :| s"$l >= $r"
+      ((l < r) ==> Instant(r) >= Instant(l)) :| s"$l < $r"
+  }
+  
+  property("<=") = forAll { (l: Long, r: Long) => 
+      ((l <= r) ==> Instant(l) <= Instant(r)) :| s"$l <= $r"
+      ((l > r) ==> Instant(r) <= Instant(l)) :| s"$l > $r"
+  }
+  
+  property(">") = forAll { (l: Long, r: Long) => 
+      ((l > r) ==> Instant(l) > Instant(r)) :| s"$l > $r"
+      ((l < r) ==> Instant(r) > Instant(l)) :| s"$l < $r"
+  }
+  
+  property("<") = forAll { (l: Long, r: Long) => 
+      ((l < r) ==> Instant(l) < Instant(r)) :| s"$l < $r"
+      ((l > r) ==> Instant(r) < Instant(l)) :| s"$l > $r"
+  }
+  
+  property("length") = forAll { (r: Instant) => 
+      r.length == Some(0)
+  }
+  
+  property("min") = forAll { (l: Long, r: Long) =>
+    val res = Instant.min(Instant(l), Instant(r))
+    
+      ((l < r) ==> (res.value == l)) :| s"$l < $r"
+      ((l > r) ==> (res.value == r)) :| s"$l > $r"
+  }
+  
+  property("max") = forAll { (l: Long, r: Long) =>
+    val res = Instant.max(Instant(l), Instant(r))
+    
+      ((l > r) ==> (res.value == l)) :| s"$l > $r"
+      ((l < r) ==> (res.value == r)) :| s"$l < $r"
+  }  
+}
+
 class InstantTest extends FlatSpec with Matchers {
 
   "An Instant" should "have the correct < relation" in {

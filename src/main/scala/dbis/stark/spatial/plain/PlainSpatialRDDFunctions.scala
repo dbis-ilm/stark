@@ -88,7 +88,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           Iterator.empty
       })
     } else {
-    
+      // no spatial partitioner
       rdd.filter{ case (g,_) => g.contains(o) }
     }
   }

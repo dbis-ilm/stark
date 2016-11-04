@@ -107,7 +107,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
         
         val env = g.getEnvelopeInternal
   		  val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-        println(s"$center --> $id")
+//        println(s"$center --> $id")
   		  (id,gExtent)
       }
       .reduceByKey{case(a,b) => a.extend(b)}

@@ -45,7 +45,11 @@ object LiveIndexedSpatialRDDFunctions {
      * for all result elements we need to check if they
      * really intersect with the actual geometry
      */
-    result.filter{ case (g,_) => predicate(qry,g) }
+    result.filter{ case (g,_) => 
+    
+      predicate(g,qry) 
+      
+    }
     
   }
   
@@ -76,15 +80,19 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def contains(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
     val partitionCheck = rdd.partitioner.map { p =>
       p match {
-        case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-        case _ => true
+        case sp: SpatialPartitioner => 
+          Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+        case _ => 
+          true
       }
     }.getOrElse(true)
     
-    if(partitionCheck)
+    if(partitionCheck) {
       LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.contains _, capacity)
-    else 
+    }
+    else {
       Iterator.empty
+    }
   
     }) 
 

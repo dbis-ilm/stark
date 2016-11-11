@@ -45,7 +45,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     
     val checkPartitions = leftParti.isDefined && rightParti.isDefined
     
-    logDebug(s"apply partition pruning: $checkPartitions")
+//    logDebug(s"apply partition pruning: $checkPartitions")
     var idx = 0
     for (
         s1 <- left.partitions; 
@@ -55,7 +55,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
       parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
       idx += 1
     }
-    logDebug(s"partition combinations: ${parts.size} (of ${left.partitions.size * right.partitions.size})")
+//    logDebug(s"partition combinations: ${parts.size} (of ${left.partitions.size * right.partitions.size})")
     parts.toArray
   }
   

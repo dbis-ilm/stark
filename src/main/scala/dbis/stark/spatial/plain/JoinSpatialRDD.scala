@@ -16,6 +16,7 @@ import dbis.stark.spatial.Utils
 import dbis.stark.spatial.JoinPredicate
 import org.apache.spark.Dependency
 import org.apache.spark.NarrowDependency
+import scala.collection.mutable.ArrayBuffer
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     var left: RDD[(G,V)], 
@@ -29,7 +30,7 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     this(left, right, JoinPredicate.predicateFunction(predicate))
   
   override def getPartitions = {
-    val parts = ListBuffer.empty[CartesianPartition]
+    val parts = ArrayBuffer.empty[CartesianPartition]
     
     val checkPartitions = leftParti.isDefined && rightParti.isDefined
     var idx = 0
@@ -84,20 +85,19 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[CartesianPartition]
     
-//    val map = SpatialRDD.createExternalMap[G,V,V2]
+    val rightList = right.iterator(split.s2, context).toList
+    
+    left.iterator(split.s1, context).flatMap{ case (lg, lv) =>
+      rightList.filter{ case (rg, _) => predicate(lg,rg)}.map{ case (_,rv) => (lv,rv) }  
+    }
     
     
-    val pairs = for(
-        l <- left.iterator(split.s1, context);
-        r <- right.iterator(split.s2, context)
-        if(predicate(l._1, r._1))) yield(l._1, (l._2,r._2))
+    
+//    for(
+//      l <- left.iterator(split.s1, context);
+//      r <- right.iterator(split.s2, context)
+//      if(predicate(l._1, r._1))) yield(l._2,r._2)
         
-//    map.insertAll(pairs)
-    
-//    val f = map.iterator.flatMap{ case (g, l) => l}
-    
-//    new InterruptibleIterator(context, f)
-      pairs.map{ case (_, p) => p }
   }
   
   

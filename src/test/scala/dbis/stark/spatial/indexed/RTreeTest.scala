@@ -69,4 +69,44 @@ class RTreeTest extends FlatSpec with Matchers {
     queryresult should contain only ((STObject(q),2013))
   }
   
+  it should "return cancidates for point DS" in {
+    
+    val entries = Array(
+      STObject("POINT(1 1)"),
+      STObject("POINT(10 1)"),
+      STObject("POINT(5 10)"),
+      
+      STObject("POINT(1 1)"),
+      STObject("POINT(10 1)"),
+      STObject("POINT(5 10)"),
+      
+      STObject("POINT(1 1)"),
+      STObject("POINT(10 1)"),
+      STObject("POINT(5 10)"),
+      
+      STObject("POINT(1 1)"),
+      STObject("POINT(10 1)"),
+      STObject("POINT(5 10)"),
+      
+      STObject("POINT(1 1)"),
+      STObject("POINT(10 1)"),
+      STObject("POINT(5 10)")
+    )
+    
+    val tree = new RTree[STObject, (STObject, Int)](3)
+    
+    entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
+    
+    val q = STObject("POLYGON((2 -1, 13 -1, 8 0, 8 2, 11 2, 5 4, 0 4, 3 2, 2 -1))")
+//    println(q.getGeo.getEnvelopeInternal)
+    
+    val candidates = tree.query(q).toList
+    
+    withClue("candidates size") { candidates.size shouldBe 10 } // not just 2 because of the duplicates
+    
+    val result = candidates.filter(p => q.getGeo.contains(p._1))
+    withClue("result size") { result.size shouldBe 0 }
+    
+  }
+  
 }

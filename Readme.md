@@ -26,7 +26,7 @@ val countries = sc.textFile("/data/countries") // assume Schema ID;Name;WKT Stri
     .map(arr => (STObject(arr(2)), (arr(0).toInt, arr(1)) ) // ( STObject, (Int, String) )
 
 // find all geometries that contain the given point    
-val filtered = countries.contains(STObject("POINT( 50.681898, 10.938838 )"))
+val filtered = countries.contains(STObject("POINT( 50.681898 10.938838 )"))
 ```
 
 ## Features

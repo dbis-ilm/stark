@@ -9,7 +9,6 @@ package dbis.stark.spatial
  * <b>Note</b> This is interpreted as a right open interval, i.e. the 
  * max values do not belong to the geometry. 
  * 
- * @param id The ID of this geometry
  * @param ll The lower left point (min value of each dimension)
  * @param ur The upper right point (max value in each dimension)
  */
@@ -24,30 +23,60 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable {
    * 
    * @param p The point to check
    */
-  def contains(p: NPoint): Boolean =
+  def contains(p: NPoint): Boolean = {
     // right open interval p must be "smaller" than the max values of our range
-    p.c.zipWithIndex.forall { case(e, idx) => e >= ll(idx) && e < ur(idx) }
+    var idx = 0
+    var res = true
+    while(idx < p.c.length) {
+      res &&= p.c(idx) >= ll(idx) && p.c(idx) < ur(idx)
+      if(!res)
+        return false
+
+      idx += 1
+    }
+    res
+
+//    p.c.zipWithIndex.forall { case (e, idx) => e >= ll(idx) && e < ur(idx) }
+  }
   
   /**
    * Check if the this range completely contains another NRectRange 
    * 
    * @param r The other range to check for containment
    */
-  def contains(r: NRectRange): Boolean =
-    r.ll.c.zipWithIndex.forall{case (e,idx) => e >= ll(idx)} && r.ur.c.zipWithIndex.forall { case (e, idx) => e <= ur(idx) }
+  def contains(r: NRectRange): Boolean = {
+//    r.ll.c.zipWithIndex.forall { case (e, idx) => e >= ll(idx) } && r.ur.c.zipWithIndex.forall { case (e, idx) => e <= ur(idx) }
+
+    var idx = 0
+    var res = true
+    while(idx < r.ll.c.length) {
+      res &&= r.ll.c(idx) >= ll(idx) && r.ur.c(idx) <= ur(idx)
+      if(!res)
+        return false
+
+      idx += 1
+    }
+    res
+  }
   
   def intersects(r: NRectRange): Boolean = points.exists { p => r.contains(p) }
   
   def points = Array(ll, NPoint(ur(0),ll(1)),ur, NPoint(ll(0),ur(1)))
   
-  def getWKTString() = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))" 
-  
+  def wkt: String = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))"
+
+  /**
+    * Extent this range with the given other range. That is, the minimum and maximum value in each dimension
+    * of the two rangess
+    * @param other The other range
+    * @return The combined extent.
+    */
   def extend(other: NRectRange) = NRectRange(
       this.ll.mergeMin(other.ll).mergeMin(other.ur),
       this.ur.mergeMax(other.ur).mergeMax(other.ll)
     )
   
-  def diff(other: NRectRange) = {
+  def diff(other: NRectRange): NRectRange = {
     
     // FIXME: arbitrary no. dimensions
     require(dim == 2,"works for 2 dimensions only")
@@ -78,17 +107,17 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable {
   /** 
    *  Dimensionality of the geometry
    */
-  def dim = ll.dim
+  def dim: Int = ll.dim
   
   /**
    * The side lengths of the geometry. Lazily evaluated.
    */
-  lazy val lengths = (0 until dim).map { i => math.abs(ur(i) - ll(i)) }.toArray 
+  lazy val lengths: Array[Double] = (0 until dim).map { i => math.abs(ur(i) - ll(i)) }.toArray
   
   /**
    * The volume (area, in 2D) of the geometry. Lazily evaluated
    */
-  lazy val volume = lengths.reduceLeft(_ * _)
+  lazy val volume: Double = lengths.product
   
   /**
    * Check if this NRechtRange is equal to some other object.
@@ -102,7 +131,7 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable {
     case _ => false
   }
   
-  override def hashCode() = (ll,ur).hashCode() // hashcode of a pair of points ll & ur
+  override def hashCode(): Int = (ll,ur).hashCode() // hashcode of a pair of points ll & ur
   
   override def clone(): NRectRange = NRectRange(ll.clone(), ur.clone())
 }

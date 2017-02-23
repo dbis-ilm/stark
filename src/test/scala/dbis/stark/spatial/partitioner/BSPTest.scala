@@ -109,7 +109,7 @@ class BSPTest extends FlatSpec with Matchers {
     val numYCells = 180
     val llStartX = -180
     val llStartY = -90
-    
+
     val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
     
     withClue("generated ll wrong") { ll shouldBe NPoint(llStartX, llStartY)  }
@@ -126,14 +126,16 @@ class BSPTest extends FlatSpec with Matchers {
       withExtent = true
     )
     
-    val cells = bsp.getCellsIn(NRectRange(ll,ur)) 
-    
+    val cells = bsp.getCellsIn(NRectRange(ll,ur))
+
 //    cells should contain only ((0 until histo.size):_*)
     cells.size shouldBe histo.size
-    
+
+    val start = System.currentTimeMillis()
     cells.foreach { cellId => 
       noException should be thrownBy histo(cellId) 
-    } 
+    }
+    val end = System.currentTimeMillis()
   }
   
   it should "find correct cells per dimension" in {
@@ -182,7 +184,6 @@ class BSPTest extends FlatSpec with Matchers {
   }
   
   it should "create correct extent information" in {
-    
     val cell1 = Cell(0,
       range = NRectRange(NPoint(-4,-4), NPoint(0,0)),
       extent = NRectRange(NPoint(-7,-5), NPoint(0,1)))
@@ -238,7 +239,6 @@ class BSPTest extends FlatSpec with Matchers {
     
     withClue("p2 range") { p2.get.range shouldBe expP2.range }
     withClue("p2 extent") { p2.get.extent shouldBe expP2.extent }
-    
   }
   
   it should "process a large number of cells"taggedAs(Slow)  in {
@@ -254,6 +254,5 @@ class BSPTest extends FlatSpec with Matchers {
     val bsp = new BSP(ll,ur,histo,sideLength,100,false)
     
     bsp.partitions.size should be > 0
-    
   }
 }

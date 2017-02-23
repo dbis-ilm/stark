@@ -1,15 +1,11 @@
 package dbis.stark.spatial
 
-import scala.reflect.ClassTag
-import scala.collection.mutable.Map
-
-import scala.collection.JavaConverters._
-
+import dbis.stark.STObject
+import dbis.stark.spatial.partitioner.BSP
 import org.apache.spark.rdd.RDD
 
-import dbis.stark.spatial.partitioner.BSP
-import dbis.stark.STObject
-import dbis.stark.spatial.partitioner.BSPBinary
+import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
 
 
 object BSPartitioner {
@@ -38,9 +34,9 @@ object BSPartitioner {
     _minX: Double,
     _maxX: Double,
     _minY: Double,
-    _maxY: Double) = {
+    _maxY: Double): BSPartitioner[G, V] = {
     
-    val _sideLength = (( math.min(math.abs(_maxX - _minX), math.abs(_maxY - _minY))) / _gridPPD)
+    val _sideLength = math.min(math.abs(_maxX - _minX), math.abs(_maxY - _minY)) / _gridPPD
     
     new BSPartitioner(rdd, _sideLength, _maxCostPerPartition, withExtent, _minX, _maxX, _minY, _maxY)
     
@@ -50,14 +46,21 @@ object BSPartitioner {
 }
 
 /**
- * A cost based binary space partitioner based on the paper
- * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
- * by He, Tan, Luo, Feng, Fan 
- * 
- * @param rdd The RDD to partition
- * @param sideLength side length of a quadratic cell - defines granularity
- * @param maxCostPerPartition Maximum cost a partition should have - here: number of elements  
- */
+  * * A cost based binary space partitioner based on the paper
+  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
+  * by He, Tan, Luo, Feng, Fan
+  *
+  * @param rdd Th RDD
+  * @param _sideLength Length of a cell
+  * @param _maxCostPerPartition Maximum allowed cost/number of elements per parititon
+  * @param withExtent Regard the element's extent
+  * @param _minX Minimum x value
+  * @param _maxX Maximum x value
+  * @param _minY Minimum y value
+  * @param _maxY Maximum y value
+  * @tparam G Geometry type
+  * @tparam V Payload data type
+  */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)],
     _sideLength: Double,
@@ -82,11 +85,11 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     this(rdd, _sideLength, _maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
 
   
-  lazy val maxCostPerPartition = _maxCostPerPartition
-  lazy val sideLength = _sideLength
+  lazy val maxCostPerPartition: Double = _maxCostPerPartition
+  lazy val sideLength: Double = _sideLength
   
-  protected[spatial] var numXCells = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
-  protected[spatial] var numYCells = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
+  protected[spatial] var numXCells: Int = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
+  protected[spatial] var numYCells: Int = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
   
   /**
    * The cells which contain elements and the number of elements
@@ -107,7 +110,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
      */
     if(withExtent) {
     
-      rdd.map { case (g,v) =>
+      rdd.map { case (g, _) =>
         val p = g.getCentroid
         
         val env = g.getEnvelopeInternal
@@ -176,14 +179,14 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 //      withExtent,
 //      BSPartitioner.numCellThreshold)
     
-  override def partitionBounds(idx: Int) = bsp.partitions(idx)
-  override def partitionExtent(idx: Int) = bsp.partitions(idx).extent
+  override def partitionBounds(idx: Int): Cell = bsp.partitions(idx)
+  override def partitionExtent(idx: Int): NRectRange = bsp.partitions(idx).extent
   
   def printPartitions(fName: java.nio.file.Path) {
-    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(1)},${p.ll(0)},${p.ur(1)},${p.ur(0)}" }.toList.asJava    
+    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(1)},${p.ll(0)},${p.ur(1)},${p.ur(0)}" }.toList.asJava
     java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING) 
     
-    val list2 = bsp.partitions.map{ cell => s"${cell.id};${cell.range.getWKTString()}"}.toList.asJava
+    val list2 = bsp.partitions.map{ cell => s"${cell.id};${cell.range.wkt}"}.toList.asJava
     java.nio.file.Files.write(fName.getParent.resolve("partitions_wkt.csv"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
     
 //    val list3 = bsp.partitions.map{ cell => s"${cell.range.id};${cell.extent.getWKTString()}"}.toList.asJava
@@ -193,10 +196,10 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   def printHistogram(fName: java.nio.file.Path) {
     
 //    println(s"num in hist: ${cells.map(_._2).sum}")
-    val list = cells.map(_._1.range).map { case c => s"${c.ll(1)},${c.ll(0)},${c.ur(1)},${c.ur(0)}" }.toList.asJava    
+    val list = cells.map(_._1.range).map { c => s"${c.ll(1)},${c.ll(0)},${c.ur(1)},${c.ur(0)}" }.toList.asJava
     java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
     
-    val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.getWKTString()};$cnt"}.toList.asJava
+    val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList.asJava
     java.nio.file.Files.write(fName.getParent.resolve("histogram_wkt.csv"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
     
 //    val list3 = cells.map{ case (cell,cnt) => s"${cell.range.id};${cell.extent.getWKTString()}"}.toList.asJava
@@ -204,7 +207,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       
   } 
   
-  override def numPartitions: Int = bsp.partitions.size
+  override def numPartitions: Int = bsp.partitions.length
   
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
@@ -214,9 +217,9 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
      * which by definition is immutable and the partitions should cover the complete data space 
      * of the RDD's content
      */
+    val c = g.getCentroid
     val part = bsp.partitions.find{ p =>
-      val c = g.getCentroid
-      p.range.contains(NPoint(c.getX, c.getY)) 
+      p.range.contains(NPoint(c.getX, c.getY))
     }
     
     

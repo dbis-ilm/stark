@@ -5,6 +5,8 @@ import scala.collection.mutable.ListBuffer
 import dbis.stark.spatial.NRectRange
 import dbis.stark.spatial.NPoint
 import dbis.stark.spatial.Cell
+
+import scala.collection.immutable.IndexedSeq
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -56,10 +58,10 @@ object BSP {
  * by He, Tan, Luo, Feng, Fan 
  * 
  * @param _ll The lower left point of the data space, i.e. min value in all dimensions
- * @param ur The upper right point of the data space, i.e. max value in all dimensions
- * @param cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
- * @param sideLength The side length of the (quadratic) cell
- * @param maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points). 
+ * @param _ur The upper right point of the data space, i.e. max value in all dimensions
+ * @param _cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
+ * @param _sideLength The side length of the (quadratic) cell
+ * @param _maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points).
  * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
  * cannot be further split.   
  */
@@ -89,15 +91,19 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   def maxCostPerPartition = _maxCostPerPartition
   
   
-  private lazy val numXCells = math.ceil(( math.abs(_ur.head - _ll.head) ) / _sideLength).toInt
+  private lazy val numXCells = math.ceil(math.abs(_ur.head - _ll.head) / _sideLength).toInt
   
-  protected[spatial] def cellId(p: NPoint) = {
-      
-      val x = math.floor(math.abs(p(0) - ll(0)) / _sideLength).toInt
-      val y = math.floor(math.abs(p(1) - ll(1)) / _sideLength).toInt
-      y * numXCells + x
-    }
-  
+  protected[spatial] def cellId(p: NPoint): Int = {
+    val x = math.floor(math.abs(p(0) - ll(0)) / _sideLength).toInt
+    val y = math.floor(math.abs(p(1) - ll(1)) / _sideLength).toInt
+    y * numXCells + x
+  }
+
+  /**
+    * Determine the IDs of the cells that are contained by the given range
+    * @param r The range
+    * @return Returns the list of Cell IDs
+    */
   def getCellsIn(r: NRectRange): Seq[Int] = {
     
 //	  require(r.ll.c.zipWithIndex.forall { case (c, idx) => c >= _ll(idx)} , s"""invalid LL of range for cells in range
@@ -117,9 +123,9 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     
     // the cellId of the lower left point of the given range
     val llCellId = cellId(r.ll)
-    
+
     (0 until numCells(1)).flatMap { i =>
-      (llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells )
+      llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells
     }
   }
   
@@ -129,23 +135,59 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * Compute the cost for a partition, i.e. sum the cost
    * for each cell in that partition.
    * 
-   * @param part The partition 
+   * @param part The partition
+   * @return Returns the cost, i.e. the number of points, of the given cell
    */
-  def costEstimation(part: Cell): Double = 
-    getCellsIn(part.range)
-      .filter{id => id >= 0 && id < _cellHistogram.size && _cellHistogram(id)._2 > 0}
-      .map{id => _cellHistogram(id)._2}
-      .sum
+  def costEstimation(part: Cell): Double = {
+    val cellIds = getCellsIn(part.range)
+    var i = 0
+    var sum = 0
+    while (i < cellIds.size) {
+      val id = cellIds(i)
+      if (id >= 0 && id < _cellHistogram.length) {
+        sum += _cellHistogram(id)._2
+      }
+      i += 1
+    }
+    sum
+
+//        getCellsIn(part.range).iterator
+//          .filter{id => id >= 0 && id < _cellHistogram.length && _cellHistogram(id)._2 > 0}
+//          .map{id => _cellHistogram(id)._2}
+//          .sum
+  }
     
-  protected[spatial] def cellsPerDimension(part: NRectRange) = (0 until part.dim).map { dim =>  
+  protected[spatial] def cellsPerDimension(part: NRectRange): IndexedSeq[Int] = (0 until part.dim).map { dim =>
       math.ceil(part.lengths(dim) / _sideLength).toInt  
     }
-      
-  protected[spatial] def extentForRange(range: NRectRange) = {
-    getCellsIn(range)
-      .filter { id => id >= 0 && id < _cellHistogram.size } // FIXME: we should actually make sure cellInRange produces always valid cells
-      .map { id => _cellHistogram(id)._1.extent } // get the extent for the cells
-      .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent 
+
+  /**
+    * Determine the extent of the given range. The extent is computed by combining the extents
+    * of all cotnained elements
+    * @param range The range to determine the extent fr
+    * @return Returns the extent
+    */
+  protected[spatial] def extentForRange(range: NRectRange): NRectRange = {
+//    getCellsIn(range)
+//      .filter { id => id >= 0 && id < _cellHistogram.length } // FIXME: we should actually make sure cellInRange produces always valid cells
+//      .map { id => _cellHistogram(id)._1.extent } // get the extent for the cells
+//      .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent
+
+    val cellIds = getCellsIn(range)
+
+    var i = 0
+    var extent = range
+
+    while(i < cellIds.length) {
+      val id = cellIds(i)
+      if(id >= 0 && id < _cellHistogram.length) {
+        extent = extent.extend(_cellHistogram(id)._1.extent)
+      }
+      i += 1
+    }
+
+    extent
+
   }
     
   /**
@@ -178,13 +220,16 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
      * i.e. we could split, actually
      */
     
-    cellsPerDimension(part.range).zipWithIndex      // index is the dimension -- (numCells, dim)
+    cellsPerDimension(part.range).iterator.zipWithIndex      // index is the dimension -- (numCells, dim)
                       .filter(_._1 > 1)             // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
+
       var prevP1Range: Option[Cell] = None                    
-      // calculate candidate partitions it we split at each possible cell
-      for(i <- (1 until numCells)) {
+//       calculate candidate partitions it we split at each possible cell
+//      for(i <- (1 until numCells)) {
+      var i = 1
+      while(i < numCells) {
         
         // TODO: better documentation for this calculation formulas
         val p1 = {
@@ -258,6 +303,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
           
           parts = (s1,s2)
         }
+        i += 1
       }
     }
     
@@ -280,12 +326,12 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
 	   */
 	  var s = Cell(0, NRectRange(NPoint(_ll), NPoint(_ur)))
 			  
-			  val cellsPerDim = cellsPerDimension(s.range)
-			  val newUr = _ur.zipWithIndex.map { case (value, dim) => 
-			    if(_ll(dim) + cellsPerDim(dim) * _sideLength > _ur(dim))
-				    _ll(dim) + cellsPerDim(dim) * _sideLength
-				  else
-					  _ur(dim)
+    val cellsPerDim = cellsPerDimension(s.range)
+    val newUr = _ur.zipWithIndex.map { case (value, dim) =>
+      if(_ll(dim) + cellsPerDim(dim) * _sideLength > _ur(dim))
+        _ll(dim) + cellsPerDim(dim) * _sideLength
+      else
+        _ur(dim)
 	  }
 	  
 	  _ur = newUr

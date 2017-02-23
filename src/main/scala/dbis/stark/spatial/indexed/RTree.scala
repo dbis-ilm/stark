@@ -1,21 +1,12 @@
 package dbis.stark.spatial.indexed
 
-import scala.collection.JavaConversions.asScalaBuffer
-
-import scala.reflect.ClassTag
-
-import com.vividsolutions.jts.index.strtree.AbstractNode
-import com.vividsolutions.jts.geom.Geometry
-import com.vividsolutions.jts.index.strtree.STRtree
-
-import dbis.stark.STObject
-import com.vividsolutions.jts.index.strtree.ItemDistance
+import com.vividsolutions.jts.geom.{Coordinate, Envelope, Geometry}
 import com.vividsolutions.jts.index.ItemVisitor
-import com.vividsolutions.jts.geom.Envelope
-import com.vividsolutions.jts.geom.Coordinate
-import com.vividsolutions.jts.index.strtree.STRtreePlus
-import com.vividsolutions.jts.index.strtree.GeometryItemDistance
-import com.vividsolutions.jts.index.strtree.ItemBoundable
+import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
+import dbis.stark.STObject
+
+import scala.collection.JavaConversions.asScalaBuffer
+import scala.reflect.ClassTag
 
 protected[indexed] class Data[G <: STObject,T](var ts: Int, val data: T, val so: G) extends Serializable
 
@@ -29,7 +20,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
   ) extends STRtreePlus[Data[G,D]](capacity)  { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
   private var timestamp = 0
-  protected[indexed] def ts = timestamp
+  protected[indexed] def ts: Int = timestamp
   
   /**
    * Insert data into the tree
@@ -37,7 +28,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param geom The geometry (key) to index
    * @param data The associated value
    */
-  def insert(geom: G, data: D) = 
+  def insert(geom: G, data: D): Unit =
     super.insert(geom.getEnvelopeInternal, new Data(-1,data, geom))
   
   /**
@@ -45,9 +36,9 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * with the query geometry
    * 
    * @param geom The geometry to compute intersection for
-   * @returns Returns all elements of the tree that intersect with the query geometry  
+   * @return Returns all elements of the tree that intersect with the query geometry
    */
-    def query(geom: STObject) = 
+    def query(geom: STObject): Iterator[D] =
       super.query(geom.getEnvelopeInternal).map(_.asInstanceOf[Data[G,D]].data).iterator
   
   /**
@@ -100,10 +91,10 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @return Returns a flat list Data
    */
   private def unnest[T](l: java.util.ArrayList[_]): List[Data[G,D]] = 
-    l.flatMap { e => e match {
-      case d: Data[G,D] => List(d)
-      case a: java.util.ArrayList[_] => unnest(a) 
-    }}.toList
+    l.flatMap {
+      case d: Data[G, D] => List(d)
+      case a: java.util.ArrayList[_] => unnest(a)
+    }.toList
   
   /**
    * Get all items in the tree
@@ -123,7 +114,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * 
    * @return Returns the list of elements that are the result of previous queries  
    */
-  def result = items.filter { d => d.ts == timestamp - 1 }.map(_.data).toList
+  def result: List[D] = items.filter { d => d.ts == timestamp - 1 }.map(_.data).toList
   
   /**
    * Query the tree to find k nearest neighbors.

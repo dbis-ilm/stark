@@ -1,11 +1,9 @@
 package dbis.stark.dbscan
 
+import dbis.stark.TestUtils
 import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.random.RandomRDDs
-import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
-import dbis.stark.TestUtils
 
 class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   var sc: SparkContext = _

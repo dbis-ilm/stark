@@ -50,7 +50,7 @@ class LiveIndexedJoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: Class
     for (
         s1 <- left.partitions; 
         s2 <- right.partitions
-        if(!checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index)))) {
+        if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
       
       parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
       idx += 1

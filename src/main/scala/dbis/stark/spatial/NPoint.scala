@@ -7,24 +7,45 @@ package dbis.stark.spatial
  */
 case class NPoint(c: Array[Double]) extends Cloneable {
   
-  require(c.size >= 2, "dimension must be >= 2")
+  require(c.length >= 2, "dimension must be >= 2")
   
-	def apply(idx:Int) = c(idx)
+	def apply(idx:Int): Double = c(idx)
 
 	/**
 	 * The dimensionality of this point 
 	 */
-	def dim = c.size
+	def dim: Int = c.length
 
 	
-	def mergeMin(other: NPoint) = NPoint(
-	    c.zip(other.c).map { case (l,r) => math.min(l, r) }
-    )
-  
-  def mergeMax(other: NPoint) = NPoint(
-      c.zip(other.c).map { case (l,r) => math.max(l, r) }
-    )
-	
+//	def mergeMin(other: NPoint) = NPoint(
+//	    c.zip(other.c).map { case (l,r) => math.min(l, r) }
+//    )
+
+//  def mergeMax(other: NPoint) = NPoint(
+//    c.zip(other.c).map { case (l,r) => math.max(l, r) }
+//  )
+
+  def mergeMin(other: NPoint): NPoint = {
+    val arr = new Array[Double](c.length)
+    var i = 0
+    while(i < c.length) {
+      arr(i) = math.min(c(i), other.c(i))
+      i += 1
+    }
+    NPoint(arr)
+  }
+
+  def mergeMax(other: NPoint): NPoint = {
+    val arr = new Array[Double](c.length)
+    var i = 0
+    while(i < c.length) {
+      arr(i) = math.max(c(i), other.c(i))
+      i += 1
+    }
+    NPoint(arr)
+  }
+
+
 	/*
 	 * Override this because we need to compare "deep", i.e.
 	 * all values instead of just the reference, which may be 
@@ -38,7 +59,7 @@ case class NPoint(c: Array[Double]) extends Cloneable {
 	/* just as we need to override equals, we also need to 
 	 * compute a deep hash code 
 	 */
-	override def hashCode() = this.c.deep.hashCode()
+	override def hashCode(): Int = this.c.deep.hashCode()
 	
 	override def toString = s"""NPoint(${c.mkString(" ")})"""
 	

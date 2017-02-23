@@ -1,27 +1,24 @@
 package dbis.stark.spatial
 
 import org.apache.spark.rdd.RDD
-import com.vividsolutions.jts.geom.Geometry
 import scala.reflect.ClassTag
-import scala.collection.mutable.Map
-import com.vividsolutions.jts.io.WKTReader
-import com.vividsolutions.jts.geom.Envelope
 
 import dbis.stark.STObject
 
 
 object SpatialGridPartitioner {
-  
-//  arr(id) = Cell(arr(id).range, arr(id).extent.extend(gExtent))
-  
+
   /**
-   * Compute the cell id of a data point
-   * 
-   * @param point The point to compute the cell id for
-   * @returns Returns the number (ID) of the cell the given point lies in
-   */
-//  private def getCellId(p: NPoint): Int = getCellId(p(0), p(1))
-  
+    * Compute the cell bounds for the given cell id
+    * @param id The ID of the cell to compute the bounds for
+    * @param numPartitions The total number of partitions
+    * @param partitionsPerDimension Number of partitions per dimensions
+    * @param minX Minimum x value
+    * @param minY Minimum y value
+    * @param xLength Length of a cell on x axis
+    * @param yLength Length of a cell on y axis
+    * @return Returns the cell object for the given ID. The cell object contains the bounds
+    */
   protected[spatial] def getCellBounds(id: Int, numPartitions: Int, partitionsPerDimension: Int, minX: Double, minY: Double, xLength: Double, yLength: Double): Cell = {
     
     require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
@@ -38,7 +35,7 @@ object SpatialGridPartitioner {
     Cell(id, NRectRange(NPoint(llx, lly), NPoint(urx, ury)))
   }
   
-   private def getCellId(_x: Double, _y: Double, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double, partitionsPerDimension: Int) = {
+  private def getCellId(_x: Double, _y: Double, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double, partitionsPerDimension: Int): Int = {
         require(_x >= minX && _x <= maxX || _y >= minY || _y <= maxY, s"(${_x},${_y}) out of range!")
     
     val x = math.floor(math.abs(_x - minX) / xLength).toInt
@@ -52,8 +49,6 @@ object SpatialGridPartitioner {
 }
 
 
-
-
 /**
  * A grid partitioner that simply applies a grid to the data space.
  * 
@@ -63,7 +58,7 @@ object SpatialGridPartitioner {
  * @author hage
  * 
  * @param partitionsPerDimension The number of partitions per dimension. This results in ppD^dimension partitions
- * @param rdd The [[org.apache.spark.RDD]] to partition
+ * @param rdd The [[org.apache.spark.rdd.RDD]] to partition
  * @param dimensions The dimensionality of the input data 
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](

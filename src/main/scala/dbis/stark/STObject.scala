@@ -64,6 +64,11 @@ case class STObject(private val g: GeoType, time: Option[TemporalExpression]) ex
    */
   def containedBy(t: STObject) = containedBySpatial(t) && containedByTemporal(t) 
   
+  def before(t: TemporalExpression) = time.map(_ < t)
+  
+  def after(t: TemporalExpression) = time.map(_ > t)
+  
+  
   /**
    * Check if this NRechtRange is equal to some other object.
    * <br><br>

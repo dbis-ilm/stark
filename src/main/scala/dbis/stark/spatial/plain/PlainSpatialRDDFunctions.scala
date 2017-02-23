@@ -81,7 +81,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
       val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
       
-      rdd.mapPartitionsWithIndex({ case (idx, iter) => 
+      rdd.mapPartitionsWithIndex({ case (idx, iter) =>
         if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(o.getGeo.getEnvelopeInternal))
           iter.filter{ case (g,_) => g.contains(o) }
         else
@@ -198,7 +198,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 	   *
 	   * We do know that there is a payload, hence calling .get is safe
 	   */
-	  val points = (if(includeNoise) model.points else model.points.filter(_.label != ClusterLabel.Noise))
+	  val points = if (includeNoise) model.points else model.points.filter(_.label != ClusterLabel.Noise)
 	  
 	  /* if the outfile is defined, write the clustering result
 	   * this can be used for debugging and visualization
@@ -236,6 +236,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     Iterator.single(tree)
   } ,
-  true) // preserve partitioning
+  preservesPartitioning = true) // preserve partitioning
 
 }

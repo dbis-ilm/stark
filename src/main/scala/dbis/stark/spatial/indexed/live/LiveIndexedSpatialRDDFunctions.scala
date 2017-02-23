@@ -71,7 +71,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }.getOrElse(true)
     
     if(partitionCheck)
-      LiveIndexedSpatialRDDFunctions.doWork(qry,iter, Predicates.intersects _, capacity)
+      LiveIndexedSpatialRDDFunctions.doWork(qry,iter, Predicates.intersects, capacity)
     else
       Iterator.empty
   })
@@ -88,7 +88,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }.getOrElse(true)
     
     if(partitionCheck) {
-      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.contains _, capacity)
+      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.contains, capacity)
     }
     else {
       Iterator.empty
@@ -105,7 +105,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }.getOrElse(true)
     
     if(partitionCheck)
-      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.containedby _, capacity)
+      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.containedby, capacity)
     else 
       Iterator.empty
   

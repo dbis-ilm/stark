@@ -19,6 +19,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
    */
   def contains(o: G): RDD[(G,V)]
 
+  def contains2(o: G): RDD[(G,V)]
+
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double): RDD[(G,V)]
       
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))]   

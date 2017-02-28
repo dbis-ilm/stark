@@ -1,10 +1,24 @@
 package dbis.stark.spatial
 
+import java.io.ObjectOutputStream
+
 import org.apache.spark.rdd.RDD
+
 import scala.reflect.ClassTag
-
 import dbis.stark.STObject
+import org.apache.spark.Partition
 
+
+case class SpatialPartition(private val idx: Int, origIndex: Int, @transient private val rdd: RDD[_]) extends Partition {
+  override def index: Int = idx
+
+  var split = rdd.partitions(origIndex)
+
+  private def writeObject(oos: ObjectOutputStream): Unit = {
+    split = rdd.partitions(origIndex)
+    oos.defaultWriteObject()
+  }
+}
 
 object SpatialGridPartitioner {
 

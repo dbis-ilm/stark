@@ -73,11 +73,26 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
 	  val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
-	  val foundGeoms = rdd.contains(q).collect()
+	  val foundGeoms = rdd.contains2(q).collect()
 	  
 	  foundGeoms.size shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
     
+  }
+
+  it should "find all elements that contain a given point with spatial partitioner" in {
+    val rdd1 = TestUtils.createRDD(sc)
+
+    val rdd = rdd1.partitionBy(new SpatialGridPartitioner(rdd1,10))
+
+    // we look for all elements that contain a given point.
+    // thus, the result should be all points in the RDD with the same coordinates
+    val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
+    val foundGeoms = rdd.contains2(q).collect()
+
+    foundGeoms.size shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
   }
   
   it should "find the correct nearest neighbors" in { 

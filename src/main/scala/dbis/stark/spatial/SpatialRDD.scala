@@ -76,7 +76,9 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    * @param g The geometry that must be contained by other geometries in this RDD
    * @return Returns an RDD consisting of all elements in this RDD that contain the given geometry g
    */
-  def contains(g: G) = new PlainSpatialRDDFunctions(this).contains(g) 
+  def contains(g: G) = new PlainSpatialRDDFunctions(this).contains(g)
+
+  def contains2(g: G) = new PlainSpatialRDDFunctions(this).contains2(g)
 
   /**
    * Find the k nearest neighbors of the given geometry in this RDD

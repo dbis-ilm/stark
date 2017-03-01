@@ -2,7 +2,7 @@ name := "stark"
 
 scalaVersion := "2.11.8"
 
-lazy val root = (project in file("."))
+lazy val stark = (project in file("."))
 
 libraryDependencies ++= Seq(
    "com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),

@@ -1,19 +1,13 @@
 package dbis.stark.spatial.indexed.live
 
 import dbis.stark.STObject
-import scala.reflect.ClassTag
-import dbis.stark.spatial.SpatialPartitioner
-import org.apache.spark.rdd.RDD
-import dbis.stark.spatial.NRectRange
-import dbis.stark.spatial.NPoint
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.Predicates
-import dbis.stark.spatial.SpatialRDDFunctions
-
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.JoinPredicate._
-import dbis.stark.spatial.Utils
-import dbis.stark.spatial.plain.PlainSpatialRDDFunctions
+import dbis.stark.spatial._
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.plain.{PlainSpatialRDDFunctions, SpatialFilterRDD}
+import org.apache.spark.rdd.RDD
+
+import scala.reflect.ClassTag
 
 
 object LiveIndexedSpatialRDDFunctions {
@@ -94,7 +88,9 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       Iterator.empty
     }
   
-    }) 
+    })
+
+  def contains2(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINS, capacity)
 
   def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
     val partitionCheck = rdd.partitioner.forall { p =>

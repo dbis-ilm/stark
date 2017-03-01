@@ -1,6 +1,5 @@
 package dbis.stark.spatial
 
-import scala.reflect.ClassTag
 import dbis.stark.STObject
 
 object JoinPredicate extends Enumeration {
@@ -8,9 +7,9 @@ object JoinPredicate extends Enumeration {
   val INTERSECTS, CONTAINS, CONTAINEDBY = Value
   
   def predicateFunction(pred: JoinPredicate): (STObject, STObject) => Boolean = pred match {
-    case INTERSECTS => Predicates.intersects _
-    case CONTAINS => Predicates.contains _
-    case CONTAINEDBY => Predicates.containedby _
+    case INTERSECTS => Predicates.intersects
+    case CONTAINS => Predicates.contains
+    case CONTAINEDBY => Predicates.containedby
   }
 }
 

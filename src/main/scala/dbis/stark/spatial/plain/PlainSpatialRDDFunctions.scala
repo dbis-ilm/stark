@@ -1,27 +1,15 @@
 package dbis.stark.spatial.plain
 
-import scala.reflect.ClassTag
-
-import org.apache.spark.rdd.RDD
-import org.apache.spark.rdd.ShuffledRDD
-import org.apache.spark.mllib.linalg.Vectors
-
 import dbis.stark.STObject
-import dbis.stark.spatial.SpatialRDD
-import dbis.stark.spatial.SpatialGridPartitioner
-import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial.SpatialPartitioner
-import dbis.stark.spatial.BSPartitioner
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.dbscan.DBScan
-import dbis.stark.dbscan.ClusterLabel
-import dbis.stark.spatial.Utils
-import dbis.stark.spatial.NRectRange
-import dbis.stark.spatial.NPoint
-import dbis.stark.spatial.SpatialRDDFunctions
+import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.JoinPredicate._
-import dbis.stark.spatial.Predicates
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
+import dbis.stark.spatial.{JoinPredicate, SpatialPartitioner, SpatialRDDFunctions, Utils}
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.rdd.RDD
+
+import scala.reflect.ClassTag
 
 
 /**
@@ -48,7 +36,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           Iterator.empty
       })
     } else {
-    
+
       rdd.filter{ case (g,_) => qry.intersects(g) }
     }
   }
@@ -80,7 +68,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
     if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
       val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
-      
       rdd.mapPartitionsWithIndex({ case (idx, iter) =>
         if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(o.getGeo.getEnvelopeInternal))
           iter.filter{ case (g,_) => g.contains(o) }
@@ -92,6 +79,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       rdd.filter{ case (g,_) => g.contains(o) }
     }
   }
+
+  def contains2(o: G) = new SpatialFilterRDD[G,V](rdd, o, JoinPredicate.CONTAINS)
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
     rdd.filter{ case (g,_) => distFunc(qry,g) <= maxDist }

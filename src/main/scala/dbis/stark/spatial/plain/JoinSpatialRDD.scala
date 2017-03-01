@@ -1,22 +1,13 @@
 package dbis.stark.spatial.plain
 
-import scala.reflect.ClassTag
-import scala.collection.mutable.ListBuffer
-
-import org.apache.spark.Partition
-import org.apache.spark.TaskContext
-import org.apache.spark.rdd.RDD
-import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.InterruptibleIterator
-
-import dbis.stark.spatial.SpatialRDD
 import dbis.stark.STObject
-import dbis.stark.spatial.SpatialPartitioner
-import dbis.stark.spatial.Utils
-import dbis.stark.spatial.JoinPredicate
-import org.apache.spark.Dependency
-import org.apache.spark.NarrowDependency
+import dbis.stark.spatial.{JoinPredicate, SpatialPartitioner}
+import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
+import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.rdd.RDD
+
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 
 class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
     var left: RDD[(G,V)], 
@@ -85,10 +76,12 @@ class JoinSpatialRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
   override def compute(s: Partition, context: TaskContext): Iterator[(V,V2)] = {
     val split = s.asInstanceOf[CartesianPartition]
     
-    val rightList = right.iterator(split.s2, context).toList
-    
+    val rightList = right.iterator(split.s2, context).toArray
+
     left.iterator(split.s1, context).flatMap{ case (lg, lv) =>
-      rightList.filter{ case (rg, _) => predicate(lg,rg)}.map{ case (_,rv) => (lv,rv) }  
+        rightList.view.filter{ case (rg, _) => predicate(lg,rg)}.map{ case (_,rv) => (lv,rv) }
+
+//      rightList.filter{ case (rg, _) => predicate(lg,rg)}.map{ case (_,rv) => (lv,rv) }
     }
     
     

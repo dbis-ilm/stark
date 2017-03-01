@@ -1,31 +1,14 @@
 package dbis.stark.spatial.indexed.persistent
 
-import scala.reflect.ClassTag
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.ListBuffer
-
-import java.io.IOException
-import java.io.ObjectOutputStream
-
-import org.apache.spark.Dependency
-import org.apache.spark.util.collection.ExternalAppendOnlyMap
-import org.apache.spark.InterruptibleIterator
-
-import org.apache.spark.rdd.RDD
-import org.apache.spark.Partition
-import org.apache.spark.TaskContext
-import org.apache.spark.OneToOneDependency
-import org.apache.spark.SparkEnv
-
-import dbis.stark.spatial.SpatialRDD
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.STObject
-import dbis.stark.spatial.Utils
-import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.{JoinPredicate, SpatialPartitioner}
+import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.plain.CartesianPartition
-import org.apache.spark.NarrowDependency
-import com.vividsolutions.jts.geom.Envelope
+import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
+import org.apache.spark.rdd.RDD
+
+import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 
 
 class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
@@ -38,27 +21,37 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 
   val predicateFunction = JoinPredicate.predicateFunction(pred)
 
-  private lazy val rightParti = {
-    val p = right.partitioner 
-      if(p.isDefined) {
-        p.get match {
-          case sp: SpatialPartitioner => Some(sp)
-          case _ => None
-        }
-      } else 
-        None
+  private lazy val rightParti = right.partitioner.flatMap {
+    case sp: SpatialPartitioner => Some(sp)
+    case _ => None
   }
+//  {
+
+
+//    val p = right.partitioner
+//      if(p.isDefined) {
+//        p.get match {
+//          case sp: SpatialPartitioner => Some(sp)
+//          case _ => None
+//        }
+//      } else
+//        None
+//  }
   
-  private lazy val leftParti = {
-    val p = left.partitioner 
-      if(p.isDefined) {
-        p.get match {
-          case sp: SpatialPartitioner => Some(sp)
-          case _ => None
-        }
-      } else 
-        None
+  private lazy val leftParti = left.partitioner.flatMap {
+    case sp: SpatialPartitioner => Some(sp)
+    case _ => None
   }
+//  {
+//    val p = left.partitioner
+//      if(p.isDefined) {
+//        p.get match {
+//          case sp: SpatialPartitioner => Some(sp)
+//          case _ => None
+//        }
+//      } else
+//        None
+//  }
   
   override def getPartitions: Array[Partition] = {
 //    // create the cross product split
@@ -76,7 +69,7 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
     for (
         s1 <- left.partitions; 
         s2 <- right.partitions
-        if(!checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index)))) {
+        if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
       
       parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
       idx += 1

@@ -55,7 +55,7 @@ object LiveIndexedSpatialRDDFunctions {
   
 }
 
-class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
+class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)],
     capacity: Int
   ) extends SpatialRDDFunctions[G,V] with Serializable {
@@ -63,12 +63,12 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 //    new LiveIndexedFilterSpatialRDD(qry, capacity, Predicates.intersects _, rdd) 
   def intersects(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
     
-    val partitionCheck = rdd.partitioner.map { p =>
+    val partitionCheck = rdd.partitioner.forall { p =>
       p match {
         case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(qry.getGeo.getEnvelopeInternal)
         case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
       }
-    }.getOrElse(true)
+    }
     
     if(partitionCheck)
       LiveIndexedSpatialRDDFunctions.doWork(qry,iter, Predicates.intersects, capacity)
@@ -78,14 +78,14 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     
 
   def contains(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    val partitionCheck = rdd.partitioner.map { p =>
+    val partitionCheck = rdd.partitioner.forall { p =>
       p match {
-        case sp: SpatialPartitioner => 
+        case sp: SpatialPartitioner =>
           Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-        case _ => 
+        case _ =>
           true
       }
-    }.getOrElse(true)
+    }
     
     if(partitionCheck) {
       LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.contains, capacity)
@@ -97,12 +97,12 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }) 
 
   def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    val partitionCheck = rdd.partitioner.map { p =>
+    val partitionCheck = rdd.partitioner.forall { p =>
       p match {
-        case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+        case sp: SpatialPartitioner => qry.getGeo.getEnvelopeInternal.contains(Utils.toEnvelope(sp.partitionBounds(idx).extent))
         case _ => true
       }
-    }.getOrElse(true)
+    }
     
     if(partitionCheck)
       LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.containedby, capacity)
@@ -138,12 +138,12 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
     val r = rdd.mapPartitionsWithIndex({(idx,iter) =>
-              val partitionCheck = rdd.partitioner.map { p =>
+              val partitionCheck = rdd.partitioner.forall { p =>
                 p match {
                   case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
                   case _ => true
                 }
-              }.getOrElse(true)
+              }
               
               if(partitionCheck) {
                 val tree = new RTree[G,(G,V)](capacity)

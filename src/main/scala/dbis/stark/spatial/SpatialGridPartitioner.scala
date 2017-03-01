@@ -57,7 +57,7 @@ object SpatialGridPartitioner {
  * 
  * @author hage
  * 
- * @param partitionsPerDimension The number of partitions per dimension. This results in ppD^dimension partitions
+ * @param partitionsPerDimension The number of partitions per dimension. This results in ppD to the power of dimension partitions
  * @param rdd The [[org.apache.spark.rdd.RDD]] to partition
  * @param dimensions The dimensionality of the input data 
  */
@@ -87,11 +87,11 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     this(rdd, partitionsPerDimension, withExtent, SpatialPartitioner.getMinMax(rdd), dimensions)
   
   
-  protected[this] val xLength = (math.abs(maxX - minX) / partitionsPerDimension )
-  protected[this] val yLength = (math.abs(maxY - minY) / partitionsPerDimension )
+  protected[this] val xLength: Double = math.abs(maxX - minX) / partitionsPerDimension
+  protected[this] val yLength: Double = math.abs(maxY - minY) / partitionsPerDimension
   
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
-  private var partitions = {
+  private val partitions = {
     val arr = Array.tabulate(numPartitions){ i => SpatialGridPartitioner.getCellBounds(i, numPartitions, partitionsPerDimension, minX, minY, xLength, yLength) }
     
     if(withExtent) {
@@ -116,9 +116,9 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   }
   
   
-  override def partitionBounds(idx: Int) = partitions(idx) //getCellBounds(idx)
+  override def partitionBounds(idx: Int): Cell = partitions(idx) //getCellBounds(idx)
   
-  override def partitionExtent(idx: Int) = partitions(idx).extent
+  override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
   
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 

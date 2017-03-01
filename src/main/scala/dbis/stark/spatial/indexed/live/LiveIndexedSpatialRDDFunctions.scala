@@ -95,7 +95,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
     val partitionCheck = rdd.partitioner.forall { p =>
       p match {
-        case sp: SpatialPartitioner => qry.getGeo.getEnvelopeInternal.contains(Utils.toEnvelope(sp.partitionBounds(idx).extent))
+        case sp: SpatialPartitioner => qry.getGeo.getEnvelopeInternal.intersects(Utils.toEnvelope(sp.partitionBounds(idx).extent))
         case _ => true
       }
     }

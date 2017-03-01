@@ -47,51 +47,51 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   //##############################################################################
   
   
-  "An INDEXED SpatialRDD" should "find the correct intersection result for points (RO)" in { 
-    
-    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-    
-//    val parti = rdd.partitioner.get.asInstanceOf[BSPartitioner[STObject, (STObject, (String, Int, String, STObject))]]
-    
-//    parti.printHistogram("/home/hage/histo")
-//    parti.printPartitions("/home/hage/parts")
-    
-    val start = System.currentTimeMillis()
-    val foundPoints = rdd.intersectsRO(qry).flatten.collect()
-    val end = System.currentTimeMillis()
-    println(s"intersect + flatten: ${end - start} ms")
-    
-    withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
-    
-    foundPoints.foreach{ case (p, _) => qry.intersects(p) shouldBe true }
-    
-  }
-  
-  it should "find all elements contained by a query (RO)" in { 
-    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-    
-    val start = System.currentTimeMillis()
-    val foundPoints = rdd.containedbyRO(qry).flatten.collect()
-    val end = System.currentTimeMillis()
-    println(s"contaiedby + flatten: ${end - start} ms")
-    
-    withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
-  }
-  
-  it should "find all elements that contain a given point (RO)" in { 
-	  val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-	  
-	  // we look for all elements that contain a given point. 
-	  // thus, the result should be all points in the RDD with the same coordinates
-	  val q = STObject("POINT (53.483437 -2.2040706)")
-	  val foundGeoms = rdd.containsRO(q).flatten.collect()
-	  
-	  foundGeoms.size shouldBe 6
-	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
-    
-  }
-  
-  it should "find the correct intersection result for points" in { 
+//  "An INDEXED SpatialRDD" should "find the correct intersection result for points (RO)" in {
+//
+//    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+//
+////    val parti = rdd.partitioner.get.asInstanceOf[BSPartitioner[STObject, (STObject, (String, Int, String, STObject))]]
+//
+////    parti.printHistogram("/home/hage/histo")
+////    parti.printPartitions("/home/hage/parts")
+//
+//    val start = System.currentTimeMillis()
+//    val foundPoints = rdd.intersectsRO(qry).flatten.collect()
+//    val end = System.currentTimeMillis()
+//    println(s"intersect + flatten: ${end - start} ms")
+//
+//    withClue("wrong number of intersected points") { foundPoints.size shouldBe 36 } // manually counted
+//
+//    foundPoints.foreach{ case (p, _) => qry.intersects(p) shouldBe true }
+//
+//  }
+//
+//  it should "find all elements contained by a query (RO)" in {
+//    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+//
+//    val start = System.currentTimeMillis()
+//    val foundPoints = rdd.containedbyRO(qry).flatten.collect()
+//    val end = System.currentTimeMillis()
+//    println(s"contaiedby + flatten: ${end - start} ms")
+//
+//    withClue("wrong number of points contained by query object") { foundPoints.size shouldBe 36 } // manually counted
+//  }
+//
+//  it should "find all elements that contain a given point (RO)" in {
+//	  val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+//
+//	  // we look for all elements that contain a given point.
+//	  // thus, the result should be all points in the RDD with the same coordinates
+//	  val q = STObject("POINT (53.483437 -2.2040706)")
+//	  val foundGeoms = rdd.containsRO(q).flatten.collect()
+//
+//	  foundGeoms.size shouldBe 6
+//	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
+//
+//  }
+
+  "An INDEXED SpatialRDD" should "find the correct intersection result for points" in {
     
     val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
     
@@ -288,21 +288,21 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     }
   }
   
-  it should "have correct types for chained executions" in  {
-    val q = STObject("POINT (53.483437 -2.2040706)")
-    val rdd1 = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-    val res = rdd1.contains(q)
-    
-    res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
-    
-    val res2 = res.intersects(qry)
-    res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
-
-    val res3 = res2.join(rdd1.flatten, (g1, g2) => false)
-    
-    res3.collect().size shouldBe 0
-    
-  }
+//  it should "have correct types for chained executions" in  {
+//    val q = STObject("POINT (53.483437 -2.2040706)")
+//    val rdd1 = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+//    val res = rdd1.contains(q)
+//
+//    res.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
+//
+//    val res2 = res.intersects(qry)
+//    res2.isInstanceOf[RDD[RTree[STObject, (STObject, (String, Int, String, STObject))]]] shouldBe true
+//
+//    val res3 = res2.join(rdd1.flatten, (g1, g2) => false)
+//
+//    res3.collect().size shouldBe 0
+//
+//  }
   
   it should "intersect with temporal instant" in {
     

@@ -6,7 +6,7 @@ package dbis.stark
  * Internally, an instant is represented as an interval with (l, l+1], i.e. we're 
  * simply adding one to the instants value
  * 
- * @param l The actual time as a long, e.g. seconds since Epoch. 
+ * @param _l The actual time as a long, e.g. seconds since Epoch.
  * 
  */
 case class Instant(

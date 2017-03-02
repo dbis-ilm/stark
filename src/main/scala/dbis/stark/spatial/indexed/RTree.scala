@@ -1,14 +1,13 @@
 package dbis.stark.spatial.indexed
 
 import com.vividsolutions.jts.geom.{Coordinate, Envelope, Geometry}
-import com.vividsolutions.jts.index.ItemVisitor
 import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
 import dbis.stark.STObject
 
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.reflect.ClassTag
 
-protected[indexed] class Data[G <: STObject,T](var ts: Int, val data: T, val so: G) extends Serializable
+protected[indexed] class Data[G <: STObject,T](/*var ts: Int, */val data: T, val so: G) extends Serializable
 
 /**
  * A R-Tree abstraction based on VividSolution's ST R-Tree implementation
@@ -19,8 +18,8 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
   ) extends STRtreePlus[Data[G,D]](capacity)  { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
-  private var timestamp = 0
-  protected[indexed] def ts: Int = timestamp
+//  private var timestamp = 0
+//  protected[indexed] def ts: Int = timestamp
   
   /**
    * Insert data into the tree
@@ -29,7 +28,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param data The associated value
    */
   def insert(geom: G, data: D): Unit =
-    super.insert(geom.getEnvelopeInternal, new Data(-1,data, geom))
+    super.insert(geom.getEnvelopeInternal, new Data(/*-1,*/data, geom))
   
   /**
    * Query the tree and find all elements in the tree that intersect
@@ -46,18 +45,18 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * 
    * A query only increases the timestamp of an item.
    */
-  def queryRO(qry: STObject, pred: (STObject, STObject) => Boolean) = doQueryRO(qry, qry.getEnvelopeInternal, pred)
+//  def queryRO(qry: STObject, pred: (STObject, STObject) => Boolean) = doQueryRO(qry, qry.getEnvelopeInternal, pred)
   
-  def withinDistanceRO(qry: STObject, distFunc: (STObject,STObject) => Double, maxDist: Double) = {
-    val env = qry.getGeo.getEnvelopeInternal
-    val env2 = new Envelope(
-        new Coordinate(env.getMinX - maxDist - 1, env.getMinY - maxDist - 1), 
-        new Coordinate(env.getMaxX + maxDist + 1, env.getMaxY + maxDist + 1))
-    
-    def pred(g1: STObject, g2: STObject) = distFunc(g1,g2) <= maxDist 
-    
-    doQueryRO(qry, env2, pred) 
-  }
+//  def withinDistanceRO(qry: STObject, distFunc: (STObject,STObject) => Double, maxDist: Double) = {
+//    val env = qry.getGeo.getEnvelopeInternal
+//    val env2 = new Envelope(
+//        new Coordinate(env.getMinX - maxDist - 1, env.getMinY - maxDist - 1),
+//        new Coordinate(env.getMaxX + maxDist + 1, env.getMaxY + maxDist + 1))
+//
+//    def pred(g1: STObject, g2: STObject) = distFunc(g1,g2) <= maxDist
+//
+//    doQueryRO(qry, env2, pred)
+//  }
   
   
   def withinDistance(qry: STObject, distFunc: (STObject,STObject) => Double, maxDist: Double) = {
@@ -69,19 +68,19 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
     super.query(env2).map(_.asInstanceOf[Data[G,D]]).iterator.filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
   }
   
-  private def doQueryRO(qry: STObject, env: Envelope, pred: (STObject, STObject) => Boolean) = {
-    class MyVisitor(ts: Int) extends ItemVisitor {
-      
-      override def visitItem(item: Any) {
-        val i = item.asInstanceOf[Data[G,D]]
-        if(i.ts == ts - 1 && pred(i.so, qry) )
-          i.ts += 1
-      }
-    }
-    
-    super.query(env, new MyVisitor(timestamp))
-    timestamp += 1 // increment timestamp for next query
-  }
+//  private def doQueryRO(qry: STObject, env: Envelope, pred: (STObject, STObject) => Boolean) = {
+//    class MyVisitor(ts: Int) extends ItemVisitor {
+//
+//      override def visitItem(item: Any) {
+//        val i = item.asInstanceOf[Data[G,D]]
+//        if(i.ts == ts - 1 && pred(i.so, qry) )
+//          i.ts += 1
+//      }
+//    }
+//
+//    super.query(env, new MyVisitor(timestamp))
+//    timestamp += 1 // increment timestamp for next query
+//  }
   
   /**
    * Helper method to convert and unnest a list of Data elements into 
@@ -114,7 +113,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * 
    * @return Returns the list of elements that are the result of previous queries  
    */
-  def result: List[D] = items.filter { d => d.ts == timestamp - 1 }.map(_.data).toList
+//  def result: List[D] = items.filter { d => d.ts == timestamp - 1 }.map(_.data).toList
   
   /**
    * Query the tree to find k nearest neighbors.

@@ -17,6 +17,7 @@ libraryDependencies ++= Seq(
 )
 
 test in assembly := {}
+
 logBuffered in Test := false
 
 parallelExecution in Test := false

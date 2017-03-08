@@ -10,8 +10,11 @@ import org.apache.spark.rdd.RDD
 
 object TesterUtil {
   def main(args: Array[String]) {
-println("asd")
-    val arr = "-fs src/test/resources/ -p 38 -ar -sf 0.1 -tp -si 10k_1-10000.csv".split(" ")
+    //println("asd")
+    var arr = args
+
+    // damit ich nicht ständig die run configurations ändern muss
+    //arr = "-fs src/test/resources/ -p 38 -ar -sf 0.1 -tp -si 10k_1-10000.csv".split(" ")
 
    new TesterUtil().mainMethod(arr)
   }

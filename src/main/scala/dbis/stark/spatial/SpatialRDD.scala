@@ -60,7 +60,7 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Compute an intersection of the elements in this RDD with the given geometry
    */
-  def intersects(qry: G) = new PlainSpatialRDDFunctions(this).intersects(qry) 
+  def intersects(qry: G) = new PlainSpatialRDDFunctions(this).intersects2(qry)
 
   /**
    * Find all elements that are contained by the given geometry
@@ -68,7 +68,7 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    * @param qry The Geometry that should contains elements of this RDD
    * @return Returns an RDD containing the elements of this RDD that are completely contained by qry
    */
-  def containedby(qry: G) = new PlainSpatialRDDFunctions(this).containedby(qry)
+  def containedby(qry: G) = new PlainSpatialRDDFunctions(this).containedby2(qry)
 
   /**
    * Find all elements that contain the given geometry.
@@ -76,7 +76,7 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    * @param g The geometry that must be contained by other geometries in this RDD
    * @return Returns an RDD consisting of all elements in this RDD that contain the given geometry g
    */
-  def contains(g: G) = new PlainSpatialRDDFunctions(this).contains(g)
+  def contains(g: G) = new PlainSpatialRDDFunctions(this).contains2(g)
 
   def contains2(g: G) = new PlainSpatialRDDFunctions(this).contains2(g)
 

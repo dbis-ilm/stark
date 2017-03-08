@@ -1,23 +1,33 @@
 package dbis.stark.spatial.plain
 
-import dbis.stark.STObject
-import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.{TestUtil, STObject}
+import dbis.stark.spatial.JoinPredicate._
+
 import dbis.stark.spatial._
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.{IntervalTree1, RTree}
+import dbis.stark.spatial.plain.IndexTyp.IndexTyp
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
+
 /**
   * Created by hg on 24.02.17.
   */
-class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
-  private val parent: RDD[(G,V)],
-  qry: STObject,
-  predicate: JoinPredicate,
-  treeOrder: Int = -1) extends SpatialRDD[G,V](parent) {
+object IndexTyp extends Enumeration {
+  type IndexTyp = Value
+  val NONE, SPATIAL, TEMPORAL = Value
+
+}
+
+class SpatialFilterRDD[G <: STObject : ClassTag, V: ClassTag](
+                                                               private val parent: RDD[(G, V)],
+                                                               qry: G,
+                                                               predicate: JoinPredicate,
+                                                               indexType: IndexTyp = IndexTyp.NONE,
+                                                               treeOrder: Int = -1) extends SpatialRDD[G, V](parent) {
 
   /**
     * Return the partitions that have to be processed.
@@ -26,37 +36,74 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
     * is present, we check if the partition can contain candidates. If not, it is not returned
     * here.
     *
-    *
     * @return The list of partitions of this RDD
     */
-  override def getPartitions: Array[Partition] = partitioner.map{
-      case sp: SpatialPartitioner => {
+  override def getPartitions: Array[Partition] = partitioner.map {
+    case sp: SpatialPartitioner => {
 
-        val spatialParts = ListBuffer.empty[Partition]
+      val spatialParts = ListBuffer.empty[Partition]
 
-        val qryEnv = qry.getGeo.getEnvelopeInternal
-        var i = 0
-        var cnt = 0
-        val numParentParts = parent.getNumPartitions
-        while (i < numParentParts) {
+      val qryEnv = qry.getGeo.getEnvelopeInternal
+      var i = 0
+      var cnt = 0
+      val numParentParts = parent.getNumPartitions
+      while (i < numParentParts) {
 
-          val cell = sp.partitionBounds(i)
+        val cell = sp.partitionBounds(i)
 
-          if (Utils.toEnvelope(cell.extent).contains(qryEnv)) {
-            spatialParts += SpatialPartition(cnt, i, parent)
-            cnt += 1
-          }
-
-          i += 1
+        if (Utils.toEnvelope(cell.extent).contains(qryEnv)) {
+          spatialParts += SpatialPartition(cnt, i, parent)
+          cnt += 1
         }
 
-        spatialParts.toArray
-//        parent.partitions
+        i += 1
       }
 
-      case _ =>
-        parent.partitions
-    }.getOrElse(parent.partitions)
+      spatialParts.toArray
+      //        parent.partitions
+    }case tp: TemporalPartitioner => {
+
+      val spatialParts = ListBuffer.empty[Partition]
+
+      val qryEnv = qry.getGeo.getEnvelopeInternal
+      var i = 0
+      var cnt = 0
+      val numParentParts = parent.getNumPartitions
+      while (i < numParentParts) {
+
+        predicate match {
+          case INTERSECTS => {
+            if ( tp.partitionBounds(i).start<=(qry.getTemp.get.end.get)) {
+              spatialParts += SpatialPartition(cnt, i, parent)
+              cnt += 1
+            }
+          }
+          case CONTAINEDBY => {
+            if ( tp.partitionBounds(i).intersects(qry.getTemp.get)) {
+              spatialParts += SpatialPartition(cnt, i, parent)
+              cnt += 1
+            }
+          }
+          case CONTAINS => {
+            if (tp.partitionBounds(i).start<=(qry.getTemp.get.start)) {
+             spatialParts += SpatialPartition(cnt, i, parent)
+              cnt += 1
+            }
+          }
+        }
+
+
+
+        i += 1
+      }
+
+      spatialParts.toArray
+      //        parent.partitions
+    }
+
+    case _ =>
+      parent.partitions
+  }.getOrElse(parent.partitions)
 
 
   @DeveloperApi
@@ -73,21 +120,35 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
       case _ => inputSplit
     }
 
-    // distinguish between no and live indexing
-    if(treeOrder <= 0) {
-      parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
-    } else {
-      val tree = new RTree[G,(G,V)](treeOrder)
 
-      // insert everything into the tree
-      parent.iterator(split, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
+    indexType match {
+      case IndexTyp.NONE => {
+        parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
+      }
 
-      // build the tree
-      tree.build()
+      case IndexTyp.SPATIAL => {
+        val tree = new RTree[G, (G, V)](treeOrder)
+        // insert everything into the tree
+        parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
+        // build the tree
+        tree.build()
+        // query tree and perform candidates check
+        tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
+      }
 
-      // query tree and perform candidates check
-      tree.query(qry).filter{ case (g, _) => predicateFunc(g, qry) }
+      case IndexTyp.TEMPORAL => {
+        val indexTree = new IntervalTree1[G, V]()
+        // insert everything into the tree
+        parent.iterator(split, context).foreach { case (g, v) => indexTree.insert(g, (g, v)) }
+        indexTree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
+      }
+
+      case _ => {
+        parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
+      }
+
+
     }
-
   }
+
 }

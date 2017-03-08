@@ -11,6 +11,24 @@ import java.time.LocalDate
 
 
 object TestUtils {
+  def createIntervalRDD(
+                         sc: SparkContext,
+                         file: String = "src/test/resources/intervaltest.csv",
+                         sep: Char = ';',
+                         numParts: Int = 8,
+                         distinct: Boolean = false) = {
+
+    val rdd = sc.textFile(file, if(distinct) 1 else numParts) // let's start with only one partition and repartition later
+      .map { line => line.split(sep) }
+      .map { arr =>
+        (arr(0), STObject(arr(1),Interval(arr(2).toInt, arr(3).toInt))) }
+      .keyBy( _._2)
+
+    if(distinct)
+      TestUtils.distinct(rdd).repartition(numParts)
+    else
+      rdd
+  }
 
   case class FileOperationError(msg: String) extends RuntimeException(msg)
 

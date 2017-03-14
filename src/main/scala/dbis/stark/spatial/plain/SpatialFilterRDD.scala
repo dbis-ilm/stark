@@ -1,6 +1,6 @@
 package dbis.stark.spatial.plain
 
-import dbis.stark.{TestUtil, STObject}
+import dbis.stark.{Interval, TestUtil, STObject}
 import dbis.stark.spatial.JoinPredicate._
 
 import dbis.stark.spatial._
@@ -73,19 +73,27 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V: ClassTag](
 
         predicate match {
           case INTERSECTS => {
-            if ( tp.partitionBounds(i).start<=(qry.getTemp.get.end.get)) {
-              spatialParts += SpatialPartition(cnt, i, parent)
-              cnt += 1
-            }
-          }
-          case CONTAINEDBY => {
             if ( tp.partitionBounds(i).intersects(qry.getTemp.get)) {
               spatialParts += SpatialPartition(cnt, i, parent)
               cnt += 1
             }
           }
+          case CONTAINEDBY => {
+            val newi = {
+              if (i == tp.numPartitions) {
+                  tp.partitionBounds(i)
+              } else {
+                 Interval(tp.partitionBounds(i).start,tp.partitionBounds(i+1).start)
+              }
+            }
+            if ( newi.intersects(qry.getTemp.get)) {
+              spatialParts += SpatialPartition(cnt, i, parent)
+              cnt += 1
+            }
+          }
           case CONTAINS => {
-            if (tp.partitionBounds(i).start<=(qry.getTemp.get.start)) {
+            //println(tp.partitionBounds(i).contains(qry.getTemp.get))
+            if (tp.partitionBounds(i).contains(qry.getTemp.get)) {
              spatialParts += SpatialPartition(cnt, i, parent)
               cnt += 1
             }

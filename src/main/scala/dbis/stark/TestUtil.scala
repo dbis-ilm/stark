@@ -225,12 +225,12 @@ class TestUtil {
         }
         case 1 => {
           println("using Method intersects")
-          val tmp = indexData.intersects(searchData)
+          val tmp = indexData.intersects2(searchData)
           res = tmp.collect()
         }
         case 2 => {
           println("using Method containedby")
-          val tmp = indexData.containedby(searchData)
+          val tmp = indexData.containedby2(searchData)
           res = tmp.collect()
         }
         case 3 => {

@@ -2,11 +2,11 @@ package dbis.stark.spatial
 
 import java.io.ObjectOutputStream
 
+import dbis.stark.STObject
+import org.apache.spark.Partition
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
-import dbis.stark.STObject
-import org.apache.spark.Partition
 
 
 case class SpatialPartition(private val idx: Int, origIndex: Int, @transient private val rdd: RDD[_]) extends Partition {
@@ -105,10 +105,30 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[this] val yLength: Double = math.abs(maxY - minY) / partitionsPerDimension
   
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
-  private val partitions = {
+  private val partitions: Array[Cell] = {
     val arr = Array.tabulate(numPartitions){ i => SpatialGridPartitioner.getCellBounds(i, numPartitions, partitionsPerDimension, minX, minY, xLength, yLength) }
     
-    if(withExtent) {
+    /*val arr = */if(withExtent) {
+
+//      def seqOp(m: Array[Cell], c: (Int, NRectRange)): Array[Cell] = {
+//        if(m(c._1) != null)
+//          m(c._1).extend(c._2)
+//        else
+//          m(c._1) = Cell(c._1, c._2)
+//
+//        m
+//      }
+//
+//      def combOp(l: Array[Cell], r:  Array[Cell]):  Array[Cell] = {
+//        l.foreach{cell =>
+//          if(cell != null)
+//            seqop(r, (cell.id, cell.extent)) }
+//
+//        l
+//      }
+//
+//
+//      val a = new Array[Cell](numPartitions)
       rdd.map{ case (g,_) =>
         val center = g.getCentroid
       
@@ -124,7 +144,10 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
       .foreach { case (id, extent) =>
         arr(id) = Cell(arr(id).range, extent)
       }
-    }
+//        .aggregate(Array.empty[Cell])(seqOp, combOp)
+    } /*else {
+      Array.tabulate(numPartitions){ i => SpatialGridPartitioner.getCellBounds(i, numPartitions, partitionsPerDimension, minX, minY, xLength, yLength) }
+    }*/
     
     arr
   }

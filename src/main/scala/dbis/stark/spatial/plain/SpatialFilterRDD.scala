@@ -6,7 +6,7 @@ import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTree
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, TaskContext}
+import org.apache.spark.{Partition, TaskContext, rdd}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -31,6 +31,9 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
     */
   override def getPartitions: Array[Partition] = partitioner.map{
       case sp: SpatialPartitioner => {
+
+        parent.join(parent)
+
 
         val spatialParts = ListBuffer.empty[Partition]
 

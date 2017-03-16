@@ -7,7 +7,6 @@ import org.apache.spark.rdd.RDD
 abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] extends Serializable {
   
   def intersects(qry: G): RDD[(G,V)]
-    
 
   /**
    * Find all elements that are contained by a given query geometry
@@ -19,7 +18,6 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
    */
   def contains(o: G): RDD[(G,V)]
 
-  def contains2(o: G): RDD[(G,V)]
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double): RDD[(G,V)]
       

@@ -10,102 +10,16 @@ import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
 
 
-object LiveIndexedSpatialRDDFunctions {
-  
-  private def doWork[G <: STObject : ClassTag, V: ClassTag](
-      qry: G,
-      iter: Iterator[(G,V)], 
-      predicate: (STObject, STObject) => Boolean,
-      capacity: Int) = {
-    
-    val indexTree = new RTree[G,(G,V)](capacity)
-    
-    // Build our index live on-the-fly
-    iter.foreach{ case (geom, data) =>
-      /* we insert a pair of (geom, data) because we want the tupled
-       * structure as a result so that subsequent RDDs build from this 
-       * result can also be used as SpatialRDD
-       */
-      indexTree.insert(geom, (geom,data))
-    }
-    indexTree.build()
-    
-    
-    // now query the index
-    val result = indexTree.query(qry)
-    
-    /* The result of a r-tree query are all elements that 
-     * intersect with the MBB of the query region. Thus, 
-     * for all result elements we need to check if they
-     * really intersect with the actual geometry
-     */
-    result.filter{ case (g,_) => 
-    
-      predicate(g,qry) 
-      
-    }
-    
-  }
-  
-}
-
 class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)],
     capacity: Int
   ) extends SpatialRDDFunctions[G,V] with Serializable {
 
-//    new LiveIndexedFilterSpatialRDD(qry, capacity, Predicates.intersects _, rdd) 
-  def intersects(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    
-    val partitionCheck = rdd.partitioner.forall { p =>
-      p match {
-        case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).contains(qry.getGeo.getEnvelopeInternal)
-        case _ => true // a non spatial partitioner was used. thus we cannot be sure if we could exclude this partition and hence have to check it
-      }
-    }
-    
-    if(partitionCheck)
-      LiveIndexedSpatialRDDFunctions.doWork(qry,iter, Predicates.intersects, capacity)
-    else
-      Iterator.empty
-  })
-    
+  def intersects(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.INTERSECTS, capacity)
 
-  def contains(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    val partitionCheck = rdd.partitioner.forall { p =>
-      p match {
-        case sp: SpatialPartitioner =>
-          Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-        case _ =>
-          true
-      }
-    }
-    
-    if(partitionCheck) {
-      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.contains, capacity)
-    }
-    else {
-      Iterator.empty
-    }
-  
-    })
+  def contains(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINS, capacity)
 
-  def contains2(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINS, capacity)
-
-  def containedby(qry: G) = rdd.mapPartitionsWithIndex({(idx,iter) =>
-    val partitionCheck = rdd.partitioner.forall { p =>
-      p match {
-        case sp: SpatialPartitioner => qry.getGeo.getEnvelopeInternal.intersects(Utils.toEnvelope(sp.partitionBounds(idx).extent))
-        case _ => true
-      }
-    }
-    
-    if(partitionCheck)
-      LiveIndexedSpatialRDDFunctions.doWork(qry, iter, Predicates.containedby, capacity)
-    else 
-      Iterator.empty
-  
-    }) 
+  def containedby(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINEDBY, capacity)
 
   def withinDistance(
 		  qry: G, 

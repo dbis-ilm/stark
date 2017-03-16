@@ -24,63 +24,17 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that intersect with a given query geometry
    */
-  def intersects(qry: G) = {
-    // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
-    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
-      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
-      
-      rdd.mapPartitionsWithIndex({ case (idx, iter) => 
-        if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal))
-          iter.filter{ case (g,_) => qry.intersects(g) }
-        else
-          Iterator.empty
-      })
-    } else {
-
-      rdd.filter{ case (g,_) => qry.intersects(g) }
-    }
-  }
+  def intersects(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.INTERSECTS)
     
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = {
-    // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
-    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
-      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
-      
-      rdd.mapPartitionsWithIndex({ case (idx, iter) => 
-        if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal))
-          iter.filter{ case (g,_) => g.containedBy(qry) }
-        else
-          Iterator.empty
-      })
-    } else {
-    
-      rdd.filter{ case (g,_) => g.containedBy(qry) }
-    }
-  }
+  def containedby(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINEDBY)
 
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(o: G) = {
-    // TODO: can be get the average load of a partition and decide based on that, if we should apply partition pruning?
-    if(rdd.partitioner.isDefined && rdd.partitioner.get.isInstanceOf[SpatialPartitioner]) {
-      val sp = rdd.partitioner.get.asInstanceOf[SpatialPartitioner]
-      rdd.mapPartitionsWithIndex({ case (idx, iter) =>
-        if(Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(o.getGeo.getEnvelopeInternal))
-          iter.filter{ case (g,_) => g.contains(o) }
-        else
-          Iterator.empty
-      })
-    } else {
-      // no spatial partitioner
-      rdd.filter{ case (g,_) => g.contains(o) }
-    }
-  }
-
-  def contains2(o: G) = new SpatialFilterRDD[G,V](rdd, o, JoinPredicate.CONTAINS)
+  def contains(o: G) = new SpatialFilterRDD[G,V](rdd, o, JoinPredicate.CONTAINS)
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
     rdd.filter{ case (g,_) => distFunc(qry,g) <= maxDist }

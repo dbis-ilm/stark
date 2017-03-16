@@ -12,55 +12,11 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     rdd: RDD[RTree[G, (G,V)]]) extends Serializable {
 
   def contains(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } } 
-//    rdd.mapPartitions({ trees =>
-//    trees.flatMap {tree =>
-//      tree.query(qry).filter{ c => c._1.contains(qry) } 
-//    }
-//    
-//  }, true)
-  
-//  def containsRO(qry: G) = rdd.map { tree => tree.queryRO(qry, Predicates.contains _) ; tree }
-//    rdd.mapPartitions({ trees => 
-//    trees.map{ tree =>
-//      tree.queryRO(qry, Predicates.contains _)
-//      tree
-//    }
-//  }, true) // preserve partitioning
-    
 
   def containedby(qry: G) = rdd.flatMap{ tree => tree.query(qry).filter{ c => c._1.containedBy(qry)} } 
-//    rdd.mapPartitions({ trees => 
-//    trees.flatMap{ tree =>
-////      tree.queryRO(qry, Predicates.containedby _)
-//      tree.query(qry).filter{ c => c._1.containedBy(qry)}
-//    }
-//  }, true) // preserve partitioning
-  
-  
-//  def containedbyRO(qry: G) = rdd.map { tree => tree.queryRO(qry, Predicates.containedby _); tree}
-//    rdd.mapPartitions({ trees => 
-//    trees.map{ tree =>
-//      tree.queryRO(qry, Predicates.containedby _)
-//      tree
-//    }
-//  }, true) // preserve partitioning
 
   def intersects(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.intersects(qry)} } 
-//    rdd.mapPartitions({ trees => 
-//    trees.flatMap{ tree =>
-//      tree.query(qry).filter{ c => c._1.intersects(qry)}
-//    }
-//  }, true) // preserve partitioning
-  
-//  def intersectsRO(qry: G) = rdd.map { tree => tree.queryRO(qry, Predicates.intersects _); tree}
-//    rdd.mapPartitions({ trees => 
-//    trees.map{ tree =>
-//      tree.queryRO(qry, Predicates.intersects _)
-//      tree
-//    }
-//  }, true) // preserve partitioning
 
-  
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = 
     new PersistentIndexedSpatialCartesianJoinRDD(rdd.sparkContext,rdd, other, pred) 
 
@@ -82,15 +38,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     rdd.sparkContext.parallelize(nn)
   }
   
-//  def withinDistanceRO(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
-//    rdd.mapPartitions({ trees =>
-//    trees.map{ tree =>
-//      //tree.queryRO(qry, Predicates.withinDistance(maxDist, distFunc) _)
-//      tree.withinDistanceRO(qry, distFunc, maxDist)
-//      tree
-//    }
-//  }, true) // preserve partitioning
-  
+
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
     rdd.mapPartitions({ trees => 
     trees.flatMap{ tree =>
@@ -99,12 +47,5 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       
     }
   }, true) // preserve partitioning
-  
-  
-  /**
-   * This gets all entries out of the index and returns
-   * a plain flat RDD
-   */
-//  def flatten = rdd.mapPartitions((trees) => trees.flatMap(tree => tree.result), true)
 
 }

@@ -73,7 +73,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
 	  val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
-	  val foundGeoms = rdd.contains2(q).collect()
+	  val foundGeoms = rdd.contains(q).collect()
 	  
 	  foundGeoms.size shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -88,7 +88,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     // we look for all elements that contain a given point.
     // thus, the result should be all points in the RDD with the same coordinates
     val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
-    val foundGeoms = rdd.contains2(q).collect()
+    val foundGeoms = rdd.contains(q).collect()
 
     foundGeoms.size shouldBe 6
     foundGeoms.foreach{ case (g,_) => g shouldBe q}

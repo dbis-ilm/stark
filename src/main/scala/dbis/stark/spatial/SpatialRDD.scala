@@ -78,8 +78,6 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    */
   def contains(g: G) = new PlainSpatialRDDFunctions(this).contains(g)
 
-  def contains2(g: G) = new PlainSpatialRDDFunctions(this).contains2(g)
-
   /**
    * Find the k nearest neighbors of the given geometry in this RDD
    *

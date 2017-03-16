@@ -32,9 +32,6 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
   override def getPartitions: Array[Partition] = partitioner.map{
       case sp: SpatialPartitioner => {
 
-        parent.join(parent)
-
-
         val spatialParts = ListBuffer.empty[Partition]
 
         val qryEnv = qry.getGeo.getEnvelopeInternal

@@ -6,7 +6,10 @@ import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.live.{LiveIndexedSpatialRDDFunctions, LiveIntervalIndexedSpatialRDDFunctions}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.{Dataset, SparkSession, SQLContext}
+import org.apache.spark.sql.functions.udf
 
 /**
   * Created by Jacob on 21.02.17.
@@ -17,8 +20,10 @@ object TestUtil {
   //-fs src/test/resources/ -nf -gp -ti 10k_1-100.csv
   def main(args: Array[String]) {
     println("davor")
+
+
     new TestUtil().mainMethod(args)
-    println("danach")
+
   }
 
   def time[R](block: => R): Long = {
@@ -42,14 +47,17 @@ class TestUtil {
   var autorange = false
   var order = 10
   var listpoints = false;
+  var dataset = false;
 
   var sc = createSparkContext("asd")
+
+  var spark = createSparkSession("asdas");
 
   def printhelp(): Unit = {
     println("Jacobs TestUtil")
     println("[Options] FILE  | DEFAULT ")
 
-    println("example : "+"-p 3 -ps 30 -nf -os 20 -sf 0.01 -ar -tp -ti 200M_1-10000.csv")
+    println("example : " + "-p 3 -ps 30 -nf -os 20 -sf 0.01 -ar -tp -ti 200M_1-10000.csv")
     println("using point 3, make 30 partitions, dont filter result after tree query, order for r-tree: 20, samplefactor for temppart 0.01, use auto range fot remp part, use temporal partitioner, user temporal index")
     println()
     println("-h  | --help               for Help")
@@ -108,6 +116,7 @@ class TestUtil {
           case "-c" => method = 0
           case "-i" => method = 1
           case "-ar" => autorange = true
+          case "-ds" => dataset = true
           case "-nf" => {
             LiveIntervalIndexedSpatialRDDFunctions.skipFilter = true
             LiveIndexedSpatialRDDFunctions.skipFilter = true
@@ -130,7 +139,7 @@ class TestUtil {
             point = args(i + 1).toInt
             i += 1
           }
-          case "-lp"  => listpoints = true
+          case "-lp" => listpoints = true
           case _ => println("unknown argument: " + arg)
         }
 
@@ -140,14 +149,19 @@ class TestUtil {
       val file = args(args.size - 1)
       filepath = filesource + file
       if (Files.exists(Paths.get(filepath))) {
-        startProgramm()
+
+        val t = TestUtil.time(startProgramm())
+
+
+        println("alltime: " + t)
+
+
       } else {
         println("File does not exist: " + filepath)
         printhelp()
       }
     }
   }
-
 
   def startProgramm(): Unit = {
 
@@ -156,16 +170,96 @@ class TestUtil {
     println("using point : " + point)
 
 
+    if (dataset) {
+      startdatasetProgramm()
+    } else {
+      startrddProgramm()
+    }
+
+
+  }
+
+
+  def blubb() = udf((start: Long) => (math.ceil(start / 1000).toInt).toLong)
+
+  def startdatasetProgramm2(): Unit = {
+    val ds = createIntervalDataSet(spark, filepath)
+
+
+
+
+
+
+
+    val predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.CONTAINS)
+    var res2: Array[(STO)] = null
+
+    implicit val myObjEncoder = org.apache.spark.sql.Encoders.kryo[(STObject)]
+
+
+
+    /*var dsa = ds.repartition(10, ds("start"))
+    var psa = dsa.filter(dsa("test") < 2)*/
+
+    var psa = ds.filter(ds("start") < 1680)
+
+
+    val searchData = STObject("POINT (15.292502748164168 63.93914390076469)", Interval(617, 1670)) //newds.take(point + 1)(point)
+    println("point-data : " + searchData)
+
+     val t3 = TestUtil.time({
+       val tmp = psa.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
+       res2 = tmp.collect()
+     })
+     println("\nelapsed time for dataset-method in ms: " + t3)
+     println("result2 size: " + res2.size)
+  }
+
+
+  def startdatasetProgramm(): Unit = {
+    val ds = createIntervalDataSet(spark, filepath)
+
+
+
+
+
+
+
+    val predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.CONTAINS)
+    var res2: Array[STO] = null
+
+    implicit val myObjEncoder = org.apache.spark.sql.Encoders.kryo[STObject]
+
+   /* val newds = ds.map(x => {
+      STObject(x.stob, Interval(x.start, x.end))
+    })*/
+    val searchData = STObject("POINT (15.292502748164168 63.93914390076469)", Interval(617, 1670)) //newds.take(point + 1)(point)
+    println("point-data : " + searchData)
+
+    val t3 = TestUtil.time({
+    //  val tmp = newds.filter { xs => predicateFunc(xs, searchData) }
+      val tmp = ds.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
+      res2 = tmp.collect()
+    })
+    println("\nelapsed time for dataset-method in ms: " + t3)
+    println("result2 size: " + res2.size)
+  }
+
+  def startrddProgramm(): Unit = {
 
     val rddRaw = createIntervalRDD(sc, filepath)
+
+
+
 
     val searchData = rddRaw.take(point + 1)(point)._1
     println("point-data : " + searchData)
 
-    if(listpoints){
+    if (listpoints) {
       var i = 0;
-      rddRaw.take(50).foreach(k => {println(i+"  -  point-data : " + k._1)
-        i +=1
+      rddRaw.take(50).foreach(k => {
+        println(i + "  -  point-data : " + k._1)
+        i += 1
       })
 
 
@@ -178,15 +272,15 @@ class TestUtil {
         case 0 => rdd = rddRaw // do nothing
         case 1 => rdd = rddRaw.partitionBy(new SpatialGridPartitioner(rddRaw, partionsize));
         case 2 => rdd = rddRaw.partitionBy(new BSPartitioner(rddRaw, 0.5, 1000))
-        case 3 => rdd = rddRaw.partitionBy(new TemporalRangePartitioner(rddRaw, partionsize, autorange,sampelfactor))
+        case 3 => rdd = rddRaw.partitionBy(new TemporalRangePartitioner(rddRaw, partionsize, autorange, sampelfactor))
         case _ => println(" wrong Partitioner: " + part)
       }
     )
     println("time for partitionby: " + t2)
     if (rdd.partitioner.isDefined) {
       println("using " + rdd.partitioner.get.getClass.getSimpleName + " as partitioner (partition-size: " + partionsize + " )")
-     // val d = rdd.mapPartitions(iter => Array(iter.size).iterator, true)
-     // println("partitionsizes: "+d.collect().mkString(","))
+      // val d = rdd.mapPartitions(iter => Array(iter.size).iterator, true)
+      // println("partitionsizes: "+d.collect().mkString(","))
     } else {
       println("using no partitioner")
     }
@@ -242,8 +336,10 @@ class TestUtil {
       }
     )
 
-
     println("\nelapsed time for method in ms: " + t1)
+
+
+
 
     if (res.size < 1) {
       throw new Exception("found nothing:" + res.size)
@@ -251,13 +347,12 @@ class TestUtil {
       println("result size: " + res.size)
     }
 
-   /* println()
-    println()
-    println()
-    println()
-    println()
-    printhelp()*/
-
+    /* println()
+     println()
+     println()
+     println()
+     println()
+     printhelp()*/
   }
 
 
@@ -279,11 +374,53 @@ class TestUtil {
     rdd
   }
 
+  def createIntervalDataFrame(
+                               sc: SparkContext,
+                               file: String = "src/test/resources/intervaltest.csv",
+                               sep: Char = ';',
+                               numParts: Int = 8,
+                               distinct: Boolean = false): RDD[(STObject, (String, STObject))] = {
+
+    val rdd = sc.textFile(file, if (distinct) 1 else numParts) // let's start with only one partition and repartition later
+      .map { line => line.split(sep) }
+      .map { arr =>
+        (arr(0), STObject(arr(1), Interval(arr(2).toInt, arr(3).toInt)))
+      }
+      .keyBy(_._2)
+
+
+    rdd
+  }
+
+
+  def createIntervalDataSet(
+                             sparks: SparkSession,
+                             file: String = "src/test/resources/20_1-100.csv",
+                             sep: String = ";"
+                           ) = {
+    import sparks.implicits._
+    //import sparkss.implicits._
+    val sparkss = sparks.read.option("inferSchema", "true").option("delimiter", sep).csv(file).toDF("id", "stob", "start", "end")
+    //sparkss.withColumn("test", blubb()(sparkss("start")))
+    sparkss.as[STO];
+
+  }
+
 
   def createSparkContext(name: String) = {
     val conf = new SparkConf().setAppName(name)
     new SparkContext(conf)
   }
 
+  def createSparkSession(name: String) = {
+    SparkSession
+      .builder()
+      .appName("Spark SQL basic example")
+      .master("local")
+      .getOrCreate()
+  }
+
 
 }
+
+case class STO(id: Long, stob: String, start: Long, end: Long, test: Long)

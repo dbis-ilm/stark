@@ -1,7 +1,9 @@
 package dbis.stark
 
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
+import com.vividsolutions.jts.index.intervalrtree.SortedPackedIntervalRTree
+import org.apache.spark.{SparkContext, SparkConf}
+
+import org.apache.spark.sql.{Dataset, SparkSession, SQLContext}
 
 /**
   * Created by Jacob on 21.02.2017.
@@ -14,7 +16,7 @@ object TesterUtil {
     var arr = args
 
     // damit ich nicht ständig die run configurations ändern muss
-    //arr = "-fs src/test/resources/ -p 38 -ar -sf 0.1 -tp -si 10k_1-10000.csv".split(" ")
+    arr = "-fs src/test/resources/ -ds -p 38 -ar -sf 0.1 -np -ni 10M_1-10000.csv".split(" ")
 
    new TesterUtil().mainMethod(arr)
   }
@@ -23,17 +25,19 @@ object TesterUtil {
 class TesterUtil extends TestUtil{
 
   override def createSparkContext(name: String) = {
-    TestUtils.createSparkContext(name)
+    val conf = new SparkConf().setMaster("local[4]").setAppName(name)
+    new SparkContext(conf)
   }
 
-  override def createIntervalRDD(
-                         sc: SparkContext,
-                         file: String = "src/test/resources/intervaltest.csv",
-                         sep: Char = ';',
-                         numParts: Int = 8,
-                         distinct: Boolean = false): RDD[(STObject, (String, STObject))] = {
-
-    TestUtils.createIntervalRDD(sc,file,sep,numParts,distinct)
+  override def createSparkSession(name: String) = {
+    SparkSession
+      .builder()
+      .appName("Spark SQL basic example")
+      .master("local[4]")
+      .getOrCreate()
   }
+
+
 
 }
+case class STO(id: Long, stob: String, start : Long, end: Long)

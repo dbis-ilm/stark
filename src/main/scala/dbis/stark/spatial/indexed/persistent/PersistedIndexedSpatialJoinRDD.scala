@@ -3,7 +3,7 @@ package dbis.stark.spatial.indexed.persistent
 import dbis.stark.STObject
 import dbis.stark.spatial.{JoinPredicate, SpatialPartitioner}
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.CartesianPartition
+import dbis.stark.spatial.plain.JoinPartition
 import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
 import org.apache.spark.rdd.RDD
 
@@ -62,7 +62,7 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 //    }
 //    array
     
-    val parts = ListBuffer.empty[CartesianPartition]
+    val parts = ListBuffer.empty[JoinPartition]
     
     val checkPartitions = leftParti.isDefined && rightParti.isDefined
     var idx = 0
@@ -71,19 +71,19 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
         s2 <- right.partitions
         if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
       
-      parts += new CartesianPartition(idx, left, right, s1.index, s2.index)
+      parts += new JoinPartition(idx, left, right, s1.index, s2.index)
       idx += 1
     }
     parts.toArray
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
-    val currSplit = split.asInstanceOf[CartesianPartition]
+    val currSplit = split.asInstanceOf[JoinPartition]
     (left.preferredLocations(currSplit.s1) ++ right.preferredLocations(currSplit.s2)).distinct
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
-    val currSplit = split.asInstanceOf[CartesianPartition]
+    val currSplit = split.asInstanceOf[JoinPartition]
 
 //    val map = SpatialRDD.createExternalMap[G,V,V2]
     

@@ -9,7 +9,7 @@ import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.CartesianPartition
+import dbis.stark.spatial.plain.JoinPartition
 import dbis.stark.spatial.SpatialRDD
 import dbis.stark.spatial.SpatialPartitioner
 import com.vividsolutions.jts.geom.Envelope
@@ -42,18 +42,18 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
     val array = new Array[Partition](rdd1.partitions.length * rdd2.partitions.length)
     for (s1 <- rdd1.partitions; s2 <- rdd2.partitions) {
       val idx = s1.index * numPartitionsInRdd2 + s2.index
-      array(idx) = new CartesianPartition(idx, rdd1, rdd2, s1.index, s2.index)
+      array(idx) = new JoinPartition(idx, rdd1, rdd2, s1.index, s2.index)
     }
     array
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
-    val currSplit = split.asInstanceOf[CartesianPartition]
+    val currSplit = split.asInstanceOf[JoinPartition]
     (rdd1.preferredLocations(currSplit.s1) ++ rdd2.preferredLocations(currSplit.s2)).distinct
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
-    val currSplit = split.asInstanceOf[CartesianPartition]
+    val currSplit = split.asInstanceOf[JoinPartition]
 
     val map = SpatialRDD.createExternalMap[G,V,V2]
     

@@ -17,7 +17,7 @@ case class Cell(var id: Int, range: NRectRange, var extent: NRectRange) extends 
     * Updates this cell's extent in place!
     * @param r The range to extent by
     */
-  def extend(r: NRectRange) = { extent = extent.extend(r) }
+  def extendBy(r: NRectRange): Unit = { extent = extent.extend(r) }
   
   override def clone(): Cell = Cell(id, range.clone(), extent.clone())
 }

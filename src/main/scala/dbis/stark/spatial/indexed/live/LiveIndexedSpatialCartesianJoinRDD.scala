@@ -1,17 +1,14 @@
 package dbis.stark.spatial.indexed.live
 
 
-import java.io.{IOException, ObjectOutputStream}
-
-import scala.reflect.ClassTag
-
+import dbis.stark.STObject
+import dbis.stark.spatial.{JoinPredicate, SpatialRDD}
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.plain.JoinPartition
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
-import dbis.stark.STObject
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.CartesianPartition
-import dbis.stark.spatial.SpatialRDD
-import dbis.stark.spatial.JoinPredicate
+
+import scala.reflect.ClassTag
 
 
 private[stark] class LiveIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag, G2 <: STObject: ClassTag, V: ClassTag, V2: ClassTag](
@@ -32,18 +29,18 @@ private[stark] class LiveIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag
     val array = new Array[Partition](rdd1.partitions.length * rdd2.partitions.length)
     for (s1 <- rdd1.partitions; s2 <- rdd2.partitions) {
       val idx = s1.index * numPartitionsInRdd2 + s2.index
-      array(idx) = new CartesianPartition(idx, rdd1, rdd2, s1.index, s2.index)
+      array(idx) = new JoinPartition(idx, rdd1, rdd2, s1.index, s2.index)
     }
     array
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
-    val currSplit = split.asInstanceOf[CartesianPartition]
+    val currSplit = split.asInstanceOf[JoinPartition]
     (rdd1.preferredLocations(currSplit.s1) ++ rdd2.preferredLocations(currSplit.s2)).distinct
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
-    val currSplit = split.asInstanceOf[CartesianPartition]
+    val currSplit = split.asInstanceOf[JoinPartition]
   
     val tree = new RTree[G,(G,V)](capacity)
     

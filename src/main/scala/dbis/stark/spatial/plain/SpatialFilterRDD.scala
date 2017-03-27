@@ -6,7 +6,7 @@ import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTree
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, TaskContext, rdd}
+import org.apache.spark.{Partition, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -15,9 +15,17 @@ import scala.reflect.ClassTag
   */
 class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
   private val parent: RDD[(G,V)],
-  qry: STObject,
-  predicate: JoinPredicate,
-  treeOrder: Int = -1) extends SpatialRDD[G,V](parent) {
+  qry: G,
+  predicateFunc: (G,G) => Boolean,
+  treeOrder: Int,
+  private val checkParties: Boolean) extends SpatialRDD[G,V](parent) {
+
+
+  def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
+    this(parent, qry, predicateFunc, -1, false)
+
+  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate, treeOrder: Int = -1) =
+    this(parent, qry, JoinPredicate.predicateFunction(predicate), treeOrder, true)
 
   /**
     * Return the partitions that have to be processed.
@@ -30,29 +38,27 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
     * @return The list of partitions of this RDD
     */
   override def getPartitions: Array[Partition] = partitioner.map{
-      case sp: SpatialPartitioner => {
+      case sp: SpatialPartitioner if checkParties =>
 
         val spatialParts = ListBuffer.empty[Partition]
 
         val qryEnv = qry.getGeo.getEnvelopeInternal
-        var i = 0
-        var cnt = 0
+        var parentPartiId = 0
+        var spatialPartId = 0
         val numParentParts = parent.getNumPartitions
-        while (i < numParentParts) {
+        while (parentPartiId < numParentParts) {
 
-          val cell = sp.partitionBounds(i)
+          val cell = sp.partitionBounds(parentPartiId)
 
-          if (Utils.toEnvelope(cell.extent).contains(qryEnv)) {
-            spatialParts += SpatialPartition(cnt, i, parent)
-            cnt += 1
+          if (Utils.toEnvelope(cell.extent).intersects(qryEnv)) {
+            spatialParts += SpatialPartition(spatialPartId, parentPartiId, parent)
+            spatialPartId += 1
           }
 
-          i += 1
+          parentPartiId += 1
         }
 
         spatialParts.toArray
-//        parent.partitions
-      }
 
       case _ =>
         parent.partitions
@@ -62,11 +68,8 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
   @DeveloperApi
   override def compute(inputSplit: Partition, context: TaskContext): Iterator[(G, V)] = {
 
-    // get the function behind the enum value
-    val predicateFunc = JoinPredicate.predicateFunction(predicate)
-
-    /* determine the split to process. If a spatial partitoner was applied, the actual
-     * partition/split is encapsuled
+    /* determine the split to process. If a spatial partitioner was applied, the actual
+     * partition/split is encapsulated
      */
     val split = inputSplit match {
       case sp: SpatialPartition => sp.split

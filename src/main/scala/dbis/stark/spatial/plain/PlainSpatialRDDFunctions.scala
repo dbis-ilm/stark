@@ -5,7 +5,7 @@ import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial.{JoinPredicate, SpatialPartitioner, SpatialRDDFunctions, Utils}
+import dbis.stark.spatial._
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
@@ -37,7 +37,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def contains(o: G) = new SpatialFilterRDD[G,V](rdd, o, JoinPredicate.CONTAINS)
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
-    rdd.filter{ case (g,_) => distFunc(qry,g) <= maxDist }
+    new SpatialFilterRDD(rdd, qry, Predicates.withinDistance(maxDist, distFunc) _)
+
       
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
     // compute k NN for each partition individually --> n * k results
@@ -67,11 +68,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (STObject,STObject) => Boolean) = 
-    new CartesianSpatialJoinRDD(rdd.sparkContext,rdd, other, pred) 
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) =
+    new SpatialJoinRDD(rdd, other, pred)
 
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) =      
-    new JoinSpatialRDD(
+    new SpatialJoinRDD(
         if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd , 
         if(partitioner.isDefined) other.partitionBy(partitioner.get) else other, 
         pred)
@@ -172,7 +173,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * This puts all data items of a partition into an Index structure, e.g., R-tree
    * and thus changes the type of the RDD from RDD[(STObject, V)] to RDD[RTree[STObject, (STObject, V)]]
    */
-  def index(partitioner: Option[SpatialPartitioner], order: Int = 10): RDD[RTree[G,(G,V)]] = {
+  def index(partitioner: Option[SpatialPartitioner] = None, order: Int = 10): RDD[RTree[G,(G,V)]] = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
     reparted.mapPartitions(iter => {
       val tree = new RTree[G, (G, V)](order)

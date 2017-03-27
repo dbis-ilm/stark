@@ -140,6 +140,8 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V: ClassTag](
         parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
         // build the tree
         tree.build()
+
+
         // query tree and perform candidates check
         tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
       }

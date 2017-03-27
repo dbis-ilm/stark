@@ -26,7 +26,7 @@ object TemporalRangePartitioner {
   }
 
   def getCellId(start: Long, minT: Long, maxT: Long, partitions: Int): Int = {
-    val length = (maxT * 1.2) - minT
+    val length = (maxT * 1.3) - minT
     val interval = length / partitions
 
     val position_in_range = start - minT

@@ -70,7 +70,6 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V: ClassTag](
       var cnt = 0
       val numParentParts = parent.getNumPartitions
       while (i < numParentParts) {
-
         predicate match {
           case INTERSECTS => {
             if ( tp.partitionBounds(i).intersects(qry.getTemp.get)) {
@@ -80,7 +79,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V: ClassTag](
           }
           case CONTAINEDBY => {
             val newi = {
-              if (i == tp.numPartitions) {
+              if (i == tp.numPartitions-1) {
                   tp.partitionBounds(i)
               } else {
                  Interval(tp.partitionBounds(i).start,tp.partitionBounds(i+1).start)

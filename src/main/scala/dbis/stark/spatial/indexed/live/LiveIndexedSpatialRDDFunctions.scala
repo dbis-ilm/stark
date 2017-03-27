@@ -2,9 +2,9 @@ package dbis.stark.spatial.indexed.live
 
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial._
+import dbis.stark.spatial.{SpatialFilterRDD, _}
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.SpatialFilterRDD
+import dbis.stark.spatial.partitioner.SpatialPartitioner
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag

@@ -7,13 +7,13 @@ object JoinPredicate extends Enumeration {
   val INTERSECTS, CONTAINS, CONTAINEDBY = Value
   
   def predicateFunction(pred: JoinPredicate): (STObject, STObject) => Boolean = pred match {
-    case INTERSECTS => Predicates.intersects
-    case CONTAINS => Predicates.contains
-    case CONTAINEDBY => Predicates.containedby
+    case INTERSECTS => PredicatesFunctions.intersects
+    case CONTAINS => PredicatesFunctions.contains
+    case CONTAINEDBY => PredicatesFunctions.containedby
   }
 }
 
-object Predicates {
+object PredicatesFunctions {
   
   /**
    * Returns <code>true</code> if the two given spatial objects intersect

@@ -1,10 +1,9 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.partitioner
 
-import org.apache.spark.Partitioner
-import com.vividsolutions.jts.geom.Geometry
-import scala.reflect.ClassTag
-import org.apache.spark.rdd.RDD
 import dbis.stark.STObject
+import dbis.stark.spatial.{Cell, NRectRange}
+import org.apache.spark.Partitioner
+import org.apache.spark.rdd.RDD
 
 object SpatialPartitioner {
   

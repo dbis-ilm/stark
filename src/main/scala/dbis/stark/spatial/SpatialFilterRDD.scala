@@ -1,9 +1,9 @@
-package dbis.stark.spatial.plain
+package dbis.stark.spatial
 
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, TaskContext}
@@ -18,7 +18,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
   qry: G,
   predicateFunc: (G,G) => Boolean,
   treeOrder: Int,
-  private val checkParties: Boolean) extends SpatialRDD[G,V](parent) {
+  private val checkParties: Boolean) extends RDD[(G,V)](parent) {
 
 
   def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
@@ -30,7 +30,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
   /**
     * Return the partitions that have to be processed.
     *
-    * We apply partition pruning in this step: If a [[dbis.stark.spatial.SpatialPartitioner]]
+    * We apply partition pruning in this step: If a [[SpatialPartitioner]]
     * is present, we check if the partition can contain candidates. If not, it is not returned
     * here.
     *

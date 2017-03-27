@@ -2,6 +2,7 @@ package dbis.stark.spatial
 
 import scala.reflect.ClassTag
 import dbis.stark.STObject
+import dbis.stark.spatial.partitioner.SpatialPartitioner
 import org.apache.spark.rdd.RDD
 
 abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] extends Serializable {

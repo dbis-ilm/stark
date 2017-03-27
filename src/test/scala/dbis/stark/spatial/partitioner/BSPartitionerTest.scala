@@ -1,24 +1,12 @@
-package dbis.stark.spatial
-
-import dbis.stark.spatial.SpatialRDD._
-
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import org.scalatest.BeforeAndAfterAll
-
-import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
-
-import scala.collection.mutable.Map
+package dbis.stark.spatial.partitioner
 
 import com.vividsolutions.jts.io.WKTReader
-
-
-import dbis.stark.STObject
-import org.apache.spark.rdd.ShuffledRDD
-import dbis.stark.TestUtils
+import dbis.stark.{STObject, TestUtils}
+import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.{RDD, ShuffledRDD}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import org.scalatest.tagobjects.Slow
 
 class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {

@@ -2,8 +2,8 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.SpatialPartitioner
 import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.partitioner.SpatialPartitioner
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag

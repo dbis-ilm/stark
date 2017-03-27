@@ -1,11 +1,8 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.partitioner
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import org.scalatest.BeforeAndAfterAll
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
 import dbis.stark.STObject
+import org.apache.spark.{SparkConf, SparkContext}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   

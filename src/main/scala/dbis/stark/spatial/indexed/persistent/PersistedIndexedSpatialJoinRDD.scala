@@ -1,9 +1,9 @@
 package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject
-import dbis.stark.spatial.{JoinPredicate, SpatialPartitioner}
+import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.JoinPartition
+import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
 import org.apache.spark.rdd.RDD
 
@@ -21,38 +21,14 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 
   val predicateFunction = JoinPredicate.predicateFunction(pred)
 
-  private lazy val rightParti = right.partitioner.flatMap {
-    case sp: SpatialPartitioner => Some(sp)
-    case _ => None
+  private lazy val rightParti = right.partitioner.map {
+    case sp: SpatialPartitioner => sp
   }
-//  {
 
-
-//    val p = right.partitioner
-//      if(p.isDefined) {
-//        p.get match {
-//          case sp: SpatialPartitioner => Some(sp)
-//          case _ => None
-//        }
-//      } else
-//        None
-//  }
-  
-  private lazy val leftParti = left.partitioner.flatMap {
-    case sp: SpatialPartitioner => Some(sp)
-    case _ => None
+  private lazy val leftParti = left.partitioner.map {
+    case sp: SpatialPartitioner => sp
   }
-//  {
-//    val p = left.partitioner
-//      if(p.isDefined) {
-//        p.get match {
-//          case sp: SpatialPartitioner => Some(sp)
-//          case _ => None
-//        }
-//      } else
-//        None
-//  }
-  
+
   override def getPartitions: Array[Partition] = {
 //    // create the cross product split
 //    val array = new Array[Partition](left.partitions.length * right.partitions.length)
@@ -85,9 +61,9 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
     val currSplit = split.asInstanceOf[JoinPartition]
 
-//    val map = SpatialRDD.createExternalMap[G,V,V2]
-    
-    val theIter = left.iterator(currSplit.s1, context).flatMap{ tree => 
+    val rightArray = right.iterator(currSplit.s2, context).toArray
+
+    val resultIter = left.iterator(currSplit.s1, context).flatMap{ tree =>
       
       /*
        * Returns:
@@ -96,30 +72,15 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   		 * 
   		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
-//      val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
-//      
-//      val partitionCheck = rightParti.map { p => 
-//            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
-//      }.getOrElse(true)
-//      
-//      if(partitionCheck) {
-        right.iterator(currSplit.s2, context)
-                .flatMap { case (rg,rv) =>
-                  tree.query(rg)
-                    .filter { case (lg,_) => predicateFunction(lg,rg)}
-                    .map{ case (_,lv) => (lv,rv) }
-//                    .map{ case (lg,lv) => (lg,(lv,rv)) }
-//              .foreach { case (g,v) => map.insert(g,v) }
-                }
-//        } else {
-//          Iterator.empty
-//        }
+
+      rightArray.flatMap { case (rg,rv) =>
+        tree.query(rg)
+          .filter { case (lg,_) => predicateFunction(lg,rg)}
+          .map{ case (_,lv) => (lv,rv) }
       }
+    }
     
-//    val f = map.iterator.flatMap{ case (g, l) => l}
-    
-//    new InterruptibleIterator(context, theIter)
-    theIter
+    resultIter
     
   }
 

@@ -1,13 +1,15 @@
 package dbis.stark
 
 import java.io.File
+
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD._
 import org.apache.spark.SparkConf
-import dbis.stark.spatial.BSPartitioner
 import java.util.Date
 import java.time.LocalDate
+
+import dbis.stark.spatial.partitioner.BSPartitioner
 
 
 object TestUtils {

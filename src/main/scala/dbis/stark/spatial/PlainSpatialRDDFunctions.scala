@@ -1,11 +1,11 @@
-package dbis.stark.spatial.plain
+package dbis.stark.spatial
 
 import dbis.stark.STObject
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial._
+import dbis.stark.spatial.partitioner.SpatialPartitioner
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
@@ -37,7 +37,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def contains(o: G) = new SpatialFilterRDD[G,V](rdd, o, JoinPredicate.CONTAINS)
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
-    new SpatialFilterRDD(rdd, qry, Predicates.withinDistance(maxDist, distFunc) _)
+    new SpatialFilterRDD(rdd, qry, PredicatesFunctions.withinDistance(maxDist, distFunc) _)
 
       
   def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {

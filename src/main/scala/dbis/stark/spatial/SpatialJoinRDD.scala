@@ -2,7 +2,7 @@ package dbis.stark.spatial
 
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.JoinPartition
+import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
 

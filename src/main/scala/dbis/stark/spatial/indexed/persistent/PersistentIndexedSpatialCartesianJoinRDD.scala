@@ -1,19 +1,15 @@
 package dbis.stark.spatial.indexed.persistent
 
 
-import java.io.{IOException, ObjectOutputStream}
-
-import scala.reflect.ClassTag
-
-import org.apache.spark._
-import org.apache.spark.rdd.RDD
+import com.vividsolutions.jts.geom.Envelope
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.plain.JoinPartition
-import dbis.stark.spatial.SpatialRDD
-import dbis.stark.spatial.SpatialPartitioner
-import com.vividsolutions.jts.geom.Envelope
-import dbis.stark.spatial.Utils
+import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
+import dbis.stark.spatial.{SpatialRDD, Utils}
+import org.apache.spark._
+import org.apache.spark.rdd.RDD
+
+import scala.reflect.ClassTag
 
 
 private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag, G2 <: STObject: ClassTag, V: ClassTag, V2: ClassTag](
@@ -55,7 +51,7 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
     val currSplit = split.asInstanceOf[JoinPartition]
 
-    val map = SpatialRDD.createExternalMap[G,V,V2]
+    val map = SpatialRDD.createExternalMap[G, V, V2]()
     
     rdd1.iterator(currSplit.s1, context).foreach{ tree => 
       
@@ -68,9 +64,9 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
        */
       val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
       
-      val partitionCheck = rightParti.map { p => 
-            indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
-      }.getOrElse(true)
+      val partitionCheck = rightParti.forall { p =>
+        indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
+      }
       
       if(partitionCheck) {
         rdd2.iterator(currSplit.s2, context).foreach{ case (rg,rv) =>

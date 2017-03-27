@@ -1,7 +1,7 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.partitioner
 
 import dbis.stark.STObject
-import dbis.stark.spatial.partitioner.BSP
+import dbis.stark.spatial._
 import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConverters._

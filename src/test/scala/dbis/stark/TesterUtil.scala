@@ -18,7 +18,7 @@ object TesterUtil {
    // println(s"Polygon((-$searchsize $searchsize, $searchsize $searchsize, $searchsize -$searchsize, -$searchsize -$searchsize, -$searchsize $searchsize))")
 
     // damit ich nicht ständig die run configurations ändern muss
-    arr = "-fs src/test/resources/ -gp -sp -cb 10k_1-10000.csv".split(" ")
+    arr = "-fs src/test/resources/ -ds -si -sq -pf -sp -cb 10k_1-10000.csv".split(" ")
 
    new TesterUtil().mainMethod(arr)
   }

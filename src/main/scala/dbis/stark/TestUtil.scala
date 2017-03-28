@@ -4,12 +4,16 @@ import java.nio.file.{Files, Paths}
 
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial._
+import dbis.stark.spatial.indexed.{IntervalTree1, RTree}
 import dbis.stark.spatial.indexed.live.{LiveIndexedSpatialRDDFunctions, LiveIntervalIndexedSpatialRDDFunctions}
+import dbis.stark.spatial.plain.IndexTyp
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{LongType, StructType, StringType, StructField}
 import org.apache.spark.sql._
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{Partition, SparkConf, SparkContext}
 import org.apache.spark.sql.functions.udf
+
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created by Jacob on 21.02.17.
@@ -34,7 +38,7 @@ object TestUtil {
   }
 }
 
-class TestUtil {
+class TestUtil{
 
   var filesource = ""
   var filepath = filesource
@@ -191,7 +195,7 @@ class TestUtil {
 
 
     if (dataset) {
-      startdatasetProgramm2()
+      startdatasetProgramm2(spark)
     } else {
       startrddProgramm()
     }
@@ -202,7 +206,7 @@ class TestUtil {
 
   def blubb() = udf((start: Long) => (math.ceil(start / 1000).toInt).toLong)
 
-  def startdatasetProgramm2(): Unit = {
+  def startdatasetProgramm2(sparks: SparkSession): Unit = {
     val ds = if (!datasetfromrdd) {
       println("createIntervalDataSet")
       createIntervalDataSet(spark, filepath)
@@ -231,51 +235,47 @@ class TestUtil {
 
     if (prefilter) {
       val t = searchData.getTemp.get
-      val t2 = TestUtil.time(
-        method match {
-          case 0 => {
-            println("time filter contains")
-            psa = ds.where(ds("start") <= t.start.value and ds("end") >= t.end.get.value)
-          }
-          case 1 => {
-            println("time filter intersects")
-            psa = ds.where((ds("start") <= t.start.value and ds("end") >= t.start.value) or (ds("start") >= t.start.value and ds("start") <= t.end.get.value))
-          }
-          case 2 => {
-            println("time filter containedby")
-            psa = ds.where(ds("start") >= t.start.value and ds("end") <= t.end.get.value)
-          }
-          case _ => println(" wrong Method: " + method)
-        }
-      )
 
-      println("\nelapsed time for dataset-pre-filter in ms: " + t2)
+      method match {
+        case 0 => {
+          println("pre time filter contains")
+          psa = ds.where(ds("start") <= t.start.value and ds("end") >= t.end.get.value)
+        }
+        case 1 => {
+          println("pre time filter intersects")
+          psa = ds.where((ds("start") <= t.start.value and ds("end") >= t.start.value) or (ds("start") >= t.start.value and ds("start") <= t.end.get.value))
+        }
+        case 2 => {
+          println("pre time filter containedby")
+          psa = ds.where(ds("start") >= t.start.value and ds("end") <= t.end.get.value)
+        }
+        case _ => println(" wrong Method: " + method)
+      }
+
 
     } else {
       println("no prefilter")
     }
 
 
-    var predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.CONTAINS)
-    var res1: Array[STO] = null
-    method match {
-      case 0 => {
-        println("using Method contains")
-        predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.CONTAINS)
-      }
-      case 1 => {
-        println("using Method intersects")
-        predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.INTERSECTS)
-      }
-      case 2 => {
-        println("using Method containedby")
-        predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.CONTAINEDBY)
-      }
-      case _ => println(" wrong Method: " + method)
+    var predicateFunc = TestF.getJP(method)
+
+    var indexTyp = IndexTyp.NONE
+    index match {
+      case 0 => indexTyp = IndexTyp.NONE
+      case 1 => indexTyp = IndexTyp.TEMPORAL
+      case 2 => indexTyp = IndexTyp.SPATIAL
+      case _ => println(" wrong Index: " + index)
     }
+
+    var res1: Array[STO] = null
+    import sparks.implicits._
+    val treeorder = order
+
     val t1 = TestUtil.time({
-      val tmp = psa.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
-      res1 = tmp.collect()
+      val psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+      val tmp7 = psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
+      res1 = tmp7.collect()
     }
     )
     println("\nelapsed time for dataset-method in ms: " + t1)
@@ -285,6 +285,7 @@ class TestUtil {
     } else {
       println("result size: " + res1.size)
     }
+
     //-------------------
     if (secondquery) {
       var psa = ds
@@ -297,15 +298,15 @@ class TestUtil {
 
       method match {
         case 0 => {
-          println("time filter contains")
+          println("pre time filter contains")
           psa = ds.where(ds("start") <= t.start.value and ds("end") >= t.end.get.value)
         }
         case 1 => {
-          println("time filter intersects")
+          println("pre time filter intersects")
           psa = ds.where((ds("start") <= t.start.value and ds("end") >= t.start.value) or (ds("start") >= t.start.value and ds("start") <= t.end.get.value))
         }
         case 2 => {
-          println("time filter containedby")
+          println("pre time filter containedby")
           psa = ds.where(ds("start") >= t.start.value and ds("end") <= t.end.get.value)
         }
         case _ => println(" wrong Method: " + method)
@@ -315,8 +316,9 @@ class TestUtil {
       var res2: Array[STO] = null
       println("search data : " + searchData)
       val t2 = TestUtil.time({
-        val tmp = psa.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
-        res2 = tmp.collect()
+        val psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+        val tmp7 = psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
+        res2 = tmp7.collect()
       }
       )
       println("\nelapsed time2 for dataset-method in ms: " + t2)
@@ -337,8 +339,6 @@ class TestUtil {
 
 
   }
-
-
 
 
   def startrddProgramm(): Unit = {
@@ -453,7 +453,7 @@ class TestUtil {
      println()
      printhelp()*/
 
-    if(secondquery){
+    if (secondquery) {
       searchData = secondPolygon
       if (!searchP) {
         searchData = rddRaw.take(secondPoint + 1)(secondPoint)._1
@@ -525,7 +525,7 @@ class TestUtil {
                                     sep: Char = ';',
                                     numParts: Int = 32,
                                     distinct: Boolean = false) = {
-    import collection.JavaConverters._
+
     import sparks.implicits._
     val rdd1 = sc.textFile(file, if (distinct) 1 else numParts) // let's start with only one partition and repartition later
     val rdd = rdd1.map { line => Row.fromSeq(line.split(sep)) }

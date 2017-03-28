@@ -339,44 +339,11 @@ class TestUtil {
   }
 
 
-  def startdatasetProgramm(): Unit = {
-    val ds = createIntervalDataSet(spark, filepath)
 
-
-
-
-
-
-
-    val predicateFunc = JoinPredicate.predicateFunction(JoinPredicate.CONTAINS)
-
-
-    implicit val myObjEncoder = org.apache.spark.sql.Encoders.kryo[STObject]
-
-    /* val newds = ds.map(x => {
-       STObject(x.stob, Interval(x.start, x.end))
-     })*/
-    val xs = ds.take(point + 1)(point)
-    val searchData = STObject(xs.stob, Interval(xs.start, xs.end))
-
-    //STObject("POINT (15.292502748164168 63.93914390076469)", Interval(617, 1670)) //newds.take(point + 1)(point)
-    println("point-data : " + searchData)
-    var res2: Array[STO] = null
-    val t3 = TestUtil.time({
-      //  val tmp = newds.filter { xs => predicateFunc(xs, searchData) }
-      val tmp = ds.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
-      res2 = tmp.collect()
-    })
-    println("\nelapsed time for dataset-method1 in ms: " + t3)
-    println("result2 size: " + res2.size)
-  }
 
   def startrddProgramm(): Unit = {
 
     val rddRaw = createIntervalRDD(sc, filepath)
-
-
-
 
     var searchData = searchPolygon
     if (!searchP) {

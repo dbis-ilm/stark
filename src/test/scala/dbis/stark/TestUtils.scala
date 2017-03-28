@@ -6,6 +6,7 @@ import org.apache.spark.rdd.RDD
 import dbis.stark.spatial.SpatialRDD._
 import org.apache.spark.SparkConf
 import dbis.stark.spatial.BSPartitioner
+
 import java.util.Date
 import java.time.LocalDate
 

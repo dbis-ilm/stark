@@ -38,13 +38,13 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
     val rddRaw = TestUtils.createIntervalRDD(sc,"src/test/resources/10k_1-10000.csv")
 
     var indexData: SpatialRDDFunctions[STObject, (String, STObject)] = rddRaw
-    var res1 = indexData.containedby2(searchPolygon).collect()
+    var res1 = indexData.containedby(searchPolygon).collect()
 
 
 
     val rdd2 = rddRaw.partitionBy(new SpatialGridPartitioner(rddRaw, 10))
     var indexData2: SpatialRDDFunctions[STObject, (String, STObject)] = rdd2
-    val res2 = indexData2.containedby2(searchPolygon).collect()
+    val res2 = indexData2.containedby(searchPolygon).collect()
 
     println(res1.size)
     println(res2.size)

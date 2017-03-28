@@ -59,7 +59,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
 //  }
   
   
-  def withinDistance(qry: STObject, distFunc: (STObject,STObject) => Double, maxDist: Double) = {
+  def withinDistance(qry: G, distFunc: (G,G) => Double, maxDist: Double) = {
     val env = qry.getGeo.getEnvelopeInternal
     val env2 = new Envelope(
         new Coordinate(env.getMinX - maxDist - 1, env.getMinY - maxDist - 1), 

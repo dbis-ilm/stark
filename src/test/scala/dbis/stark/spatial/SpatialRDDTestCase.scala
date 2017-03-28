@@ -73,7 +73,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
 	  val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
-	  val foundGeoms = rdd.contains2(q).collect()
+	  val foundGeoms = rdd.contains(q).collect()
 	  
 	  foundGeoms.size shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -88,7 +88,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     // we look for all elements that contain a given point.
     // thus, the result should be all points in the RDD with the same coordinates
     val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
-    val foundGeoms = rdd.contains2(q).collect()
+    val foundGeoms = rdd.contains(q).collect()
 
     foundGeoms.size shouldBe 6
     foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -124,14 +124,16 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd1.map{ case (st, v) => (st.toText(), 1) }
+    val rdd2 = rdd1.map{ case (st, v) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
-    spatialJoinResult.size shouldBe plainJoinResult.size
-    
+    val isLength = spatialJoinResult.length
+    val shouldLength = plainJoinResult.length
+    withClue(s"comparing result sizes"){isLength shouldBe shouldLength}
+
     // and they both should contain the same elements (we don't care abour ordering)
-    spatialJoinResult should contain theSameElementsAs(plainJoinResult)
+    spatialJoinResult should contain theSameElementsAs plainJoinResult
   }
   
   it should "find correct self-join result for points with contains" in {

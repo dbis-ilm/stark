@@ -413,17 +413,17 @@ class TestUtil {
       method match {
         case 0 => {
           println("using Method contains")
-          val tmp = indexData.contains2(searchData)
+          val tmp = indexData.contains(searchData)
           res = tmp.collect()
         }
         case 1 => {
           println("using Method intersects")
-          val tmp = indexData.intersects2(searchData)
+          val tmp = indexData.intersects(searchData)
           res = tmp.collect()
         }
         case 2 => {
           println("using Method containedby")
-          val tmp = indexData.containedby2(searchData)
+          val tmp = indexData.containedby(searchData)
           res = tmp.collect()
         }
         case 3 => {
@@ -463,17 +463,17 @@ class TestUtil {
         method match {
           case 0 => {
             println("using Method contains")
-            val tmp = indexData.contains2(searchData)
+            val tmp = indexData.contains(searchData)
             res = tmp.collect()
           }
           case 1 => {
             println("using Method intersects")
-            val tmp = indexData.intersects2(searchData)
+            val tmp = indexData.intersects(searchData)
             res = tmp.collect()
           }
           case 2 => {
             println("using Method containedby")
-            val tmp = indexData.containedby2(searchData)
+            val tmp = indexData.containedby(searchData)
             res = tmp.collect()
           }
           case 3 => {

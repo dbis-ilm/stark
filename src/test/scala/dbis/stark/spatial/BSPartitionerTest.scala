@@ -211,7 +211,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 //    parti.printPartitions(java.nio.file.Paths.get(System.getProperty("user.home"), "partition2.csv"))
     
     // make sure there are no duplicate cells, i.e. they shouldn't have the same region
-    parti.cells.map{ case (cell, _) => cell.range}.distinct.size shouldBe parti.cells.size
+    parti.cells.map { case (cell, _) => cell.range }.distinct.length shouldBe parti.cells.length
 
     
     // every point must be in one partition
@@ -233,7 +233,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
         
-        val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))).headOption
+        val containingCell = parti.cells.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
           println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
         } else {
@@ -259,7 +259,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4)
       
       val nonempty = parti.cells.filter(_._2 > 0)
-      nonempty.size shouldBe 7
+      nonempty.length shouldBe 7
       parti.numPartitions shouldBe 7
       
       val cnt = rdd.count()
@@ -284,7 +284,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
             println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
           }
           
-          val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))).headOption
+          val containingCell = parti.cells.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
           if(containingCell.isDefined) {
             println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
           } else {
@@ -301,7 +301,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       
   }
   
-  it should "create real partitions correctly for taxi" taggedAs(Slow) in {
+  it should "create real partitions correctly for taxi" taggedAs Slow in {
     val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -331,7 +331,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
             println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
           }
           
-          val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))).headOption
+          val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
           if(containingCell.isDefined) {
             println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
           } else {
@@ -365,10 +365,10 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       val partiTaxi = new BSPartitioner(rddtaxi, 0.1, 100, false)
       
       val matches = for(t <- partiTaxi.bsp.partitions;
-          b <- parti.bsp.partitions;
-          if(t.extent.intersects(b.extent))) yield (t,b)
+          b <- parti.bsp.partitions
+                        if t.extent.intersects(b.extent)) yield (t,b)
       
-      matches.size shouldBe >(0)
+      matches.length shouldBe >(0)
       val res = new LiveIndexedSpatialRDDFunctions(rdd, 5).join(rddtaxi, JoinPredicate.CONTAINS, None)
   }
   

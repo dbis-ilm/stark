@@ -83,11 +83,11 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     parts.toArray
   }
 
-  private lazy val leftParti = left.partitioner.map{
+  private[stark] lazy val leftParti = left.partitioner.map{
     case sp: SpatialPartitioner => sp
   }
 
-  private lazy val rightParti = right.partitioner.map{
+  private[stark] lazy val rightParti = right.partitioner.map{
     case sp: SpatialPartitioner => sp
   }
 

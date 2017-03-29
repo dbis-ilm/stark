@@ -94,8 +94,46 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
   }
-  
-  
+
+  it should "find the correct within distance filter result" in {
+    val rdd = TestUtils.createRDD(sc).liveIndex(order = 3)
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.withinDistance(q, 0, (l,r) => l.distance(r)).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+  }
+
+  it should "find the correct within distance filter result with FixedGrid" in {
+    val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 10), order = 3)
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.withinDistance(q, 0, (l,r) => l.distance(r)).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+  }
+
+  it should "find the correct within distance filter result with BSP" in {
+    val rddRaw = TestUtils.createRDD(sc)
+    val rdd = rddRaw.liveIndex(new BSPartitioner(rddRaw, 1, 50), order = 3)
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.withinDistance(q, 0, (l,r) => l.distance(r)).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+  }
+
+
   it should "find correct self-join result for points with intersect with grid partitioning" in {
     
     val rdd = TestUtils.createRDD(sc, distinct = true).cache()
@@ -243,4 +281,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     res.count() shouldBe 4
   }
+
+
+
 }

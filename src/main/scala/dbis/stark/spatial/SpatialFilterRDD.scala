@@ -13,7 +13,7 @@ import scala.reflect.ClassTag
 /**
   * Created by hg on 24.02.17.
   */
-class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
+class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
   private val parent: RDD[(G,V)],
   qry: G,
   predicateFunc: (G,G) => Boolean,
@@ -26,6 +26,13 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag](
 
   def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate, treeOrder: Int = -1) =
     this(parent, qry, JoinPredicate.predicateFunction(predicate), treeOrder, true)
+
+  /**
+    * The partitioner of this RDD.
+    *
+    * This will always be set to the parent's partitioner
+    */
+  override val partitioner = parent.partitioner
 
   /**
     * Return the partitions that have to be processed.

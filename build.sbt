@@ -1,6 +1,6 @@
 name := "stark"
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
 
 lazy val stark = (project in file("."))
 

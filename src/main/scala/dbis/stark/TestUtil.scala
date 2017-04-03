@@ -38,7 +38,7 @@ object TestUtil {
   }
 }
 
-class TestUtil{
+class TestUtil {
 
   var filesource = ""
   var filepath = filesource
@@ -204,17 +204,17 @@ class TestUtil{
   }
 
 
-  def blubb() = udf((start: Long) => (math.ceil(start / 1000).toInt).toLong)
-
   def startdatasetProgramm2(sparks: SparkSession): Unit = {
-    val ds = if (!datasetfromrdd) {
-      println("createIntervalDataSet")
-      createIntervalDataSet(spark, filepath)
-    } else {
-      println("createIntervalDataSetFromRdd")
-      createIntervalDataSetFromRdd(sc, spark, filepath)
-    }
+    //if (!datasetfromrdd) {
 
+    val ds = createIntervalDataSet(spark, filepath)
+    println("createIntervalDataSet")
+  //  } else {
+   //   println("createIntervalDataSetFromRdd")
+    //  createIntervalDataSetFromRdd(sc, spark, filepath)
+   // }
+
+   // ds.cache()
 
     println("using dataset")
 
@@ -227,6 +227,7 @@ class TestUtil{
     var searchData = searchPolygon
     if (!searchP) {
       val xs = ds.take(point + 1)(point)
+
       searchData = STObject(xs.stob, Interval(xs.start, xs.end))
     }
     println("search data : " + searchData)
@@ -268,12 +269,16 @@ class TestUtil{
       case _ => println(" wrong Index: " + index)
     }
 
-    var res1: Array[STO] = null
+    var res1: Array[ESTO] = null
     import sparks.implicits._
     val treeorder = order
 
     val t1 = TestUtil.time({
-      val psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+      var psa2 = psa
+      if (indexTyp != IndexTyp.NONE) {
+        println("index")
+        psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+      }
       val tmp7 = psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
       res1 = tmp7.collect()
     }
@@ -294,29 +299,21 @@ class TestUtil{
         val xs = ds.take(secondPoint + 1)(secondPoint)
         searchData = STObject(xs.stob, Interval(xs.start, xs.end))
       }
-      val t = searchData.getTemp.get
 
-      method match {
-        case 0 => {
-          println("pre time filter contains")
-          psa = ds.where(ds("start") <= t.start.value and ds("end") >= t.end.get.value)
-        }
-        case 1 => {
-          println("pre time filter intersects")
-          psa = ds.where((ds("start") <= t.start.value and ds("end") >= t.start.value) or (ds("start") >= t.start.value and ds("start") <= t.end.get.value))
-        }
-        case 2 => {
-          println("pre time filter containedby")
-          psa = ds.where(ds("start") >= t.start.value and ds("end") <= t.end.get.value)
-        }
-        case _ => println(" wrong Method: " + method)
+      if (prefilter) {
+       psa = TestF.prefilter(method,ds,searchData)
+
+      } else {
+        println("no prefilter")
       }
 
-
-      var res2: Array[STO] = null
+      var res2: Array[ESTO] = null
       println("search data : " + searchData)
       val t2 = TestUtil.time({
-        val psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+        var psa2 = psa
+        if (indexTyp != IndexTyp.NONE) {
+          psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+        }
         val tmp7 = psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
         res2 = tmp7.collect()
       }
@@ -344,6 +341,8 @@ class TestUtil{
   def startrddProgramm(): Unit = {
 
     val rddRaw = createIntervalRDD(sc, filepath)
+
+
 
     var searchData = searchPolygon
     if (!searchP) {
@@ -373,6 +372,7 @@ class TestUtil{
       }
     )
 
+    rdd.cache()
 
 
     println("time for partitionby: " + t2)
@@ -518,28 +518,6 @@ class TestUtil{
   }
 
 
-  def createIntervalDataSetFromRdd(
-                                    sc: SparkContext,
-                                    sparks: SparkSession,
-                                    file: String = "src/test/resources/intervaltest.csv",
-                                    sep: Char = ';',
-                                    numParts: Int = 32,
-                                    distinct: Boolean = false) = {
-
-    import sparks.implicits._
-    val rdd1 = sc.textFile(file, if (distinct) 1 else numParts) // let's start with only one partition and repartition later
-    val rdd = rdd1.map { line => Row.fromSeq(line.split(sep)) }
-    val fields = "id,stob,start,end".split(",").map(fieldName => StructField(fieldName, if (fieldName.equals("stob")) {
-      StringType
-    } else {
-      LongType
-    }, nullable = true))
-    val schema = StructType(fields)
-    var ds = spark.createDataFrame(rdd, schema).as[STO]
-
-    ds
-  }
-
 
   def createIntervalDataSet(
                              sparks: SparkSession,
@@ -548,11 +526,39 @@ class TestUtil{
                            ) = {
     import sparks.implicits._
     //import sparkss.implicits._
-    val sparkss = sparks.read.option("inferSchema", "true").option("delimiter", sep).csv(file).toDF("id", "stob", "start", "end")
-    //sparkss.withColumn("test", blubb()(sparkss("start")))
-    sparkss.as[STO];
+    var sparkss = sparks.read.option("inferSchema", "true").option("delimiter", sep).csv(file).toDF("id", "stob", "start", "end")
+    // "minx", "maxx", "miny", "maxy"
+
+    //sparkss.withColumn("minx",sparkss("id"))
+    /*sparkss.withColumn("maxx",sparkss("id"))
+     sparkss.withColumn("miny",sparkss("id"))
+     sparkss.withColumn("maxy",sparkss("id"))*/
+   // sparkss = sparkss.withColumn("stob2", blubb()(sparkss("stob")))
+   // sparkss.show(10)
+
+
+    val extsto = sparkss.map( x => {
+      val s = x.getString(1)
+      val ob = STObject(s)
+      val env = ob.getEnvelopeInternal()
+      ESTO(x.getInt(0).toLong,
+        x.getString(1),
+        x.getInt(2).toLong,
+        x.getInt(3).toLong,
+        env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
+    })
+
+    extsto.as[ESTO]
 
   }
+
+  def blubb() = udf((stob: String) => {
+    val x = stob
+    val ob = STObject(x)
+    val env = ob.getEnvelopeInternal()
+
+    env.getMaxX +""
+  })
 
 
   def createSparkContext(name: String) = {
@@ -570,4 +576,12 @@ class TestUtil{
 
 }
 
-case class STO(id: Long, stob: String, start: Long, end: Long)
+
+
+
+
+
+//case class STO(id: Long, stob: String, start: Long, end: Long)
+
+case class ESTO(id: Long, stob: String, start: Long, end: Long,minx: Double, maxx: Double, miny: Double, maxy: Double)
+

@@ -6,7 +6,7 @@ import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, TaskContext}
+import org.apache.spark.{Partition, Partitioner, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -32,7 +32,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
     *
     * This will always be set to the parent's partitioner
     */
-  override val partitioner = parent.partitioner
+  override val partitioner: Option[Partitioner] = parent.partitioner
 
   /**
     * Return the partitions that have to be processed.
@@ -83,10 +83,18 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
       case _ => inputSplit
     }
 
-    // distinguish between no and live indexing
+    /* distinguish between no and live indexing
+     * of tree order is zero or smaller, indexing is _not_ applied.
+     *
+     * It it is greater than 0, we will perform live indexing
+     */
     if(treeOrder <= 0) {
+
+      // simply iterate over all items in this partition and apply the predicate function
       parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
     } else {
+
+      // create tree object
       val tree = new RTree[G,(G,V)](treeOrder)
 
       // insert everything into the tree

@@ -1,5 +1,7 @@
 package dbis.stark.spatial
 
+import java.nio.file.Paths
+
 import dbis.stark.STObject
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
@@ -20,6 +22,22 @@ import scala.reflect.ClassTag
 class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
   ) extends SpatialRDDFunctions[G,V] with Serializable {
+
+
+  def saveAsStarkTextFile(path: String): Unit = rdd.partitioner.foreach {
+    case sp: SpatialPartitioner =>
+      val wkts = rdd.partitions.indices.map{i =>
+        Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+      }
+
+      rdd.saveAsTextFile(path)
+      rdd.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+
+    // in case there is no or not a spatial partitioner, use normal save
+    case _ => rdd.saveAsTextFile(path)
+  }
+
+
 
   /**
    * Find all elements that intersect with a given query geometry

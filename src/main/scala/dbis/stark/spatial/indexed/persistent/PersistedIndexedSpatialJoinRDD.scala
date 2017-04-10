@@ -55,15 +55,15 @@ class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
     val currSplit = split.asInstanceOf[JoinPartition]
-    (left.preferredLocations(currSplit.s1) ++ right.preferredLocations(currSplit.s2)).distinct
+    (left.preferredLocations(currSplit.leftPartition) ++ right.preferredLocations(currSplit.rightPartition)).distinct
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
     val currSplit = split.asInstanceOf[JoinPartition]
 
-    val rightArray = right.iterator(currSplit.s2, context).toArray
+    val rightArray = right.iterator(currSplit.rightPartition, context).toArray
 
-    val resultIter = left.iterator(currSplit.s1, context).flatMap{ tree =>
+    val resultIter = left.iterator(currSplit.leftPartition, context).flatMap{ tree =>
       
       /*
        * Returns:

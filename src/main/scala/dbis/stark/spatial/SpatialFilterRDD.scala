@@ -10,8 +10,17 @@ import org.apache.spark.{Partition, Partitioner, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
+
 /**
-  * Created by hg on 24.02.17.
+  * A stpatio-temporal filter implementation
+  *
+  * @param parent The parent RDD serving as input
+  * @param qry The query object used in the filter evaluation
+  * @param predicateFunc The predicate to apply in the filter
+  * @param treeOrder The (optional) order of the tree. <= 0 to not apply indexing
+  * @param checkParties Perform partition check
+  * @tparam G The type representing spatio-temporal data
+  * @tparam V The payload data
   */
 class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
   private val parent: RDD[(G,V)],
@@ -20,10 +29,26 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
   treeOrder: Int,
   private val checkParties: Boolean) extends RDD[(G,V)](parent) {
 
-
+  /**
+    * A stpatio-temporal filter implementation
+    *
+    * @param parent The parent RDD serving as input
+    * @param qry The query object used in the filter evaluation
+    * @param predicateFunc The predicate to apply in the filter
+    * @return Creates a new instance of this class
+    */
   def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
     this(parent, qry, predicateFunc, -1, false)
 
+  /**
+    * A stpatio-temporal filter implementation
+    *
+    * @param parent The parent RDD serving as input
+    * @param qry The query object used in the filter evaluation
+    * @param predicate The predicate to apply in the filter
+    * @param treeOrder The (optional) order of the tree. <= 0 to not apply indexing
+    * @return Creates a new instance of this class
+    */
   def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate, treeOrder: Int = -1) =
     this(parent, qry, JoinPredicate.predicateFunction(predicate), treeOrder, true)
 
@@ -45,6 +70,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
     * @return The list of partitions of this RDD
     */
   override def getPartitions: Array[Partition] = partitioner.map{
+      // check if this is a spatial partitioner
       case sp: SpatialPartitioner if checkParties =>
 
         val spatialParts = ListBuffer.empty[Partition]
@@ -53,11 +79,15 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
         var parentPartiId = 0
         var spatialPartId = 0
         val numParentParts = parent.getNumPartitions
+
+        // loop over all partitions in the parent
         while (parentPartiId < numParentParts) {
 
           val cell = sp.partitionBounds(parentPartiId)
 
+          // check if partitions intersect
           if (Utils.toEnvelope(cell.extent).intersects(qryEnv)) {
+            // create a new "spatial partition" pointing to the parent partition
             spatialParts += SpatialPartition(spatialPartId, parentPartiId, parent)
             spatialPartId += 1
           }
@@ -67,9 +97,11 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
 
         spatialParts.toArray
 
+      // if it's not a spatial partitioner, we cannot apply partition pruning
       case _ =>
         parent.partitions
-    }.getOrElse(parent.partitions)
+
+    }.getOrElse(parent.partitions) // no partitioner
 
 
   @DeveloperApi
@@ -79,7 +111,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
      * partition/split is encapsulated
      */
     val split = inputSplit match {
-      case sp: SpatialPartition => sp.split
+      case sp: SpatialPartition => sp.parentPartition
       case _ => inputSplit
     }
 

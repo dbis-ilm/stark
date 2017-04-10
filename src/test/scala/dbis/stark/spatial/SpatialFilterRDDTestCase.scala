@@ -18,7 +18,6 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
       sc.stop()
   }
 
-
   "A SpatialFilterRDD" should "return all partitions if no spatial partitioner was applied" in {
 
     val raw = TestUtils.createRDD(sc)

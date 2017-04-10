@@ -10,7 +10,18 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 /**
-  * Created by hg on 25.03.17.
+  * A spatio-temporal join implementation.
+  *
+  * Currently this is a nested loop implementation
+  *
+  * @param left The left input RDD
+  * @param right The right input RDD
+  * @param predicateFunc The predicate to apply in the join (join condition)
+  * @param treeOrder The (optional) order of the tree. <= 0 to not apply indexing
+  * @param checkParties Perform partition check
+  * @tparam G The type representing spatio-temporal data
+  * @tparam V The type representing payload data in left RDD
+  * @tparam V2 The type representing payload data in right RDD
   */
 class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] private (
   var left: RDD[(G,V)],
@@ -93,29 +104,36 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
   override def compute(s: Partition, context: TaskContext): Iterator[(V, V2)] = {
 
+    // in getPartitions we created JoinPartition that link to two partitions that have to be joined
     val split = s.asInstanceOf[JoinPartition]
 
+    // if treeOrder is <= 0 we do not use indexing
     if(treeOrder <= 0) {
-      val rightList = right.iterator(split.s2, context).toArray
+      // collect the right partition into an array
+      val rightList = right.iterator(split.rightPartition, context).toArray
 
-      left.iterator(split.s1, context).flatMap{ case (lg, lv) =>
+      // loop over the left partition and check join condition on every element in the right partition's array
+      left.iterator(split.leftPartition, context).flatMap{ case (lg, lv) =>
         rightList.filter{ case (rg, _) => predicateFunc(lg,rg)}.map{ case (_,rv) => (lv,rv) }
 
       }
-    } else {
+    } else { // we should apply indexing
+
+      // the index
       val tree = new RTree[G,(G,V2)](capacity = treeOrder)
 
       // insert everything into the tree
-      right.iterator(split.s2, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
+      right.iterator(split.rightPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
 
       // build the tree
       tree.build()
 
-
-
-      // query tree and perform candidates check
-      left.iterator(split.s1, context).flatMap { case (lg, lv) =>
-        tree.query(lg).filter{ case (rg, _) => predicateFunc(lg, rg) }.map{ case (_,rv) => (lv,rv)}
+      // loop over every element in the left partition and query tree.
+      // For the results of a query we have to perform candidates check
+      left.iterator(split.leftPartition, context).flatMap { case (lg, lv) =>
+        tree.query(lg) // index query
+          .filter{ case (rg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
+          .map{ case (_,rv) => (lv,rv)} // result is the combined tuple of the payload items
       }
 
 
@@ -124,7 +142,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
     val currSplit = split.asInstanceOf[JoinPartition]
-    (left.preferredLocations(currSplit.s1) ++ right.preferredLocations(currSplit.s2)).distinct
+    (left.preferredLocations(currSplit.leftPartition) ++ right.preferredLocations(currSplit.rightPartition)).distinct
   }
 
   override def getDependencies: Seq[Dependency[_]] = List(

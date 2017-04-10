@@ -7,15 +7,26 @@ import org.apache.spark.rdd.RDD
 
 
 /**
-  * Created by hage on 27.03.17.
+  * A spatial partition represents a partitioning with spatial bounds.
+  *
+  * Instances of this class simply contain the pointer (index number) of the parent partition
+  * @param idx The index number of this partition
+  * @param parentPartitionId The index number of the parent partition
+  * @param rdd The parent RDD
   */
-case class SpatialPartition(private val idx: Int, origIndex: Int, @transient private val rdd: RDD[_]) extends Partition {
+case class SpatialPartition(
+   private val idx: Int,
+   parentPartitionId: Int,
+   @transient private val rdd: RDD[_]) extends Partition {
+
   override def index: Int = idx
 
-  var split = rdd.partitions(origIndex)
+  var parentPartition: Partition = rdd.partitions(parentPartitionId)
 
   private def writeObject(oos: ObjectOutputStream): Unit = {
-    split = rdd.partitions(origIndex)
+    parentPartition = rdd.partitions(parentPartitionId)
     oos.defaultWriteObject()
   }
+
+  override def toString: String = s"SpatialPartition[idx=$idx, parentPartitionId=$parentPartitionId]"
 }

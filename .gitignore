@@ -57,6 +57,7 @@ src_managed/
 project/boot/
 project/plugins/project/
 buildinfo.properties
+project/build.properties
 
 # Scala-IDE specific
 .scala_dependencies

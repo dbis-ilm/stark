@@ -45,7 +45,7 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
     val currSplit = split.asInstanceOf[JoinPartition]
-    (rdd1.preferredLocations(currSplit.s1) ++ rdd2.preferredLocations(currSplit.s2)).distinct
+    (rdd1.preferredLocations(currSplit.leftPartition) ++ rdd2.preferredLocations(currSplit.rightPartition)).distinct
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
@@ -53,7 +53,7 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
 
     val map = SpatialRDD.createExternalMap[G, V, V2]()
     
-    rdd1.iterator(currSplit.s1, context).foreach{ tree => 
+    rdd1.iterator(currSplit.leftPartition, context).foreach{ tree =>
       
       /*
        * Returns:
@@ -65,11 +65,11 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
       val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
       
       val partitionCheck = rightParti.forall { p =>
-        indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.s2.index)))
+        indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.rightPartition.index)))
       }
       
       if(partitionCheck) {
-        rdd2.iterator(currSplit.s2, context).foreach{ case (rg,rv) =>
+        rdd2.iterator(currSplit.rightPartition, context).foreach{ case (rg,rv) =>
           tree.query(rg)
               .filter { case (lg,_) => predicate(lg,rg)}
               .map{ case (lg,lv) => (lg,(lv,rv)) }

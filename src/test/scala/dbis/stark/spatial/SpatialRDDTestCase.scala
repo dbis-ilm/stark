@@ -240,11 +240,14 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(TestUtils.makeTimeStamp(2013, 6, 1)))
 
+    val start = System.currentTimeMillis()
     val skyline = rdd.filter(_._1 != q).skyline(q,
       Skyline.euclidDist,
       Skyline.centroidDominates,
       ppD = 5)
       .collect()
+    val end = System.currentTimeMillis()
+    println(s"${end -start}ms")
 
     // check that there is no point in the RDD that dominates any skyline point
     skyline.foreach { skylinePoint =>

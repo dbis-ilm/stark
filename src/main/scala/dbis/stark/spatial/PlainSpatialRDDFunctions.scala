@@ -11,6 +11,7 @@ import dbis.stark.spatial.partitioner.{SpatialGridPartitioner, SpatialPartitione
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 
@@ -175,7 +176,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       ref: STObject,
       distFunc: (STObject, STObject) => (Double, Double),
       dominates: (STObject, STObject) => Boolean,
-      ppD: Int): RDD[(G,V)] = {
+      ppD: Int,
+      allowCache: Boolean = false): RDD[(G,V)] = {
 
     def localSkyline(iter: Iterator[(STObject,(G,V))]): Iterator[(STObject,(G,V))] = {
       val arr = iter.toArray
@@ -193,7 +195,34 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
 
     // TODO: specify parititoner as parameter - but it has to work on distance RDD...
-    val partedDistRDD = distanceRDD.partitionBy(new SpatialGridPartitioner(distanceRDD, ppD))
+    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD)
+    val partedDistRDD = distanceRDD.partitionBy(partitioner)
+
+    val cachedDistRDD = if(allowCache) partedDistRDD.cache() else partedDistRDD
+
+    val globalBS = cachedDistRDD.mapPartitionsWithIndex{ case (idx, iter) =>
+      val bs = mutable.BitSet.empty
+      if(iter.nonEmpty)
+        bs += idx
+
+      Iterator(bs)
+    }.reduce{ case (bs1, bs2) => bs1 | bs2}
+
+    for(idx <- globalBS) {
+      val currMax = partitioner.partitionExtent(idx).ur.c
+      val currMaxTup = STObject(currMax(0), currMax(1))
+
+      (idx until partitioner.numPartitions).foreach{ otherPart =>
+        val otherMin = partitioner.partitionExtent(otherPart).ll.c
+        val otherMinTup = STObject(otherMin(0), otherMin(1))
+
+        if(Skyline.centroidDominates(currMaxTup, otherMinTup)) {
+          globalBS(otherPart) = false
+        }
+      }
+    }
+
+    val bsBC = rdd.sparkContext.broadcast(globalBS)
 
     // TODO: partition pruning: for the grid and BSP based partitioners we know that partitions dominate each other
     // how to apply this here?
@@ -203,10 +232,15 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 //    val localSkylines = partedDistRDD.mapPartitions(localSkyline).collect().iterator
 //    rdd.sparkContext.parallelize(localSkyline(localSkylines).map(_._2).toSeq)
 
-    partedDistRDD.mapPartitions(localSkyline) // compute local skyline in each partition
-                  .coalesce(1)                // collect local skyline points into a single partition
-                  .mapPartitions(localSkyline) // compute skyline out of the local skyline points
-                  .map(_._2)                  // transform back to input format
+    cachedDistRDD.mapPartitionsWithIndex{ case (idx, iter) =>
+        if(bsBC.value(idx))
+          localSkyline(iter)
+        else
+          Iterator.empty
+      } // compute local skyline in each partition
+      .coalesce(1)                // collect local skyline points into a single partition
+      .mapPartitions(localSkyline) // compute skyline out of the local skyline points
+      .map(_._2)                  // transform back to input format
 
   }
   // LIVE

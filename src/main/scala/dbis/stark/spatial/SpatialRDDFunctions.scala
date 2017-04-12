@@ -38,7 +38,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
   def skyline(ref: STObject,
               distFunc: (STObject, STObject) => (Double, Double),
               dominates: (STObject, STObject) => Boolean,
-              ppD: Int): RDD[(G,V)]
+              ppD: Int,
+              alloCache: Boolean): RDD[(G,V)]
   
   /**
    * Cluster this SpatialRDD using DBSCAN

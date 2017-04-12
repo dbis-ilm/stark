@@ -125,6 +125,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   override def skyline(ref: STObject,
                        distFunc: (STObject, STObject) => (Double, Double),
                        dominates: (STObject, STObject) => Boolean,
-                       ppD: Int): RDD[(G, V)] = ???
+                       ppD: Int,
+                       allowCache: Boolean): RDD[(G, V)] = ???
 }
 

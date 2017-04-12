@@ -121,5 +121,10 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  maxPartitionCost: Int = 10,
 		  outfile: Option[String] = None
 		  ) : RDD[(G, (Int, V))] = ???
+
+  override def skyline(ref: STObject,
+                       distFunc: (STObject, STObject) => (Double, Double),
+                       dominates: (STObject, STObject) => Boolean,
+                       ppD: Int): RDD[(G, V)] = ???
 }
 

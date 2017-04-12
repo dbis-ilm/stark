@@ -34,7 +34,11 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
    */
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean): RDD[(V,V2)]
   def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner]): RDD[(V,V2)]
-  
+
+  def skyline(ref: STObject,
+              distFunc: (STObject, STObject) => (Double, Double),
+              dominates: (STObject, STObject) => Boolean,
+              ppD: Int): RDD[(G,V)]
   
   /**
    * Cluster this SpatialRDD using DBSCAN

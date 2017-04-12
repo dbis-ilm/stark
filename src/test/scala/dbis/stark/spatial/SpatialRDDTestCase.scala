@@ -2,7 +2,7 @@ package dbis.stark.spatial
 
 import com.vividsolutions.jts.io.WKTReader
 import dbis.stark.STObject._
-import dbis.stark.{Interval, STObject, TestUtils}
+import dbis.stark.{Instant, Interval, STObject, TestUtils}
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.partitioner.SpatialGridPartitioner
 import org.apache.spark.SparkContext
@@ -108,7 +108,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd1.map{ case (st, v) => (st.toText, 1) }
+    val rdd2 = rdd1.map{ case (st, _) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -135,7 +135,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd1.map{ case (st, v) => (st.toText, 1) }
+    val rdd2 = rdd1.map{ case (st, _) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -160,7 +160,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd1.map{ case (st, v) => (st.toText, 1) }
+    val rdd2 = rdd1.map{ case (st, _) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -233,6 +233,34 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val res = rdd.containedby(q)
     
     res.count() shouldBe 4
+  }
+
+  it should "compute the correct skyline" in {
+
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(TestUtils.makeTimeStamp(2013, 6, 1)))
+
+    val skyline = rdd.filter(_._1 != q).skyline(q,
+      Skyline.euclidDist,
+      Skyline.centroidDominates,
+      ppD = 5)
+      .collect()
+
+    // check that there is no point in the RDD that dominates any skyline point
+    skyline.foreach { skylinePoint =>
+      val refDist = Skyline.euclidDist(q,skylinePoint._1)
+      val skylineRef = STObject(refDist._1, refDist._2)
+
+      val forAll = rdd.filter( _._1 != q )
+        .map{ case (l,_) => Skyline.euclidDist(q,l)}
+        .filter{ case (sDist, tDist) =>
+          Skyline.centroidDominates(STObject(sDist, tDist), skylineRef)
+        }
+        .collect()
+
+      forAll shouldBe empty
+    }
+
   }
   
 }

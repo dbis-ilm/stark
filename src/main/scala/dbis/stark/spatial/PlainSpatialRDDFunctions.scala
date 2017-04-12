@@ -7,7 +7,7 @@ import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.partitioner.{SpatialGridPartitioner, SpatialPartitioner}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
@@ -160,37 +160,75 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 	   *
 	   * We do know that there is a payload, hence calling .get is safe
 	   */
-	  val points = if (includeNoise) model.points else model.points.filter(_.label != ClusterLabel.Noise)
-	  
-	  /* if the outfile is defined, write the clustering result
-	   * this can be used for debugging and visualization
-	   */
-	  if(outfile.isDefined)
-		  points.coalesce(1).saveAsTextFile(outfile.get)
-		  
-	  points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
+    val points = if (includeNoise) model.points else model.points.filter(_.label != ClusterLabel.Noise)
+
+    /* if the outfile is defined, write the clustering result
+     * this can be used for debugging and visualization
+     */
+    if(outfile.isDefined)
+    points.coalesce(1).saveAsTextFile(outfile.get)
+
+    points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
 
+  override def skyline(
+      ref: STObject,
+      distFunc: (STObject, STObject) => (Double, Double),
+      dominates: (STObject, STObject) => Boolean,
+      ppD: Int): RDD[(G,V)] = {
+
+    def localSkyline(iter: Iterator[(STObject,(G,V))]): Iterator[(STObject,(G,V))] = {
+      val arr = iter.toArray
+      arr.filterNot{i => arr.exists{j => dominates(j._1,i._1)}}.iterator
+    }
+
+    /*
+     * compute the distance in space and time for each element
+     * The STObject in first position represents the distances
+     */
+    val distanceRDD = rdd.map{ case (g,v) =>
+      val (sDist, tDist) = distFunc(ref, g)
+
+      (STObject(sDist, tDist), (g,v))
+    }
+
+    // TODO: specify parititoner as parameter - but it has to work on distance RDD...
+    val partedDistRDD = distanceRDD.partitionBy(new SpatialGridPartitioner(distanceRDD, ppD))
+
+    // TODO: partition pruning: for the grid and BSP based partitioners we know that partitions dominate each other
+    // how to apply this here?
+
+    // maybe instead of collect, coalesce(1).mapPartitions(localSkyline) is faster?
+    // but there's probably no difference...
+//    val localSkylines = partedDistRDD.mapPartitions(localSkyline).collect().iterator
+//    rdd.sparkContext.parallelize(localSkyline(localSkylines).map(_._2).toSeq)
+
+    partedDistRDD.mapPartitions(localSkyline) // compute local skyline in each partition
+                  .coalesce(1)                // collect local skyline points into a single partition
+                  .mapPartitions(localSkyline) // compute skyline out of the local skyline points
+                  .map(_._2)                  // transform back to input format
+
+  }
   // LIVE
-  
+
   def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, order)
-  
-  def liveIndex(partitioner: SpatialPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] = 
+
+  def liveIndex(partitioner: SpatialPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] =
     liveIndex(Some(partitioner), order)
-  
+
   def liveIndex(partitioner: Option[SpatialPartitioner], order: Int) = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
-		new LiveIndexedSpatialRDDFunctions(reparted, order)
+    new LiveIndexedSpatialRDDFunctions(reparted, order)
   }
 
   def index(partitioner: SpatialPartitioner, order: Int): RDD[RTree[G,(G,V)]] = index(Some(partitioner), order)
 
   /**
-   * Create an index for each partition. 
-   * 
-   * This puts all data items of a partition into an Index structure, e.g., R-tree
-   * and thus changes the type of the RDD from RDD[(STObject, V)] to RDD[RTree[STObject, (STObject, V)]]
-   */
+    * Create an index for each partition.
+    *
+    * This puts all data items of a partition into an Index structure, e.g., R-tree
+    * and thus changes the type of the RDD from RDD[(STObject, V)] to RDD[RTree[STObject, (STObject, V)]]
+    */
   def index(partitioner: Option[SpatialPartitioner] = None, order: Int = 10): RDD[RTree[G,(G,V)]] = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
     reparted.mapPartitions(iter => {
@@ -202,7 +240,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       Iterator.single(tree)
     },
-      preservesPartitioning = true) // preserve partitioning
+    preservesPartitioning = true) // preserve partitioning
   }
 
 }

@@ -1,7 +1,6 @@
 package dbis.stark
 
-import com.vividsolutions.jts.geom.Geometry
-
+import com.vividsolutions.jts.geom.{Geometry, Point}
 import STObject._
 import com.vividsolutions.jts.io.WKTReader
 
@@ -20,10 +19,15 @@ import com.vividsolutions.jts.io.WKTReader
  * @param g The geometry 
  * @param time The optional time component 
  */
-case class STObject(private val g: GeoType, time: Option[TemporalExpression]) extends BaseExpression[STObject] {
-  
+case class STObject(
+   private val g: GeoType,
+   time: Option[TemporalExpression]) extends BaseExpression[STObject] {
+
+  def area = g.getArea
+  def length = time.map(_.length)
+
   def intersectsSpatial(t: STObject) = g.intersects(t.g)
-  def intersectsTemporal(t: STObject) = (time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.intersects(t.time.get)))
+  def intersectsTemporal(t: STObject) = time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.intersects(t.time.get))
   
   /**
    * Check if this spatial object intersects with the other given object.
@@ -39,7 +43,7 @@ case class STObject(private val g: GeoType, time: Option[TemporalExpression]) ex
   
   
   def containsSpatial(t: STObject) = g.contains(t.g)
-  def containsTemporal(t: STObject) = (time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.contains(t.time.get))) 
+  def containsTemporal(t: STObject) = time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.contains(t.time.get))
   
   /**
    * Check if this spatial object completely contains the other given object.
@@ -77,7 +81,7 @@ case class STObject(private val g: GeoType, time: Option[TemporalExpression]) ex
    * The ID is <emph>NOT</emph> considered for equality check!  
    */
   override def equals(that: Any): Boolean = that match {
-    case STObject(g, t) => (this.g equals g) && (this.time equals t)
+    case STObject(geo, t) => (this.g equals geo) && (this.time equals t)
     case _ => false
   }
   
@@ -102,7 +106,12 @@ object STObject {
   def apply(g: GeoType, time: Long): STObject = this(g, Some(Instant(time)))
   def apply(g: GeoType, start: Long, stop: Long): STObject = this(g, Some(Interval(start, stop)))
 //  def apply(g: GeoType, start: Long, stop: Option[Long]): STObject = this(g, Some(Interval(start, Instant(stop))))
-  
+
+  def apply(x: Double, y: Double): STObject = this(new WKTReader().read(s"POINT($x $y)"))
+  def apply(x: Double, y: Double, ts: Long): STObject = this(new WKTReader().read(s"POINT($x $y)"), ts)
+  def apply(x: Double, y: Double, z: Double): STObject = this(new WKTReader().read(s"POINT($x $y $z)"))
+  def apply(x: Double, y: Double, z: Double, ts: Long): STObject = this(new WKTReader().read(s"POINT($x $y $z)"), ts)
+
   type GeoType = Geometry
   
   implicit def getInternal(s: STObject): GeoType = s.g

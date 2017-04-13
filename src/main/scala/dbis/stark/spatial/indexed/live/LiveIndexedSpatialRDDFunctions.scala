@@ -79,14 +79,15 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Perform a spatial join using the given predicate function.
    * When using this variant partitions cannot not be pruned. And basically a cartesian product has
-   * to be computed and filtered<br><br>
+   * to be computed and filtered
    *
-   * <b>NOTE</b> This method will <b>NOT</b> use an index as the given predicate function may want to find elements that are not returned
+   * ==NOTE==
+   * This method will <b>NOT</b> use an index as the given predicate function may want to find elements that are not returned
    * by the index query (which does an intersect)
    *
    * @param other The other RDD to join with
    * @param pred A function to compute the join predicate. The first parameter is the geometry of the left input RDD (i.e. the RDD on which this function is called)
-   * and the parameter is the geometry of <code>other</code>
+   * and the parameter is the geometry of other
    * @return Returns an RDD containing the Join result
    */
   def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) =

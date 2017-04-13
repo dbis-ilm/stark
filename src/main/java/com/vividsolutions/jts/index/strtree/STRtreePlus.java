@@ -145,7 +145,7 @@ public class STRtreePlus<T> extends STRtree
       double currentDistance = bndPair.getDistance();
       
       
-      /**
+      /*
        * If the distance for the first node in the queue
        * is >= the current maximum distance in the k queue , all other nodes
        * in the queue must also have a greater distance.
@@ -156,7 +156,8 @@ public class STRtreePlus<T> extends STRtree
       if (currentDistance >= distanceLowerBound && kNearestDistances.size()>=k){
     	  break;  
       }
-      /**
+
+      /*
        * If the pair members are leaves
        * then their distance is the exact lower bound.
        * Update the distanceLowerBound to reflect this
@@ -225,7 +226,7 @@ public class STRtreePlus<T> extends STRtree
           return;
         //*/
 
-        /**
+        /*
          * Otherwise, expand one side of the pair,
          * (the choice of which side to expand is heuristically determined) 
          * and insert the new expanded pairs into the queue

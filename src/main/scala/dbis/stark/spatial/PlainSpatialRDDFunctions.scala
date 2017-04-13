@@ -224,9 +224,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     val bsBC = rdd.sparkContext.broadcast(globalBS)
 
-    // TODO: partition pruning: for the grid and BSP based partitioners we know that partitions dominate each other
-    // how to apply this here?
-
     // maybe instead of collect, coalesce(1).mapPartitions(localSkyline) is faster?
     // but there's probably no difference...
 //    val localSkylines = partedDistRDD.mapPartitions(localSkyline).collect().iterator

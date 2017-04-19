@@ -12,6 +12,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
@@ -172,6 +173,32 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
 
+  def skylineAgg(
+                ref: STObject,
+                distFunc: (STObject, STObject) => (Double, Double),
+                dominates: (STObject, STObject) => Boolean
+                ): RDD[(G,V)] = {
+
+    def combine(sky: Skyline[(G,V)], tuple: (G,V)): Skyline[(G,V)] = {
+      val dist = Skyline.euclidDist(tuple._1, ref)
+      val distObj = STObject(dist._1, dist._2)
+      sky.insert((distObj, tuple))
+      sky
+    }
+
+    def merge(sky1: Skyline[(G,V)], sky2: Skyline[(G,V)]): Skyline[(G,V)] = {
+      val sky3 = sky2
+      sky1.iterator.foreach(p => sky3.insert(p))
+      sky3
+    }
+
+    val s = rdd.aggregate{new Skyline[(G,V)]()}(combine,merge).skylinePoints.map(_._2)
+
+
+    rdd.sparkContext.parallelize(s)
+
+  }
+
   override def skyline(
       ref: STObject,
       distFunc: (STObject, STObject) => (Double, Double),
@@ -180,8 +207,19 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       allowCache: Boolean = false): RDD[(G,V)] = {
 
     def localSkyline(iter: Iterator[(STObject,(G,V))]): Iterator[(STObject,(G,V))] = {
-      val arr = iter.toArray
-      arr.filterNot{i => arr.exists{j => dominates(j._1,i._1)}}.iterator
+
+      var skyline = ListBuffer.empty[(STObject, (G,V))]
+
+      iter.foreach{ p =>
+        if(!skyline.exists{ case (s,_) => dominates(s, p._1)}) {
+          skyline = skyline.filterNot{ case (s,_) => dominates(p._1,s)}
+          skyline += p
+        }
+      }
+
+//      val arr = iter.toarray
+//      arr.filterNot{i => arr.exists{j => dominates(j._1,i._1)}}.iterator
+      skyline.iterator
     }
 
     /*

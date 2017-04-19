@@ -2,9 +2,6 @@ package dbis.stark.spatial
 
 import dbis.stark.STObject
 
-import scala.collection.mutable.ListBuffer
-import scala.reflect.ClassTag
-
 /**
   * Created by hage on 12.04.17.
   */
@@ -26,26 +23,15 @@ object Skyline extends  Serializable{
     (l.getGeo.distance(r.getGeo), l.getTemp.get.center.get - r.getTemp.get.center.get)
 }
 
-class Skyline[V : ClassTag](val skylinePoints: ListBuffer[(STObject, (STObject, V))]) extends Serializable {
-  type P = (STObject, V)
-  type T = (STObject, P)
+class Skyline[PayloadType](var skylinePoints: List[(STObject, PayloadType)] = List.empty) extends Serializable {
+  type T = (STObject, PayloadType)
 
-//  private[spatial] var skylinePoints = ListBuffer.empty[T]
-
-  def isEmpty = skylinePoints.isEmpty
-
-  def reset() = skylinePoints.clear()
-
-  def insert(tuple: T): Skyline[V] = {
+  def insert(tuple: T): Unit = {
     if(!skylinePoints.exists{ case (sp,_) => Skyline.centroidDominates(sp, tuple._1)}) {
 
-      val l = skylinePoints.filter{ case (sp,_) => Skyline.centroidDominates(tuple._1, sp)}
-
-      l += tuple
-
-      new Skyline[V](l)
+      this.skylinePoints = skylinePoints.filterNot{ case (sp,_) => Skyline.centroidDominates(tuple._1, sp)} ++ List(tuple)
     }
-
-    new Skyline(skylinePoints)
   }
+
+  def iterator = skylinePoints.iterator
 }

@@ -40,6 +40,58 @@ class SkylineTest extends FlatSpec with Matchers {
     val b = STObject(2,1)
     Skyline.centroidDominates(a,b) shouldBe false
   }
+
+  "The skyline" should "correctly insert dominating point" in {
+
+    val sp = (STObject(2,2),(STObject(0,0),1))
+    val newSp = (STObject(1,1),(STObject(0,0),-1))
+
+    Skyline.centroidDominates(newSp._1, sp._1) shouldBe true
+    Skyline.centroidDominates(sp._1, newSp._1) shouldBe false
+
+    val skyline = new Skyline[(STObject,Int)](List(sp))
+    skyline.insert(newSp)
+
+    skyline.skylinePoints should contain only newSp
+  }
+
+  it should "not insert dominated point" in {
+    val p = (STObject(2,2),(STObject(0,0),1))
+    val l = List(p)
+    val skyline = new Skyline[(STObject,Int)](l)
+
+    skyline.insert((STObject(2,3),(STObject(0,0),-1)))
+
+    skyline.skylinePoints should contain only p
+
+  }
+
+  it should "add not dominated point" in {
+    val o = (STObject(2,2),(STObject(0,0),1))
+    val l = List(o)
+    val skyline = new Skyline[(STObject,Int)](l)
+
+    val p = (STObject(1,3),(STObject(0,0),-1))
+    skyline.insert(p)
+
+    skyline.skylinePoints should contain theSameElementsAs List(o,p)
+
+  }
+
+  it should "filter out dominated tuples on insert" in {
+    val sp = (STObject(2,2),(STObject(0,0),1))
+    val newSp = (STObject(1,1),(STObject(0,0),-1))
+
+
+    val skyline = new Skyline[(STObject,Int)](List(sp))
+
+
+    skyline.skylinePoints should contain only sp
+
+    val l = skyline.skylinePoints.filterNot{ case (s,_) => Skyline.centroidDominates(newSp._1,s)}
+
+    l shouldBe empty
+  }
 }
 
 class SkylineCheck extends Properties("Skyline") {

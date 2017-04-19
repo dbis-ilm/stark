@@ -25,7 +25,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  qry: G,
 		  maxDist: Double,
 		  distFunc: (STObject,STObject) => Double
-	  ) = rdd.mapPartitions({iter =>
+	  ): RDD[(G, V)] = rdd.mapPartitions({ iter =>
       // we don't know how the distance function looks like and thus have to scan all partitions
 
 	    val indexTree = new RTree[G,(G,V)](treeOrder)
@@ -128,6 +128,13 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                        distFunc: (STObject, STObject) => (Double, Double),
                        dominates: (STObject, STObject) => Boolean,
                        ppD: Int,
-                       allowCache: Boolean): RDD[(G, V)] = ???
+                       allowCache: Boolean): RDD[(G, V)] = {
+
+    /*
+     * Branch & Bound Skyline, Papadias SIGMOD 2003
+     * Nearest Neighbor Search, Kossman VLDB 2002
+     */
+    ???
+  }
 }
 

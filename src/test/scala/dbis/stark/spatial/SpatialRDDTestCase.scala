@@ -2,7 +2,7 @@ package dbis.stark.spatial
 
 import com.vividsolutions.jts.io.WKTReader
 import dbis.stark.STObject._
-import dbis.stark.{Instant, Interval, STObject, TestUtils}
+import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.partitioner.SpatialGridPartitioner
 import org.apache.spark.SparkContext
@@ -87,7 +87,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, 6).collect()
+	  val foundGeoms = rdd.kNN(q, 6, Distances.seuclid).collect()
 	  
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -246,7 +246,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     type T = (STObject,(STObject,V))
 
     def combine(sky: Skyline[V], tuple: (STObject,V)): Skyline[V] = {
-      val dist = Skyline.euclidDist(tuple._1, q)
+      val dist = Distances.euclid(tuple._1, q)
       val distObj = STObject(dist._1, dist._2)
       sky.insert((distObj, tuple))
     }
@@ -274,11 +274,11 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     // check that there is no point in the RDD that dominates any skyline point
     skyline.foreach { skylinePoint =>
-      val refDist = Skyline.euclidDist(q,skylinePoint._1)
+      val refDist = Distances.euclid(q,skylinePoint._1)
       val skylineRef = STObject(refDist._1, refDist._2)
 
       val forAll = rdd.filter( _._1 != q )
-        .map{ case (l,_) => Skyline.euclidDist(q,l)}
+        .map{ case (l,_) => Distances.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
           Skyline.centroidDominates(STObject(sDist, tDist), skylineRef)
         }

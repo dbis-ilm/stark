@@ -45,7 +45,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     })
 
 
-  def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))] = {
     val r = rdd.mapPartitionsWithIndex({(idx,iter) =>
               val partitionCheck = rdd.partitioner.forall { p =>
                 p match {
@@ -61,7 +61,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
                 tree.build()
 
-                val result = tree.kNN(qry, k)
+                val result = tree.kNN(qry, k, distFunc)
                 result
               }
               else
@@ -69,9 +69,10 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
             })
 
-          .map { case (g,v) => (g, (g.distance(qry.getGeo), v)) }
+          .map { case (g,v) => (g, (distFunc(g,qry), v)) }
           .sortBy(_._2._1, ascending = true)
           .take(k)
+
 
     rdd.sparkContext.parallelize(r)
   }

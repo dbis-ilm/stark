@@ -22,7 +22,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
 
   def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double): RDD[(G,V)]
       
-  def kNN(qry: G, k: Int): RDD[(G,(Double,V))]   
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))]
   
   
   /**
@@ -44,8 +44,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
   /**
    * Cluster this SpatialRDD using DBSCAN
    *
-   * @param minPts
-   * @param epsilon
+   * @param minPts DBSCAN minimum points parameter
+   * @param epsilon DBSCAN epsilon parameter
    * @param keyExtractor A function that extracts or generates a unique key for each point
    * @param includeNoise A flag whether or not to include noise points in the result
    * @param maxPartitionCost Maximum cost (= number of points) per partition

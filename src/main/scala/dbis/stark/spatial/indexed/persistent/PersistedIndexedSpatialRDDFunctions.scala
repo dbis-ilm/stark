@@ -25,13 +25,13 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
   
   
-  def kNN(qry: G, k: Int) = {
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double) = {
     val nn = rdd.mapPartitions({ trees =>
         trees.flatMap { tree => 
-        tree.kNN(qry, k)
+        tree.kNN(qry, k, distFunc)
       }
     }, true)
-    .map { case (g,v) => (g, (g.distance(qry), v)) }
+    .map { case (g,v) => (g, (distFunc(g,qry), v)) }
     .sortBy(_._2._1, ascending = true)
     .take(k)
     

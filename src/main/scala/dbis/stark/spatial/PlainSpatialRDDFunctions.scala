@@ -59,10 +59,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     new SpatialFilterRDD(rdd, qry, PredicatesFunctions.withinDistance(maxDist, distFunc) _)
 
       
-  def kNN(qry: G, k: Int): RDD[(G,(Double,V))] = {
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))] = {
     // compute k NN for each partition individually --> n * k results
     val r = rdd.mapPartitions({iter => iter.map { case (g,v) => 
-        val d = qry.distance(g)
+        val d = distFunc(g,qry)
         (g,(d,v)) // compute and return distance
       }
       .toList

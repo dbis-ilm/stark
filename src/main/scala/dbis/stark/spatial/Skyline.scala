@@ -21,9 +21,6 @@ object Skyline extends  Serializable{
 
     (tDistL < tDistR && sDistL <= sDistR) || (sDistL < sDistR && tDistL <= tDistR)
   }
-
-  def euclidDist(l: STObject, r: STObject): (Double, Double) =
-    (l.getGeo.distance(r.getGeo), l.getTemp.get.center.get - r.getTemp.get.center.get)
 }
 
 class Skyline[V : ClassTag](val skylinePoints: ListBuffer[(STObject, (STObject, V))]) extends Serializable {

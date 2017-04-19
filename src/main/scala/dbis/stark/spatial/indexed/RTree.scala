@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed
 
-import com.vividsolutions.jts.geom.{Coordinate, Envelope, Geometry}
+import com.vividsolutions.jts.geom.{Coordinate, Envelope}
 import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
 import dbis.stark.STObject
 
@@ -121,11 +121,11 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param geom The reference object
    * @param k The number of neighbors  
    */
-  def kNN(geom: STObject, k: Int): Iterator[D] = {
+  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Double): Iterator[D] = {
     if(size <= 0)
       Iterator.empty
     else
-      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance, k).map(_.data).iterator
+      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance(distFunc), k).map(_.data).iterator
   }
 }
 
@@ -133,9 +133,10 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
  * Companion object containing helper method
  */
 protected[stark] object DataDistance {
-  def getGeo(o: AnyRef): Geometry = o match {
-      case so: STObject => so.getGeo
-      case d: Data[_,_] => d.so.getGeo
+
+  def getGeo(o: AnyRef): STObject = o match {
+      case so: STObject => so //.getGeo
+      case d: Data[_,_] => d.so //.getGeo
       case _ => throw new IllegalArgumentException(s"unsupported type: ${o.getClass}")
     } 
 }
@@ -143,13 +144,18 @@ protected[stark] object DataDistance {
 /**
  * A distance metric that is used internally by the STRtree for comparing entries 
  */
-protected[stark] class DataDistance[G <: STObject,D] extends ItemDistance {
+protected[stark] class DataDistance[G <: STObject,D](
+      distFunc: (STObject, STObject) => Double
+    )extends ItemDistance {
+
+
   def distance(a: ItemBoundable, b: ItemBoundable): Double = {
   
     val dataA = DataDistance.getGeo(a.getItem)
     val dataB = DataDistance.getGeo(b.getItem)
     
-    dataA.distance(dataB)
+//    dataA.distance(dataB)
+    distFunc(dataA, dataB)
     
   }
 }

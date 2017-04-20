@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.{getInternal, makeSTObject, stringToGeom}
-import dbis.stark.{Distance, Interval, STObject, TestUtils}
+import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import dbis.stark.spatial.indexed.RTree
@@ -254,7 +254,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.withinDistance(0, (s1, s2) => s1.getGeo.distance(s2.getGeo)) _).collect()
+    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid) _).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the

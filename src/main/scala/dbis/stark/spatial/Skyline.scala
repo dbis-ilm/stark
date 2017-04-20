@@ -30,5 +30,5 @@ class Skyline[PayloadType](var skylinePoints: List[(STObject, PayloadType)] = Li
     }
   }
 
-  def iterator = skylinePoints.iterator
+  def iterator: Iterator[(STObject, PayloadType)] = skylinePoints.iterator
 }

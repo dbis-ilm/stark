@@ -56,11 +56,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    */
   def contains(o: G) = new SpatialFilterRDD[G,V](rdd, o, JoinPredicate.CONTAINS)
 
-  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) =
+  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
     new SpatialFilterRDD(rdd, qry, PredicatesFunctions.withinDistance(maxDist, distFunc) _)
 
       
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))] = {
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
 //    // compute k NN for each partition individually --> n * k results
 //    val r = rdd.mapPartitions({iter => iter.map { case (g,v) =>
 //        val d = distFunc(g,qry)
@@ -182,13 +182,13 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   def skylineAgg(
                 ref: STObject,
-                distFunc: (STObject, STObject) => (Double, Double),
-                dominates: (STObject, STObject) => Boolean
+                distFunc: (STObject, STObject) => (Distance, Distance),
+                dominates: (Distance, Distance) => Boolean
                 ): RDD[(G,V)] = {
 
     def combine(sky: Skyline[(G,V)], tuple: (G,V)): Skyline[(G,V)] = {
       val dist = Distance.euclid(tuple._1, ref)
-      val distObj = STObject(dist._1, dist._2)
+      val distObj = STObject(dist._1.value, dist._2.value)
       sky.insert((distObj, tuple))
       sky
     }
@@ -208,7 +208,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   override def skyline(
       ref: STObject,
-      distFunc: (STObject, STObject) => (Double, Double),
+      distFunc: (STObject, STObject) => (Distance, Distance),
       dominates: (STObject, STObject) => Boolean,
       ppD: Int,
       allowCache: Boolean = false): RDD[(G,V)] = {
@@ -236,7 +236,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val distanceRDD = rdd.map{ case (g,v) =>
       val (sDist, tDist) = distFunc(ref, g)
 
-      (STObject(sDist, tDist), (g,v))
+      (STObject(sDist.minValue, tDist.minValue), (g,v))
     }
 
     // TODO: specify parititoner as parameter - but it has to work on distance RDD...

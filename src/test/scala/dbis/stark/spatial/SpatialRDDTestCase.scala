@@ -153,7 +153,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.withinDistance(0, (g1, g2) => g1.getGeo.distance(g2.getGeo)) _).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid) _).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -255,12 +255,12 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     // check that there is no point in the RDD that dominates any skyline point
     skyline.foreach { skylinePoint =>
       val refDist = Distance.euclid(q,skylinePoint._1)
-      val skylineRef = STObject(refDist._1, refDist._2)
+      val skylineRef = STObject(refDist._1.value, refDist._2.value)
 
       val forAll = rdd.filter( _._1 != q )
         .map{ case (l,_) => Distance.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
-          Skyline.centroidDominates(STObject(sDist, tDist), skylineRef)
+          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
         }
         .collect()
 
@@ -279,7 +279,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     def combine(sky: Skyline[(STObject,V)], tuple: (STObject,V)): Skyline[(STObject,V)] = {
       val dist = Distance.euclid(tuple._1, q)
-      val distObj = STObject(dist._1, dist._2)
+      val distObj = STObject(dist._1.value, dist._2.value)
       sky.insert((distObj, tuple))
       sky
     }
@@ -305,12 +305,12 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     // check that there is no point in the RDD that dominates any skyline point
     skyline.foreach { skylinePoint =>
       val refDist = Distance.euclid(q,skylinePoint._1)
-      val skylineRef = STObject(refDist._1, refDist._2)
+      val skylineRef = STObject(refDist._1.value, refDist._2.value)
 
       val forAll = rdd.filter( _._1 != q )
         .map{ case (l,_) => Distance.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
-          Skyline.centroidDominates(STObject(sDist, tDist), skylineRef)
+          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
         }
         .collect()
 

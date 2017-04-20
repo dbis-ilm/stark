@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import dbis.stark.STObject
+import dbis.stark.{Distance, STObject}
 
 object JoinPredicate extends Enumeration {
   type JoinPredicate = Value
@@ -58,8 +58,8 @@ object PredicatesFunctions {
    * otherwise <code>false</code>
    */
   def withinDistance(
-      maxDist: Double, 
-      distFunc: (STObject, STObject) => Double)
+      maxDist: Distance,
+      distFunc: (STObject, STObject) => Distance)
       (g1: STObject, g2: STObject): Boolean = distFunc(g1,g2) <= maxDist
   
 }

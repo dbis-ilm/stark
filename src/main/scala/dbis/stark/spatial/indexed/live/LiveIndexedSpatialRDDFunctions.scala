@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.live
 
-import dbis.stark.STObject
+import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.{SpatialFilterRDD, _}
 import dbis.stark.spatial.indexed.RTree
@@ -23,8 +23,8 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   def withinDistance(
 		  qry: G,
-		  maxDist: Double,
-		  distFunc: (STObject,STObject) => Double
+		  maxDist: Distance,
+		  distFunc: (STObject,STObject) => Distance
 	  ): RDD[(G, V)] = rdd.mapPartitions({ iter =>
       // we don't know how the distance function looks like and thus have to scan all partitions
 
@@ -45,7 +45,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     })
 
 
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))] = {
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
     val r = rdd.mapPartitionsWithIndex({(idx,iter) =>
               val partitionCheck = rdd.partitioner.forall { p =>
                 p match {
@@ -125,7 +125,7 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  ) : RDD[(G, (Int, V))] = ???
 
   override def skyline(ref: STObject,
-                       distFunc: (STObject, STObject) => (Double, Double),
+                       distFunc: (STObject, STObject) => (Distance, Distance),
                        dominates: (STObject, STObject) => Boolean,
                        ppD: Int,
                        allowCache: Boolean): RDD[(G, V)] = {

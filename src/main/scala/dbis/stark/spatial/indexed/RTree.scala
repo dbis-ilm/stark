@@ -2,7 +2,7 @@ package dbis.stark.spatial.indexed
 
 import com.vividsolutions.jts.geom.{Coordinate, Envelope}
 import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
-import dbis.stark.STObject
+import dbis.stark.{Distance, STObject}
 
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.reflect.ClassTag
@@ -59,11 +59,11 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
 //  }
   
   
-  def withinDistance(qry: G, distFunc: (G,G) => Double, maxDist: Double) = {
+  def withinDistance(qry: G, distFunc: (G,G) => Distance, maxDist: Distance) = {
     val env = qry.getGeo.getEnvelopeInternal
     val env2 = new Envelope(
-        new Coordinate(env.getMinX - maxDist - 1, env.getMinY - maxDist - 1), 
-        new Coordinate(env.getMaxX + maxDist + 1, env.getMaxY + maxDist + 1))
+        new Coordinate(env.getMinX - maxDist.maxValue - 1, env.getMinY - maxDist.maxValue - 1),
+        new Coordinate(env.getMaxX + maxDist.maxValue + 1, env.getMaxY + maxDist.maxValue + 1))
     
     super.query(env2).map(_.asInstanceOf[Data[G,D]]).iterator.filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
   }
@@ -121,7 +121,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param geom The reference object
    * @param k The number of neighbors  
    */
-  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Double): Iterator[D] = {
+  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[D] = {
     if(size <= 0)
       Iterator.empty
     else
@@ -145,7 +145,7 @@ protected[stark] object DataDistance {
  * A distance metric that is used internally by the STRtree for comparing entries 
  */
 protected[stark] class DataDistance[G <: STObject,D](
-      distFunc: (STObject, STObject) => Double
+      distFunc: (STObject, STObject) => Distance
     )extends ItemDistance {
 
 
@@ -155,7 +155,7 @@ protected[stark] class DataDistance[G <: STObject,D](
     val dataB = DataDistance.getGeo(b.getItem)
     
 //    dataA.distance(dataB)
-    distFunc(dataA, dataB)
+    distFunc(dataA, dataB).minValue
     
   }
 }

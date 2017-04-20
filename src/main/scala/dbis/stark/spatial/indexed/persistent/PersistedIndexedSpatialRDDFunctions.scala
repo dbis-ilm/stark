@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.STObject
+import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.SpatialPartitioner
@@ -25,7 +25,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
   
   
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double) = {
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance) = {
     val nn = rdd.mapPartitions({ trees =>
         trees.flatMap { tree => 
         tree.kNN(qry, k, distFunc)
@@ -39,7 +39,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   }
   
 
-  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double) = 
+  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
     rdd.mapPartitions({ trees => 
     trees.flatMap{ tree =>
 //      tree.query(qry, Predicates.withinDistance(maxDist, distFunc) _)

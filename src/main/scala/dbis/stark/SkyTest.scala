@@ -30,7 +30,7 @@ object SkyTest {
 
     def combine(sky: Skyline[PayloadType], tuple: PayloadType): Skyline[PayloadType] = {
       val dist = Distance.euclid(tuple._1, q)
-      val distObj = STObject(dist._1, dist._2)
+      val distObj = STObject(dist._1.minValue, dist._2.minValue)
       sky.insert((distObj, tuple))
       sky
     }

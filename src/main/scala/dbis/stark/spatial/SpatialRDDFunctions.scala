@@ -1,7 +1,7 @@
 package dbis.stark.spatial
 
 import scala.reflect.ClassTag
-import dbis.stark.STObject
+import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.partitioner.SpatialPartitioner
 import org.apache.spark.rdd.RDD
 
@@ -20,9 +20,9 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
   def contains(o: G): RDD[(G,V)]
 
 
-  def withinDistance(qry: G, maxDist: Double, distFunc: (STObject,STObject) => Double): RDD[(G,V)]
+  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance): RDD[(G,V)]
       
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))]
+  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))]
   
   
   /**
@@ -36,7 +36,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag] exten
   def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner]): RDD[(V,V2)]
 
   def skyline(ref: STObject,
-              distFunc: (STObject, STObject) => (Double, Double),
+              distFunc: (STObject, STObject) => (Distance, Distance),
               dominates: (STObject, STObject) => Boolean,
               ppD: Int,
               alloCache: Boolean): RDD[(G,V)]

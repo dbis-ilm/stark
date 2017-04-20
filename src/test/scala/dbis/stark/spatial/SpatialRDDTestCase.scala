@@ -85,7 +85,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, 6, Distances.seuclid).collect()
+	  val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
 	  
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -242,7 +242,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val start = System.currentTimeMillis()
     val skyline = rdd.filter(_._1 != q).skyline(q,
-      Distances.euclid,
+      Distance.euclid,
       Skyline.centroidDominates,
       ppD = 5)
       .collect()
@@ -254,11 +254,11 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     // check that there is no point in the RDD that dominates any skyline point
     skyline.foreach { skylinePoint =>
-      val refDist = Distances.euclid(q,skylinePoint._1)
+      val refDist = Distance.euclid(q,skylinePoint._1)
       val skylineRef = STObject(refDist._1, refDist._2)
 
       val forAll = rdd.filter( _._1 != q )
-        .map{ case (l,_) => Distances.euclid(q,l)}
+        .map{ case (l,_) => Distance.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
           Skyline.centroidDominates(STObject(sDist, tDist), skylineRef)
         }
@@ -278,7 +278,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     type T = (STObject,(STObject,V))
 
     def combine(sky: Skyline[(STObject,V)], tuple: (STObject,V)): Skyline[(STObject,V)] = {
-      val dist = Distances.euclid(tuple._1, q)
+      val dist = Distance.euclid(tuple._1, q)
       val distObj = STObject(dist._1, dist._2)
       sky.insert((distObj, tuple))
       sky
@@ -304,11 +304,11 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     // check that there is no point in the RDD that dominates any skyline point
     skyline.foreach { skylinePoint =>
-      val refDist = Distances.euclid(q,skylinePoint._1)
+      val refDist = Distance.euclid(q,skylinePoint._1)
       val skylineRef = STObject(refDist._1, refDist._2)
 
       val forAll = rdd.filter( _._1 != q )
-        .map{ case (l,_) => Distances.euclid(q,l)}
+        .map{ case (l,_) => Distance.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
           Skyline.centroidDominates(STObject(sDist, tDist), skylineRef)
         }

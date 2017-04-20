@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.{getInternal, makeSTObject, stringToGeom}
-import dbis.stark.{Distances, Interval, STObject, TestUtils}
+import dbis.stark.{Distance, Interval, STObject, TestUtils}
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import dbis.stark.spatial.indexed.RTree
@@ -125,7 +125,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, 6, Distances.seuclid).collect()
+	  val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
 	  
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -140,13 +140,13 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, k, Distances.seuclid).collect()
+	  val foundGeoms = rdd.kNN(q, k, Distance.seuclid).collect()
 	  
 	  val tree = new RTree[STObject, (String, Long, String, STObject)](5)
     rddRaw.collect().foreach{ case (so, v) => tree.insert(so, v) }
 	  tree.build()
 	  
-    val refGeoms = tree.kNN(q, k, Distances.seuclid).toList
+    val refGeoms = tree.kNN(q, k, Distance.seuclid).toList
     refGeoms.size shouldBe k
     refGeoms.foreach{ case (_,_,_,g) => withClue("reference geoms did not match") {g shouldBe q }}
 	  

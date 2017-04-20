@@ -22,14 +22,14 @@ object SkyTest {
       (STObject(arr(1), Interval(start, end)), id)
 
     }
-    val q = STObject("POINT(0 0)", 0L)
+    val q = STObject("POINT(-190 -91)", 0L)
 
 
     type PayloadType = (STObject, Long)
     type T = (STObject,PayloadType)
 
     def combine(sky: Skyline[PayloadType], tuple: PayloadType): Skyline[PayloadType] = {
-      val dist = Distances.euclid(tuple._1, q)
+      val dist = Distance.euclid(tuple._1, q)
       val distObj = STObject(dist._1, dist._2)
       sky.insert((distObj, tuple))
       sky
@@ -48,7 +48,7 @@ object SkyTest {
     while(i < num_runs) {
       val start1 = System.currentTimeMillis()
       val skyline1 = rdd.filter(_._1 != q).skyline(q,
-        Distances.euclid,
+        Distance.euclid,
         Skyline.centroidDominates,
         ppD = 20)
         .collect()

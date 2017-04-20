@@ -2,7 +2,7 @@ package dbis.stark.spatial
 
 import java.nio.file.Paths
 
-import dbis.stark.{Distances, STObject}
+import dbis.stark.{Distance, STObject}
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
@@ -61,22 +61,29 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Double): RDD[(G,(Double,V))] = {
-    // compute k NN for each partition individually --> n * k results
-    val r = rdd.mapPartitions({iter => iter.map { case (g,v) => 
-        val d = distFunc(g,qry)
-        (g,(d,v)) // compute and return distance
-      }
-      .toList
-      .sortWith(_._2._1 < _._2._1) // on distance
-      .take(k) // take only the fist k 
-      .toIterator // remove the iterator
-    })
+//    // compute k NN for each partition individually --> n * k results
+//    val r = rdd.mapPartitions({iter => iter.map { case (g,v) =>
+//        val d = distFunc(g,qry)
+//        (g,(d,v)) // compute and return distance
+//      }
+//      .toList
+//      .sortWith(_._2._1 < _._2._1) // on distance
+//      .take(k) // take only the fist k
+//      .toIterator // remove the iterator
+//    })
+//
+//    // sort all n lists and sort by distance, then take only the first k elements
+//    val arr = r.sortBy(_._2._1, ascending = true).take(k)
+//
+//    // return as an RDD
+//    rdd.sparkContext.parallelize(arr)
 
-    // sort all n lists and sort by distance, then take only the first k elements
-    val arr = r.sortBy(_._2._1, ascending = true).take(k)
+    val knn = rdd.map{ case(g,v) => (distFunc(qry,g), (g,v)) } // compute distances and make it key
+                  .sortByKey(ascending = true) // sort by distance
+                  .take(k) // take only the first k elements
+                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
 
-    // return as an RDD
-    rdd.sparkContext.parallelize(arr)
+    rdd.sparkContext.parallelize(knn) // return as RDD
   }   
   
   
@@ -180,7 +187,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                 ): RDD[(G,V)] = {
 
     def combine(sky: Skyline[(G,V)], tuple: (G,V)): Skyline[(G,V)] = {
-      val dist = Distances.euclid(tuple._1, ref)
+      val dist = Distance.euclid(tuple._1, ref)
       val distObj = STObject(dist._1, dist._2)
       sky.insert((distObj, tuple))
       sky

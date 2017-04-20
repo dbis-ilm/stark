@@ -5,7 +5,7 @@ import dbis.stark.STObject._
 import dbis.stark.spatial.PredicatesFunctions
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
-import dbis.stark.{Distances, Interval, STObject, TestUtils}
+import dbis.stark.{Distance, Interval, STObject, TestUtils}
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -75,7 +75,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, 6, Distances.seuclid).collect()
+	  val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
 	  
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
@@ -89,7 +89,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, 6, Distances.seuclid).collect()
+	  val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
 	  
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}

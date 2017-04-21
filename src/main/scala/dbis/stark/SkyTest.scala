@@ -11,7 +11,9 @@ object SkyTest {
 
   def main(args: Array[String]): Unit = {
 
-    val conf = new SparkConf().setAppName("skylinetest").set("spark.ui.showConsoleProgress", false.toString)
+    val showProgress = if(args.length >= 2) args(1).toBoolean else true
+
+    val conf = new SparkConf().setAppName("skylinetest").set("spark.ui.showConsoleProgress", showProgress.toString)
     val sc = new SparkContext(conf)
 
     val rdd = sc.textFile(args(0)).map(_.split(";")).map{ arr=>
@@ -41,7 +43,7 @@ object SkyTest {
       sky3
     }
 
-    val num_runs = 10
+    val num_runs = 5
 
     var i = 0
     var sum1 = 0L
@@ -50,7 +52,8 @@ object SkyTest {
       val skyline1 = rdd.filter(_._1 != q).skyline(q,
         Distance.euclid,
         Skyline.centroidDominates,
-        ppD = 20)
+        ppD = 6,
+        allowCache = true)
         .collect()
       val end1 = System.currentTimeMillis()
       println(s"skyline1 ${skyline1.length}")
@@ -63,19 +66,21 @@ object SkyTest {
 
     i = 0
     var sum2 = 0L
-    while(i < num_runs) {
-      val start2 = System.currentTimeMillis()
+//    while(i < num_runs) {
+//      val start2 = System.currentTimeMillis()
+//
+//      val skyline2 = rdd.aggregate(new Skyline[PayloadType]())(combine, merge).skylinePoints.map(_._2)
+//      val end2 = System.currentTimeMillis()
+//      println(s"skyline2 ${skyline2.length}")
+//
+//      i += 1
+//      sum2 += (end2 - start2)
+//    }
 
-      val skyline2 = rdd.aggregate(new Skyline[PayloadType]())(combine, merge).skylinePoints.map(_._2)
-      val end2 = System.currentTimeMillis()
-      println(s"skyline2 ${skyline2.length}")
-
-      i += 1
-      sum2 += (end2 - start2)
-    }
-
-    println(s"skyline mappartitons: ${sum1 / num_runs}ms")
-    println(s"skyline aggregate: ${sum2 / num_runs}ms")
+    println
+    println
+    println(s"skyline mappartitons:\t${sum1 / num_runs}ms")
+    println(s"skyline aggregate:\t${sum2 / num_runs}ms")
 
   }
 

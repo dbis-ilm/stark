@@ -240,7 +240,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
 
     // TODO: specify parititoner as parameter - but it has to work on distance RDD...
-    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD)
+    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, withExtent = false)
     val partedDistRDD = distanceRDD.partitionBy(partitioner)
 
     val cachedDistRDD = if(allowCache) partedDistRDD.cache() else partedDistRDD
@@ -280,7 +280,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         else
           Iterator.empty
       } // compute local skyline in each partition
-      .coalesce(1)                // collect local skyline points into a single partition
+      .coalesce(1, shuffle = true)                // collect local skyline points into a single partition
       .mapPartitions(localSkyline) // compute skyline out of the local skyline points
       .map(_._2)                  // transform back to input format
 

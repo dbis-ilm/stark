@@ -49,7 +49,7 @@ class SkylineTest extends FlatSpec with Matchers {
     Skyline.centroidDominates(newSp._1, sp._1) shouldBe true
     Skyline.centroidDominates(sp._1, newSp._1) shouldBe false
 
-    val skyline = new Skyline[(STObject,Int)](List(sp))
+    val skyline = new Skyline[(STObject,Int)](List(sp), Skyline.centroidDominates)
     skyline.insert(newSp)
 
     skyline.skylinePoints should contain only newSp
@@ -58,7 +58,7 @@ class SkylineTest extends FlatSpec with Matchers {
   it should "not insert dominated point" in {
     val p = (STObject(2,2),(STObject(0,0),1))
     val l = List(p)
-    val skyline = new Skyline[(STObject,Int)](l)
+    val skyline = new Skyline[(STObject,Int)](l, Skyline.centroidDominates)
 
     skyline.insert((STObject(2,3),(STObject(0,0),-1)))
 
@@ -69,7 +69,7 @@ class SkylineTest extends FlatSpec with Matchers {
   it should "add not dominated point" in {
     val o = (STObject(2,2),(STObject(0,0),1))
     val l = List(o)
-    val skyline = new Skyline[(STObject,Int)](l)
+    val skyline = new Skyline[(STObject,Int)](l, Skyline.centroidDominates)
 
     val p = (STObject(1,3),(STObject(0,0),-1))
     skyline.insert(p)
@@ -83,7 +83,7 @@ class SkylineTest extends FlatSpec with Matchers {
     val newSp = (STObject(1,1),(STObject(0,0),-1))
 
 
-    val skyline = new Skyline[(STObject,Int)](List(sp))
+    val skyline = new Skyline[(STObject,Int)](List(sp), Skyline.centroidDominates)
 
 
     skyline.skylinePoints should contain only sp

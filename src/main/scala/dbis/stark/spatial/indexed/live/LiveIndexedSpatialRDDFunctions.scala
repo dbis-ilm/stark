@@ -136,5 +136,25 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
      */
     ???
   }
+
+  override def skylineAgg(ref: STObject,
+                          distFunc: (STObject, STObject) => (Distance, Distance),
+                          dominates: (STObject, STObject) => Boolean
+                         ): RDD[(G,V)] = {
+
+    //    def combine(sky: Skyline[(G,V)], tuple: (G,V)): Skyline[(G,V)] = {
+    //      val dist = Distance.euclid(tuple._1, ref)
+    //      val distObj = STObject(dist._1.value, dist._2.value)
+    //      sky.insert((distObj, tuple))
+    //      sky
+    //    }
+    //
+    //    def merge(sky1: Skyline[(G,V)], sky2: Skyline[(G,V)]): Skyline[(G,V)] = {
+    //      sky1.merge(sky2)
+    //    }
+
+
+    ???
+  }
 }
 

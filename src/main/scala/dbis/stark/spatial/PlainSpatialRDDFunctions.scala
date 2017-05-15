@@ -2,17 +2,16 @@ package dbis.stark.spatial
 
 import java.nio.file.Paths
 
-import dbis.stark.{Distance, STObject}
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
 import dbis.stark.spatial.partitioner.{SpatialGridPartitioner, SpatialPartitioner}
+import dbis.stark.{Distance, STObject}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
@@ -108,8 +107,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Cluster this SpatialRDD using DBSCAN
    *
-   * @param minPts
-   * @param epsilon
+   * @param minPts MinPts parameter to DBSCAN
+   * @param epsilon Epsilon parameter to DBSCAN
    * @param keyExtractor A function that extracts or generates a unique key for each point
    * @param includeNoise A flag whether or not to include noise points in the result
    * @param maxPartitionCost Maximum cost (= number of points) per partition
@@ -180,32 +179,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
 
-  def skylineAgg(
-                ref: STObject,
-                distFunc: (STObject, STObject) => (Distance, Distance),
-                dominates: (Distance, Distance) => Boolean
-                ): RDD[(G,V)] = {
-
-    def combine(sky: Skyline[(G,V)], tuple: (G,V)): Skyline[(G,V)] = {
-      val dist = Distance.euclid(tuple._1, ref)
-      val distObj = STObject(dist._1.value, dist._2.value)
-      sky.insert((distObj, tuple))
-      sky
-    }
-
-    def merge(sky1: Skyline[(G,V)], sky2: Skyline[(G,V)]): Skyline[(G,V)] = {
-      val sky3 = sky2
-      sky1.iterator.foreach(p => sky3.insert(p))
-      sky3
-    }
-
-    val s = rdd.aggregate{new Skyline[(G,V)]()}(combine,merge).skylinePoints.map(_._2)
-
-
-    rdd.sparkContext.parallelize(s)
-
-  }
-
   override def skyline(
       ref: STObject,
       distFunc: (STObject, STObject) => (Distance, Distance),
@@ -215,18 +188,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     def localSkyline(iter: Iterator[(STObject,(G,V))]): Iterator[(STObject,(G,V))] = {
 
-      var skyline = ListBuffer.empty[(STObject, (G,V))]
+      val s = new Skyline[(G,V)](dominates = dominates)
 
-      iter.foreach{ p =>
-        if(!skyline.exists{ case (s,_) => dominates(s, p._1)}) {
-          skyline = skyline.filterNot{ case (s,_) => dominates(p._1,s)}
-          skyline += p
-        }
-      }
-
-//      val arr = iter.toarray
-//      arr.filterNot{i => arr.exists{j => dominates(j._1,i._1)}}.iterator
-      skyline.iterator
+      iter.foreach(tuple => s.insert(tuple))
+      s.iterator
     }
 
     /*
@@ -257,6 +222,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       val currMax = partitioner.partitionExtent(idx).ur.c
       val currMaxTup = STObject(currMax(0), currMax(1))
 
+      // TODO: here we can be more selective by computing which partitions are dominated
+      // based on the partiton index
       (idx until partitioner.numPartitions).foreach{ otherPart =>
         val otherMin = partitioner.partitionExtent(otherPart).ll.c
         val otherMinTup = STObject(otherMin(0), otherMin(1))
@@ -269,11 +236,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     val bsBC = rdd.sparkContext.broadcast(globalBS)
 
-    // maybe instead of collect, coalesce(1).mapPartitions(localSkyline) is faster?
-    // but there's probably no difference...
-//    val localSkylines = partedDistRDD.mapPartitions(localSkyline).collect().iterator
-//    rdd.sparkContext.parallelize(localSkyline(localSkylines).map(_._2).toSeq)
-
     cachedDistRDD.mapPartitionsWithIndex{ case (idx, iter) =>
         if(bsBC.value(idx))
           localSkyline(iter)
@@ -285,6 +247,30 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       .map(_._2)                  // transform back to input format
 
   }
+
+  override def skylineAgg(ref: STObject,
+                          distFunc: (STObject, STObject) => (Distance, Distance),
+                          dominatesRel: (STObject, STObject) => Boolean
+                ): RDD[(G,V)] = {
+
+    def combine(sky: Skyline[(G,V)], tuple: (G,V)): Skyline[(G,V)] = {
+      val dist = distFunc(tuple._1, ref)
+      val distObj = STObject(dist._1.minValue, dist._2.minValue)
+      sky.insert((distObj, tuple))
+      sky
+    }
+
+    def merge(sky1: Skyline[(G,V)], sky2: Skyline[(G,V)]): Skyline[(G,V)] = {
+      sky1.merge(sky2)
+    }
+
+
+    val startSkyline = new Skyline[(G,V)](dominates = dominatesRel)
+    val skyline = rdd.aggregate(startSkyline)(combine,merge)
+
+    rdd.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
+  }
+
   // LIVE
 
   def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, order)

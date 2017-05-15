@@ -1,20 +1,17 @@
 package dbis.stark
 
 import java.io.File
-
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
-import dbis.stark.spatial.SpatialRDD._
-import org.apache.spark.SparkConf
-import java.util.Date
 import java.time.LocalDate
 
+import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.partitioner.BSPartitioner
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.RDD
 
 
 object TestUtils {
-
   case class FileOperationError(msg: String) extends RuntimeException(msg)
+
 
   def rmrf(root: String): Unit = rmrf(new File(root))
 
@@ -31,13 +28,17 @@ object TestUtils {
   def rm(file: File): Unit =
     if (!file.delete) throw FileOperationError(s"Deleting $file failed!")
 
-  def mkdir(path: String): Unit = (new File(path)).mkdirs
-  
+  def mkdir(path: String): Unit = new File(path).mkdirs
+
   def createSparkContext(name: String, parallel: Int = 4) = {
-    val conf = new SparkConf().setMaster(s"local[${parallel}]").setAppName(name)
+    val conf = new SparkConf().setMaster(s"local[$parallel]").setAppName(name)
     new SparkContext(conf)
   }
-  
+
+  def load(sc: SparkContext, path: String, delim: String = ";") = sc.textFile(path).map(_.split(delim)).map{ arr => (STObject(arr(1)), arr(0))}
+
+
+
   def createRDD(
       sc: SparkContext, 
       file: String = "src/test/resources/new_eventful_flat_1000.csv", 
@@ -59,7 +60,7 @@ object TestUtils {
       rdd
   }
   
-  def makeTimeStamp(year: Int, month: Int, day: Int) = LocalDate.of(year, month, day).toEpochDay()
+  def makeTimeStamp(year: Int, month: Int, day: Int) = LocalDate.of(year, month, day).toEpochDay
   
   
   def createIndexedRDD(

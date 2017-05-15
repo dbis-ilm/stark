@@ -4,7 +4,7 @@ import com.vividsolutions.jts.io.WKTReader
 import dbis.stark.STObject._
 import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._
-import dbis.stark.spatial.partitioner.SpatialGridPartitioner
+import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -235,6 +235,71 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     res.count() shouldBe 4
   }
 
+
+//  it should "produce the same results independent from partitioner" in {
+//
+//    val polygons = TestUtils.load(sc, "file:///home/hage/polygon_10000.wkt")
+//
+//    val qry = TestUtils.load(sc, "src/test/resources/querypoly.wkt").first()._1
+//
+//    val resultPlain = polygons.intersects(qry).collect()
+//
+//    val resultGrid = polygons.partitionBy(new SpatialGridPartitioner(
+//                                                    polygons,
+//                                                    partitionsPerDimension = 10,
+//                                                    withExtent = true)
+//                                          ).intersects(qry)
+//                                           .collect()
+//
+//    val resultBSP = polygons.partitionBy(new BSPartitioner(
+//                                              polygons,
+//                                              _sideLength = 0.5,
+//                                              _maxCostPerPartition = 1000
+//                                              )
+//                                            ).intersects(qry)
+//                                              .collect()
+//
+//    withClue("grid") { resultGrid should contain theSameElementsAs resultPlain }
+//    withClue("bsp") { resultBSP should contain theSameElementsAs resultPlain }
+//
+//
+//  }
+
+
+  it should "compute the correct skyline with aggregate" in {
+
+    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(TestUtils.makeTimeStamp(2013, 6, 1)))
+
+    val start = System.currentTimeMillis()
+    val s = rdd.filter(_._1 != q).skylineAgg(q, Distance.euclid, Skyline.centroidDominates)
+    //    val s = rdd.aggregate(startSkyline)(combine,merge)
+    val skyline = s.collect()
+
+    val end = System.currentTimeMillis()
+    println(s"${end -start}ms")
+
+//    println(skyline.mkString("\n"))
+
+    skyline should not be empty
+
+    // check that there is no point in the RDD that dominates any skyline point
+    skyline.foreach { skylinePoint =>
+      val refDist = Distance.euclid(q,skylinePoint._1)
+      val skylineRef = STObject(refDist._1.value, refDist._2.value)
+
+      val forAll = rdd.filter( _._1 != q )
+        .map{ case (l,_) => Distance.euclid(q,l)}
+        .filter{ case (sDist, tDist) =>
+          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
+        }
+        .collect()
+
+      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
+    }
+
+  }
+
   it should "compute the correct skyline" in {
 
     val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
@@ -250,6 +315,8 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val end = System.currentTimeMillis()
     println(s"${end -start}ms")
 
+//    println(skyline.mkString("\n"))
+
     skyline should not be empty
 
     // check that there is no point in the RDD that dominates any skyline point
@@ -269,54 +336,18 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
-  it should "compute the correct skyline with aggregate" in {
-
-    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+  "The skyline implementations" should "produce the same skylines" in {
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(TestUtils.makeTimeStamp(2013, 6, 1)))
+    val rdd = TestUtils.createRDD(sc)
+              .map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+              .filter(_._1 != q)
 
-    type V = (String, String)
-    type T = (STObject,(STObject,V))
+    val skyline = rdd.skyline(q, Distance.euclid, Skyline.centroidDominates,ppD=5).collect()
+    val skylineAgg = rdd.skylineAgg(q, Distance.euclid, Skyline.centroidDominates).collect()
 
-    def combine(sky: Skyline[(STObject,V)], tuple: (STObject,V)): Skyline[(STObject,V)] = {
-      val dist = Distance.euclid(tuple._1, q)
-      val distObj = STObject(dist._1.value, dist._2.value)
-      sky.insert((distObj, tuple))
-      sky
-    }
-
-    def merge(sky1: Skyline[(STObject,V)], sky2: Skyline[(STObject,V)]): Skyline[(STObject,V)] = {
-      val sky3 = sky2
-      sky1.skylinePoints.foreach(p => sky3.insert(p))
-      sky3
-    }
-
-    val start = System.currentTimeMillis()
-//    val l = List.empty[(STObject, (STObject, (String, String)))]
-    val s = rdd.aggregate{new Skyline[(STObject,V)]()}(combine,merge)
-    val skyline = s.skylinePoints.map(_._2)
-
-    val end = System.currentTimeMillis()
-    println(s"${end -start}ms")
-
-    println(s.skylinePoints.mkString("\n"))
-
-    skyline should not be empty
-
-    // check that there is no point in the RDD that dominates any skyline point
-    skyline.foreach { skylinePoint =>
-      val refDist = Distance.euclid(q,skylinePoint._1)
-      val skylineRef = STObject(refDist._1.value, refDist._2.value)
-
-      val forAll = rdd.filter( _._1 != q )
-        .map{ case (l,_) => Distance.euclid(q,l)}
-        .filter{ case (sDist, tDist) =>
-          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
-        }
-        .collect()
-
-      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
-    }
-
+    skyline should contain theSameElementsAs skylineAgg
   }
+
+
   
 }

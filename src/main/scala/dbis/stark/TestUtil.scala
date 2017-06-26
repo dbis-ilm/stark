@@ -50,15 +50,19 @@ class TestUtil {
   var partionsize = 10
   var prefilter = false;
   var autorange = false
+  var cache = false
+  var secondfilter = false
   var order = 10
   var datasetfromrdd = false;
   var searchP = false;
   var listpoints = false;
   var dataset = false;
   val searchsize = 30;
+  val searchsize2 = 15;
+  var useresult = false;
   val intervalfakt = 1000;
-  val searchPolygon: STObject = STObject(s"Polygon((-$searchsize $searchsize, $searchsize $searchsize, $searchsize -$searchsize, -$searchsize -$searchsize, -$searchsize $searchsize))", Interval(2 * intervalfakt, 5 * intervalfakt))
-  val secondPolygon: STObject = STObject(s"Polygon((-$searchsize $searchsize, $searchsize $searchsize, $searchsize -$searchsize, -$searchsize -$searchsize, -$searchsize $searchsize))", Interval(6 * intervalfakt, 7 * intervalfakt))
+  val searchPolygon: STObject = STObject(s"Polygon((-$searchsize $searchsize, $searchsize $searchsize, $searchsize -$searchsize, -$searchsize -$searchsize, -$searchsize $searchsize))", Interval(3 * intervalfakt, 6 * intervalfakt))
+  val secondPolygon: STObject = STObject(s"Polygon((-$searchsize2 $searchsize2, $searchsize2 $searchsize2, $searchsize2 -$searchsize2, -$searchsize2 -$searchsize2, -$searchsize2 $searchsize2))", Interval(4 * intervalfakt, 5 * intervalfakt))
   var secondPoint = 1
   var secondquery = false;
 
@@ -99,6 +103,9 @@ class TestUtil {
     println("-pf | --pre-filter     use pre filtering for datasets")
     println("-dsfr | --dataset-from-rdd     create dataset from rdd")
     println("-sq | --second-query    second query")
+    println("-sf | --second-filter    second filter")
+    println("-ca | --cache    use .cache()")
+    println("-ur | --use-result    use result for second query")
     println()
     println("-c  | --contains               use contains as Method | DEFAULT")
     println("-i  | --intersects             use intersects as Method")
@@ -140,6 +147,9 @@ class TestUtil {
           case "-sp" => searchP = true
           case "-pf" => prefilter = true
           case "-sq" => secondquery = true
+          case "-sf" => secondfilter = true
+          case "-ca" => cache = true
+          case "-ur" => useresult = true
           case "-dsfr" => datasetfromrdd = true
           case "-nf" => {
             LiveIntervalIndexedSpatialRDDFunctions.skipFilter = true
@@ -151,7 +161,7 @@ class TestUtil {
             partionsize = args(i + 1).toInt
             i += 1
           }
-          case "-sf" => {
+          case "-sa" => {
             sampelfactor = args(i + 1).toDouble
             i += 1
           }
@@ -214,7 +224,13 @@ class TestUtil {
     //  createIntervalDataSetFromRdd(sc, spark, filepath)
    // }
 
-   // ds.cache()
+
+    if(cache) {
+      ds.cache()
+    }else{
+      println("no cache")
+    }
+
 
     println("using dataset")
 
@@ -235,25 +251,7 @@ class TestUtil {
     var psa = ds
 
     if (prefilter) {
-      val t = searchData.getTemp.get
-
-      method match {
-        case 0 => {
-          println("pre time filter contains")
-          psa = ds.where(ds("start") <= t.start.value and ds("end") >= t.end.get.value)
-        }
-        case 1 => {
-          println("pre time filter intersects")
-          psa = ds.where((ds("start") <= t.start.value and ds("end") >= t.start.value) or (ds("start") >= t.start.value and ds("start") <= t.end.get.value))
-        }
-        case 2 => {
-          println("pre time filter containedby")
-          psa = ds.where(ds("start") >= t.start.value and ds("end") <= t.end.get.value)
-        }
-        case _ => println(" wrong Method: " + method)
-      }
-
-
+      psa = TestF.prefilter(method,ds,searchData,secondfilter)
     } else {
       println("no prefilter")
     }
@@ -270,6 +268,7 @@ class TestUtil {
     }
 
     var res1: Array[ESTO] = null
+    var res_d: Dataset[ESTO] = null
     import sparks.implicits._
     val treeorder = order
 
@@ -279,8 +278,8 @@ class TestUtil {
         println("index")
         psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
       }
-      val tmp7 = psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
-      res1 = tmp7.collect()
+      res_d= psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
+      res1 = res_d.collect()
     }
     )
     println("\nelapsed time for dataset-method in ms: " + t1)
@@ -294,14 +293,23 @@ class TestUtil {
     //-------------------
     if (secondquery) {
       var psa = ds
+
+
+
       var searchData = secondPolygon
       if (!searchP) {
         val xs = ds.take(secondPoint + 1)(secondPoint)
         searchData = STObject(xs.stob, Interval(xs.start, xs.end))
       }
 
+      if(useresult){
+        println("using result")
+        psa = res_d
+      }
+
+
       if (prefilter) {
-       psa = TestF.prefilter(method,ds,searchData)
+       psa = TestF.prefilter(method,psa,searchData,secondfilter)
 
       } else {
         println("no prefilter")
@@ -371,11 +379,16 @@ class TestUtil {
         case _ => println(" wrong Partitioner: " + part)
       }
     )
-
-    rdd.cache()
-
-
     println("time for partitionby: " + t2)
+
+
+    if(cache) {
+      rdd.cache()
+    }else{
+      println("no cache")
+    }
+
+
     if (rdd.partitioner.isDefined) {
       println("using " + rdd.partitioner.get.getClass.getSimpleName + " as partitioner (partition-size: " + partionsize + " )")
       // val d = rdd.mapPartitions(iter => Array(iter.size).iterator, true)
@@ -409,27 +422,28 @@ class TestUtil {
 
 
     var res: Array[(STObject, (String, STObject))] = null
+    var res_r: RDD[(STObject, (String, STObject))] = null
     val t1 = TestUtil.time(
       method match {
         case 0 => {
           println("using Method contains")
-          val tmp = indexData.contains(searchData)
-          res = tmp.collect()
+           res_r = indexData.contains(searchData)
+          res = res_r.collect()
         }
         case 1 => {
           println("using Method intersects")
-          val tmp = indexData.intersects(searchData)
-          res = tmp.collect()
+          res_r = indexData.intersects(searchData)
+          res = res_r.collect()
         }
         case 2 => {
           println("using Method containedby")
-          val tmp = indexData.containedby(searchData)
-          res = tmp.collect()
+          res_r = indexData.containedby(searchData)
+          res = res_r.collect()
         }
         case 3 => {
           println("using Method withinDistance")
-          val tmp = indexData.withinDistance(searchData, 0.5, (g1, g2) => g1.getGeo.distance(g2.getGeo))
-          res = tmp.collect()
+          res_r = indexData.withinDistance(searchData, 0.5, (g1, g2) => g1.getGeo.distance(g2.getGeo))
+          res = res_r.collect()
         }
         case _ => println(" wrong Method: " + method)
       }
@@ -458,6 +472,25 @@ class TestUtil {
       if (!searchP) {
         searchData = rddRaw.take(secondPoint + 1)(secondPoint)._1
       }
+      if(useresult){
+
+        part match {
+          case 0 => rdd = res_r // do nothing
+          case 1 => rdd = res_r.partitionBy(new SpatialGridPartitioner(rddRaw, partionsize));
+          case 2 => rdd = res_r.partitionBy(new BSPartitioner(rddRaw, 0.5, 1000))
+          case 3 => rdd = res_r.partitionBy(new TemporalRangePartitioner(rddRaw, partionsize, autorange, sampelfactor))
+          case _ => println(" wrong Partitioner: " + part)
+        }
+
+        index match {
+          case 0 => indexData = rdd // do nothing
+          case 1 => indexData = rdd.liveIntervalIndex()
+          case 2 => indexData = rdd.liveIndex(order)
+          case _ => println(" wrong Index: " + index)
+        }
+        println("used result")
+      }
+
       var res: Array[(STObject, (String, STObject))] = null
       val t1 = TestUtil.time(
         method match {
@@ -529,26 +562,33 @@ class TestUtil {
     var sparkss = sparks.read.option("inferSchema", "true").option("delimiter", sep).csv(file).toDF("id", "stob", "start", "end")
     // "minx", "maxx", "miny", "maxy"
 
-    //sparkss.withColumn("minx",sparkss("id"))
-    /*sparkss.withColumn("maxx",sparkss("id"))
-     sparkss.withColumn("miny",sparkss("id"))
-     sparkss.withColumn("maxy",sparkss("id"))*/
+    sparkss = sparkss.withColumn("minx",sparkss("id"))
+    sparkss = sparkss.withColumn("maxx",sparkss("id"))
+    sparkss = sparkss.withColumn("miny",sparkss("id"))
+    sparkss = sparkss.withColumn("maxy",sparkss("id"))
    // sparkss = sparkss.withColumn("stob2", blubb()(sparkss("stob")))
    // sparkss.show(10)
 
+    //sparkss.as[ESTO]
+    if(secondfilter) {
+      println("load second filter")
+      val extsto = sparkss.map(x => {
+        val s = x.getString(1)
+        val ob = STObject(s)
+        val env = ob.getEnvelopeInternal()
+        ESTO(x.getInt(0).toLong,
+          x.getString(1),
+          x.getInt(2).toLong,
+          x.getInt(3).toLong,
+          env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
+      })
 
-    val extsto = sparkss.map( x => {
-      val s = x.getString(1)
-      val ob = STObject(s)
-      val env = ob.getEnvelopeInternal()
-      ESTO(x.getInt(0).toLong,
-        x.getString(1),
-        x.getInt(2).toLong,
-        x.getInt(3).toLong,
-        env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
-    })
+      extsto.as[ESTO]
+    }else{
 
-    extsto.as[ESTO]
+
+      sparkss.as[ESTO]
+    }
 
   }
 
@@ -583,5 +623,5 @@ class TestUtil {
 
 //case class STO(id: Long, stob: String, start: Long, end: Long)
 
-case class ESTO(id: Long, stob: String, start: Long, end: Long,minx: Double, maxx: Double, miny: Double, maxy: Double)
+case class ESTO(id: Long, stob: String, start: Long, end: Long, minx: Double, maxx: Double, miny: Double, maxy: Double)
 

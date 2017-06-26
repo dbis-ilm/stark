@@ -12,7 +12,7 @@ import spire.syntax.order
   * Created by Jacob on 28.03.2017.
   */
 object TestF extends Serializable {
-  def prefilter(method: Int, ds: Dataset[ESTO], searchData: STObject): Dataset[ESTO] = {
+  def prefilter(method: Int, ds: Dataset[ESTO], searchData: STObject,secondfilter : Boolean): Dataset[ESTO] = {
     var psa = ds
     val t = searchData.getTemp.get
     val env = searchData.getGeo.getEnvelopeInternal
@@ -22,10 +22,13 @@ object TestF extends Serializable {
       case 0 => {
         println("pre time filter contains")
         psa = ds.where(ds("start") <= t.start.value and ds("end") >= t.end.get.value)
-          .where(ds("minx") < env.getMinX)
-          .where(ds("maxx") > env.getMaxX)
-          .where(ds("miny") < env.getMinY)
-          .where(ds("maxy") > env.getMaxY)
+        if(secondfilter) {
+          println("second filter contains")
+          psa = psa.where(ds("minx") < env.getMinX)
+            .where(ds("maxx") > env.getMaxX)
+            .where(ds("miny") < env.getMinY)
+            .where(ds("maxy") > env.getMaxY)
+        }
       }
       case 1 => {
         println("pre time filter intersects")
@@ -34,10 +37,13 @@ object TestF extends Serializable {
       case 2 => {
         println("pre time filter containedby")
         psa = ds.where(ds("start") >= t.start.value and ds("end") <= t.end.get.value)
-          .where(ds("minx") > env.getMinX)
-          .where(ds("maxx") < env.getMaxX)
-          .where(ds("miny") > env.getMinY)
-          .where(ds("maxy") < env.getMaxY)
+        if(secondfilter) {
+          println("second filter containedby")
+          psa = psa.where(ds("minx") > env.getMinX)
+            .where(ds("maxx") < env.getMaxX)
+            .where(ds("miny") > env.getMinY)
+            .where(ds("maxy") < env.getMaxY)
+        }
       }
       case _ => println(" wrong Method: " + method)
     }

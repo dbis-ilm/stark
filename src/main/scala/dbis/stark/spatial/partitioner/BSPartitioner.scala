@@ -111,7 +111,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     if(withExtent) {
     
       rdd.map { case (g, _) =>
-        val p = g.getCentroid
+        val p = Utils.getCenter(g.getGeo)
         
         val env = g.getEnvelopeInternal
         val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
@@ -217,7 +217,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
      * which by definition is immutable and the partitions should cover the complete data space 
      * of the RDD's content
      */
-    val c = g.getCentroid
+    val c = Utils.getCenter(g.getGeo)
     val part = bsp.partitions.find{ p =>
       p.range.contains(NPoint(c.getX, c.getY))
     }

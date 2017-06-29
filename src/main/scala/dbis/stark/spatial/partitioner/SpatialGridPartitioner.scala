@@ -1,7 +1,8 @@
 package dbis.stark.spatial.partitioner
 
+import com.vividsolutions.jts.geom.GeometryFactory
 import dbis.stark.STObject
-import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -72,7 +73,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
 //
 //      val a = new Array[Cell](numPartitions)
       rdd.map{ case (g,_) =>
-        val center = g.getCentroid
+        val center = Utils.getCenter(g.getGeo)
 
         val id = SpatialGridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 
@@ -112,7 +113,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
-    val center = g.getCentroid
+    val center = Utils.getCenter(g.getGeo)
 
     val id = SpatialGridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 

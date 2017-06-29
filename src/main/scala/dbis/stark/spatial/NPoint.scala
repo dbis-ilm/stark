@@ -6,7 +6,7 @@ package dbis.stark.spatial
  * @param c: The array of coordinate values in each dimension
  */
 case class NPoint(c: Array[Double]) extends Cloneable {
-  
+  require(!c.exists(_.isNaN), s"Coordinate value must not be NaN: ${c.mkString("; ")}")
   require(c.length >= 2, "dimension must be >= 2")
   
 	def apply(idx:Int): Double = c(idx)
@@ -67,6 +67,10 @@ case class NPoint(c: Array[Double]) extends Cloneable {
 }
 
 object NPoint {
-	def apply(x: Double, y: Double): NPoint = NPoint(Array(x,y))
+	def apply(x: Double, y: Double): NPoint = {
+    require(x != Double.NaN, "x value must not be NaN")
+    require(y != Double.NaN, "y value must not be NaN")
+    NPoint(Array(x,y))
+  }
 	
 }

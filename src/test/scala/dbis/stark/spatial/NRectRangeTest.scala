@@ -1,14 +1,12 @@
 package dbis.stark.spatial
 
+import dbis.stark.STObject
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-
-
 import org.scalacheck.Properties
 import org.scalacheck.Gen
 import org.scalacheck.Arbitrary
-
-import org.scalacheck.Prop.{forAll, BooleanOperators}
+import org.scalacheck.Prop.{BooleanOperators, forAll}
 
 class NPointCheck extends Properties("NPoint") {
   
@@ -115,8 +113,8 @@ class NRectRangeTest extends FlatSpec with Matchers {
     val rect = NRectRange(NPoint(0,0), NPoint(3,3))
     val lengths = rect.lengths
     
-    lengths.size shouldBe 2
-    lengths should contain only (3)
+    lengths.length shouldBe 2
+    lengths should contain only 3
     
   }
   
@@ -125,8 +123,8 @@ class NRectRangeTest extends FlatSpec with Matchers {
     val rect = NRectRange(NPoint(-1,-1), NPoint(3,3))
     val lengths = rect.lengths
     
-    lengths.size shouldBe 2
-    lengths should contain only (4)
+    lengths.length shouldBe 2
+    lengths should contain only 4
     
   }
   
@@ -135,8 +133,8 @@ class NRectRangeTest extends FlatSpec with Matchers {
     val rect = NRectRange(NPoint(-4,-4), NPoint(-1,-1))
     val lengths = rect.lengths
     
-    lengths.size shouldBe 2
-    lengths should contain only (3)
+    lengths.length shouldBe 2
+    lengths should contain only 3
     
   }
   
@@ -175,5 +173,34 @@ class NRectRangeTest extends FlatSpec with Matchers {
     val center = NPoint(-7, -6.5)
     rect1.center shouldBe center
   }
-  
+
+  it should "intersect with a contained rectangle" in {
+    val envL = STObject("POLYGON(( 77.2723388671875 22.857194700969636, 79.2723388671875 22.857194700969636, 79.2723388671875 24.357194700969636, 77.2723388671875 24.357194700969636, 77.2723388671875 22.857194700969636 ))").getEnvelopeInternal
+    val extentL = NRectRange(NPoint(envL.getMinX, envL.getMinY), NPoint(envL.getMaxX, envL.getMaxY))
+
+    val envR = STObject("POLYGON(( 77.64656066894531 23.10247055501927, 78.64656066894531 23.10247055501927, 78.64656066894531 24.10247055501927, 77.64656066894531 24.10247055501927, 77.64656066894531 23.10247055501927 ))").getEnvelopeInternal
+    val extentR = NRectRange(NPoint(envR.getMinX, envR.getMinY), NPoint(envR.getMaxX, envR.getMaxY))
+
+    extentL.intersects(extentR) shouldBe true
+  }
+
+  it should "intersect with a containing rectangle" in {
+    val envL = STObject("POLYGON(( 77.2723388671875 22.857194700969636, 79.2723388671875 22.857194700969636, 79.2723388671875 24.357194700969636, 77.2723388671875 24.357194700969636, 77.2723388671875 22.857194700969636 ))").getEnvelopeInternal
+    val extentL = NRectRange(NPoint(envL.getMinX, envL.getMinY), NPoint(envL.getMaxX, envL.getMaxY))
+
+    val envR = STObject("POLYGON(( 77.64656066894531 23.10247055501927, 78.64656066894531 23.10247055501927, 78.64656066894531 24.10247055501927, 77.64656066894531 24.10247055501927, 77.64656066894531 23.10247055501927 ))").getEnvelopeInternal
+    val extentR = NRectRange(NPoint(envR.getMinX, envR.getMinY), NPoint(envR.getMaxX, envR.getMaxY))
+
+    extentR.intersects(extentL) shouldBe true
+  }
+
+  it should "contain a really contained rectangle" in {
+    val envL = STObject("POLYGON(( 77.2723388671875 22.857194700969636, 79.2723388671875 22.857194700969636, 79.2723388671875 24.357194700969636, 77.2723388671875 24.357194700969636, 77.2723388671875 22.857194700969636 ))").getEnvelopeInternal
+    val extentL = NRectRange(NPoint(envL.getMinX, envL.getMinY), NPoint(envL.getMaxX, envL.getMaxY))
+
+    val envR = STObject("POLYGON(( 77.64656066894531 23.10247055501927, 78.64656066894531 23.10247055501927, 78.64656066894531 24.10247055501927, 77.64656066894531 24.10247055501927, 77.64656066894531 23.10247055501927 ))").getEnvelopeInternal
+    val extentR = NRectRange(NPoint(envR.getMinX, envR.getMinY), NPoint(envR.getMaxX, envR.getMaxY))
+
+    extentL.contains(extentR) shouldBe true
+  }
 }

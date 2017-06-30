@@ -101,7 +101,7 @@ class BSPTest extends FlatSpec with Matchers {
   }
   
   
-  it should "find cells in range" taggedAs(Slow) in {
+  it should "find cells in range" taggedAs Slow in {
     
     val sideLength = 1
     val maxCost = 10
@@ -114,7 +114,7 @@ class BSPTest extends FlatSpec with Matchers {
     
     withClue("generated ll wrong") { ll shouldBe NPoint(llStartX, llStartY)  }
     withClue("generated ur wrong") { ur shouldBe NPoint(180, 90)  }
-    withClue("generated histogram wrong") { histo.size shouldBe 360*180 }
+    withClue("generated histogram wrong") { histo.length shouldBe 360*180 }
     
     
     val bsp = new BSP(
@@ -129,7 +129,7 @@ class BSPTest extends FlatSpec with Matchers {
     val cells = bsp.getCellsIn(NRectRange(ll,ur))
 
 //    cells should contain only ((0 until histo.size):_*)
-    cells.size shouldBe histo.size
+    cells.size shouldBe histo.length
 
     val start = System.currentTimeMillis()
     cells.foreach { cellId => 
@@ -241,7 +241,7 @@ class BSPTest extends FlatSpec with Matchers {
     withClue("p2 extent") { p2.get.extent shouldBe expP2.extent }
   }
   
-  it should "process a large number of cells"taggedAs(Slow)  in {
+  it should "process a large number of cells"taggedAs Slow  in {
     val sideLength = 0.1
     val maxCost = 10
     val numXCells = 500
@@ -249,10 +249,10 @@ class BSPTest extends FlatSpec with Matchers {
     val llStartX = -180
     val llStartY = -90
     
-    val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    val (ll,ur,_,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
     
     val bsp = new BSP(ll,ur,histo,sideLength,100,false)
     
-    bsp.partitions.size should be > 0
+    bsp.partitions.length should be > 0
   }
 }

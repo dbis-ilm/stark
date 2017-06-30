@@ -88,8 +88,27 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       s2 <- right.partitions
       if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
 
-      parts += new JoinPartition(idx, left, right, s1.index, s2.index)
-      idx += 1
+//        val lExtent = leftParti.get.partitionExtent(s1.index)
+//        val rExtent = rightParti.get.partitionExtent(s2.index)
+//
+//        println(lExtent)
+//        println(lExtent.wkt)
+//
+//        println
+//
+//        println(rExtent)
+//        println(rExtent.wkt)
+//
+//        val i = lExtent.intersects(rExtent)
+//        println(i)
+//
+//        if(i) {
+          val p = new JoinPartition(idx, left, right, s1.index, s2.index)
+//          println(s"marking $p for processing")
+          parts += p
+          idx += 1
+//        }
+
     }
     parts.toArray
   }
@@ -114,7 +133,11 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
       // loop over the left partition and check join condition on every element in the right partition's array
       left.iterator(split.leftPartition, context).flatMap{ case (lg, lv) =>
-        rightList.filter{ case (rg, _) => predicateFunc(lg,rg)}.map{ case (_,rv) => (lv,rv) }
+        rightList.filter{ case (rg, _) =>
+          val res = predicateFunc(lg,rg)
+//          println(s"check ($predicateFunc) $lg -- $rg --> $res")
+            res
+          }.map{ case (_,rv) => (lv,rv) }
 
       }
     } else { // we should apply indexing

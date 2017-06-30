@@ -1,14 +1,20 @@
 package dbis.stark.spatial
 
+trait WKT {
+  def wkt: String
+}
+
 /**
  * A class representing a point in a n-dimensional space
  * 
  * @param c: The array of coordinate values in each dimension
  */
-case class NPoint(c: Array[Double]) extends Cloneable {
+case class NPoint(c: Array[Double]) extends Cloneable with WKT {
   require(!c.exists(_.isNaN), s"Coordinate value must not be NaN: ${c.mkString("; ")}")
   require(c.length >= 2, "dimension must be >= 2")
-  
+
+  override def wkt: String = s"POINT(${c.mkString(" ")})"
+
 	def apply(idx:Int): Double = c(idx)
 
 	/**

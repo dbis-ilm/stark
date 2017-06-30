@@ -12,7 +12,7 @@ package dbis.stark.spatial
  * @param ll The lower left point (min value of each dimension)
  * @param ur The upper right point (max value in each dimension)
  */
-case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable {
+case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
     
   require(ll.dim >= 2, "dimension must be >= 2")
 	require(ll.dim == ur.dim, "ll and ur points must be of same dimension")
@@ -59,11 +59,11 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable {
     res
   }
   
-  def intersects(r: NRectRange): Boolean = points.exists { p => r.contains(p) }
+  def intersects(r: NRectRange): Boolean = this.contains(r) || points.exists { p => r.contains(p) }
   
   def points = Array(ll, NPoint(ur(0),ll(1)),ur, NPoint(ll(0),ur(1)))
   
-  def wkt: String = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))"
+  override def wkt: String = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))"
 
   /**
     * Extent this range with the given other range. That is, the minimum and maximum value in each dimension

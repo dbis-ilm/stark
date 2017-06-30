@@ -1,6 +1,5 @@
 package dbis.stark.spatial.partitioner
 
-import com.vividsolutions.jts.geom.GeometryFactory
 import dbis.stark.STObject
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.rdd.RDD
@@ -91,6 +90,9 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     } /*else {
       Array.tabulate(numPartitions){ i => SpatialGridPartitioner.getCellBounds(i, numPartitions, partitionsPerDimension, minX, minY, xLength, yLength) }
     }*/
+
+
+//    arr.foreach(c => println(s"$withExtent;${c.extent.wkt}"))
 
     arr
   }

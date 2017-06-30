@@ -10,6 +10,9 @@ import org.apache.spark.rdd.RDD
   */
 object SpatialPartitioner {
 
+  var EPS: Double = 1 / 1000000.0
+
+
   /**
     * Determine the min/max extents of a given RDD
     *
@@ -35,7 +38,7 @@ object SpatialPartitioner {
     }
     
     // do +1 for the max values to achieve right open intervals 
-    (minX, maxX + 1, minY, maxY + 1)
+    (minX, maxX + EPS, minY, maxY + EPS)
   }
 }
 

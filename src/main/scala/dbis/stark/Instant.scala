@@ -2,10 +2,7 @@ package dbis.stark
 
 /**
  * An instant represents a point in time.
- * <br><br>
- * Internally, an instant is represented as an interval with (l, l+1], i.e. we're 
- * simply adding one to the instants value
- * 
+ *
  * @param _l The actual time as a long, e.g. seconds since Epoch.
  * 
  */

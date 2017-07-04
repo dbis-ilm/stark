@@ -79,7 +79,7 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
     }
   }
 
-  it should "correctly partition wikimapia" in {
+  ignore should "correctly partition wikimapia" in {
     val rdd = sc.textFile("src/test/resources/wiki.wkt")
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))

@@ -1,12 +1,9 @@
 package dbis.stark.spatial.partitioner
 
-import scala.collection.mutable.Queue
-import scala.collection.mutable.ListBuffer
-import dbis.stark.spatial.NRectRange
-import dbis.stark.spatial.NPoint
-import dbis.stark.spatial.Cell
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 
 import scala.collection.immutable.IndexedSeq
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -28,7 +25,7 @@ case class PartitionStats(
     histoSize: Int
   ) {
   
-  override def toString() = s"""stats:
+  override def toString = s"""stats:
     start range: $start 
     ll: $ll
     ur: $ur
@@ -73,8 +70,8 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     numCellThreshold: Int = -1
   ) extends Serializable {
   
-  require(_ll.size > 0, "zero dimension is not supported")
-  require(_ll.size == _ur.size, "Equal number of dimension required")
+  require(_ll.length > 0, "zero dimension is not supported")
+  require(_ll.length == _ur.size, "Equal number of dimension required")
   require(_cellHistogram.nonEmpty, "cell histogram must not be empty")
   require(_maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
   require(_sideLength > 0, "cell side length must not be negative or zero")
@@ -221,7 +218,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
      */
     
     cellsPerDimension(part.range).iterator.zipWithIndex      // index is the dimension -- (numCells, dim)
-                      .filter(_._1 > 1)             // filter for number of cells
+                      .filter(_._1 > 0)             // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
 
@@ -317,14 +314,14 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   }  
   
   protected[spatial] var start = {
-    
-	  /* start with a partition covering the complete data space
-	   * If the last cell ends beyond the max values created from
-	   * the data points, adjust it to completely cover the last cell, 
-	   * 
-	   * i.e. we expand our space to complete cells
-	   */
-	  var s = Cell(0, NRectRange(NPoint(_ll), NPoint(_ur)))
+
+    /* start with a partition covering the complete data space
+     * If the last cell ends beyond the max values created from
+     * the data points, adjust it to completely cover the last cell,
+     *
+     * i.e. we expand our space to complete cells
+     */
+    val s = Cell(0, NRectRange(NPoint(_ll), NPoint(_ur)))
 			  
     val cellsPerDim = cellsPerDimension(s.range)
     val newUr = _ur.zipWithIndex.map { case (value, dim) =>
@@ -346,18 +343,20 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
    * 
    * This is a lazy value    
    */
-  var partitions = {
+  lazy val partitions = {
 //    val startTime = System.currentTimeMillis()
     val resultPartitions = new ArrayBuffer[Cell](BSP.DEFAULT_PARTITION_BUFF_SIZE)
     
     val nonempty = _cellHistogram.filter{ case (_, cnt) => cnt > 0 }.map(_._1)
 
-    if(nonempty.size <= numCellThreshold) {
+
+
+    if(nonempty.length <= numCellThreshold) {
       resultPartitions ++= nonempty.map(_.clone())
     } else {
     
       // add it to processing queue
-      val queue = Queue(start)
+      val queue = mutable.Queue(start)
       while(queue.nonEmpty) {
         val part = queue.dequeue()
         
@@ -370,7 +369,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
          */
         
         if((costEstimation(part) > _maxCostPerPartition) && 
-            (part.range.lengths.find ( _ > _sideLength ).isDefined) ) {
+            getCellsIn(part.range).length > 1 /*part.range.lengths.exists(_ > _sideLength)*/ ) {
           
           val (p1, p2) = costBasedSplit(part)
 
@@ -385,14 +384,14 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
             if(p1.get != part)
           	  queue.enqueue(p1.get)
           	else
-          	  resultPartitions += p1.get
+          	  resultPartitions += p1.get.clone()
           }
           	
           if(p2.isDefined) {
             if(p2.get != part)
           	  queue.enqueue(p2.get)
           	else
-          	  resultPartitions += p2.get
+          	  resultPartitions += p2.get.clone()
           }
           	
           	
@@ -402,7 +401,18 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
         }
       }
     }
-    
+
+    // FIXME: this is a dirty workaround for a bug that does not add all non-empty cells to partitions
+    // somehow there are non-empty cells that also exceed max cost but which are not added to the result partitions
+    val usedCell = Array.fill(_cellHistogram.length)(false)
+    resultPartitions.foreach{ p =>
+      getCellsIn(p.range).foreach(c => usedCell(c) = true)
+    }
+
+    usedCell.zipWithIndex.withFilter{case (b,i) => b && _cellHistogram(i)._2 > 0}.foreach { case (_, i) =>
+      resultPartitions += _cellHistogram(i)._1
+    }
+
     // index is the ID of the partition
     resultPartitions.zipWithIndex.foreach { case (p, i) =>
       p.id = i  
@@ -423,7 +433,7 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
   lazy val partitionStats = {
     
     // this will trigger the computation, in case it was not done before
-    val numParts = partitions.size
+    val numParts = partitions.length
     
     val partCounts = _cellHistogram.view
       .flatMap { case (cell, count) =>
@@ -459,9 +469,9 @@ class BSP(_ll: Array[Double], var _ur: Array[Double],
     val maxArea = partAreas.filter(_._2 == maxA)
     val minArea = partAreas.filter(_._2 == minA)
     
-    val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
+//    val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
     
-    PartitionStats(NPoint(ll), NPoint(ur), start,numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea, _cellHistogram.size) 
+    PartitionStats(NPoint(ll), NPoint(ur), start,numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea, _cellHistogram.length)
   }  
     
 }

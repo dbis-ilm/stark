@@ -228,18 +228,18 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       part.get.id 
       
     } else {
-      println("error: no partition found")
-      println(bsp.partitions.mkString("\n"))
+//      println("error: no partition found")
+//      println(bsp.partitions.mkString("\n"))
       val histoFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_histogram")
       val partitionFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_partitions")
       
-      println(s"saving historgram to $histoFile")
+//      println(s"saving historgram to $histoFile")
       printHistogram(histoFile)
       
-      println(s"saving partitions to $partitionFile")
+//      println(s"saving partitions to $partitionFile")
       printPartitions(partitionFile)
       
-      println("you can use the script/plotpoints.py script to visualize points, cells, and partitions")
+//      println("you can use the script/plotpoints.py script to visualize points, cells, and partitions")
       
       throw new IllegalStateException(s"$g is not in any partition!")
         

@@ -143,20 +143,20 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     } else { // we should apply indexing
 
       // the index
-      val tree = new RTree[G,(G,V2)](capacity = treeOrder)
+      val tree = new RTree[G,(G,V)](capacity = treeOrder)
 
       // insert everything into the tree
-      right.iterator(split.rightPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
+      left.iterator(split.leftPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
 
       // build the tree
       tree.build()
 
       // loop over every element in the left partition and query tree.
       // For the results of a query we have to perform candidates check
-      left.iterator(split.leftPartition, context).flatMap { case (lg, lv) =>
-        tree.query(lg) // index query
-          .filter{ case (rg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
-          .map{ case (_,rv) => (lv,rv)} // result is the combined tuple of the payload items
+      right.iterator(split.rightPartition, context).flatMap { case (rg, rv) =>
+        tree.query(rg) // index query
+          .filter{ case (lg, _) => predicateFunc(rg, lg) } // candidate check and apply join condidion
+          .map{ case (_,lv) => (lv,rv)} // result is the combined tuple of the payload items
       }
 
 

@@ -7,6 +7,8 @@ import dbis.stark.spatial.Cell
 import dbis.stark.spatial.NRectRange
 import org.scalatest.tagobjects.Slow
 
+import scala.util.Random
+
 class BSPTest extends FlatSpec with Matchers {
 
   private def createCells(sideLength: Double, cost: Int = 10, numXCells: Int, numYCells: Int, llStartX: Double, llStartY: Double) = {
@@ -20,7 +22,7 @@ class BSPTest extends FlatSpec with Matchers {
           val ur = NPoint(ll(0) + sideLength, ll(1) + sideLength)
           
           val id = y * numXCells + x
-          (Cell(id, NRectRange(ll,ur)), cost)
+          (Cell(id, NRectRange(ll,ur)), Random.nextInt(cost))
         }
       }.toArray
       
@@ -44,11 +46,10 @@ class BSPTest extends FlatSpec with Matchers {
 	  val llStartX = -18
 	  val llStartY = -11
 	  
-    val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)	  
+    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 	  
     val bsp = new BSP(
-      ll.c,
-      ur.c,
+      whole,
       histo,
       sideLength,
       maxCost      
@@ -71,11 +72,10 @@ class BSPTest extends FlatSpec with Matchers {
 	  val llStartX = -4
 	  val llStartY = -4
 	  
-    val (ll,ur,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 	  
     val bsp = new BSP(
-      ll.c,
-      ur.c,
+      whole,
       histo,
       sideLength,
       maxCost      
@@ -118,8 +118,7 @@ class BSPTest extends FlatSpec with Matchers {
     
     
     val bsp = new BSP(
-      ll,
-      ur,
+      whole,
       histo,
       sideLength,
       maxCost,
@@ -137,7 +136,34 @@ class BSPTest extends FlatSpec with Matchers {
     }
     val end = System.currentTimeMillis()
   }
-  
+
+
+  ignore should "find cells in range for strange values" in {
+
+    val sideLength = 0.05
+    val maxCost = 10
+    val numXCells = 2450
+    val numYCells = 180
+    val llStartX = -118.0374626
+    val llStartY = 33.7448744
+
+    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+
+    val bsp = new BSP(
+      whole,
+      histo,
+      sideLength,
+      maxCost,
+      withExtent = true
+    )
+
+    val cells = bsp.getCellsIn(whole)
+    cells should contain theSameElementsAs (0 until numXCells * numYCells)
+
+
+  }
+
+
   it should "find correct cells per dimension" in {
     val cell1 = Cell(0,
       range = NRectRange(NPoint(-4,-4), NPoint(0,0)),
@@ -165,8 +191,7 @@ class BSPTest extends FlatSpec with Matchers {
     val ur = NPoint(4,4)
     
     val bsp = new BSP(
-        ll,
-        ur,
+        NRectRange(ll,ur),
         histo,
         4, //side Length
         20,
@@ -210,8 +235,7 @@ class BSPTest extends FlatSpec with Matchers {
     val ur = NPoint(4,4)
     
     val bsp = new BSP(
-        ll,
-        ur,
+        NRectRange(ll,ur),
         histo,
         4, //side Length
         20,
@@ -249,9 +273,9 @@ class BSPTest extends FlatSpec with Matchers {
     val llStartX = -180
     val llStartY = -90
     
-    val (ll,ur,_,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
     
-    val bsp = new BSP(ll,ur,histo,sideLength,100,false)
+    val bsp = new BSP(whole,histo,sideLength,100,false)
     
     bsp.partitions.length should be > 0
   }

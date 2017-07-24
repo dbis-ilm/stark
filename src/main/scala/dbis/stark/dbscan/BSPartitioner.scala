@@ -75,8 +75,11 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
 //    logInfo(s"produced ${cellHistogram.size} cells")
     
 //    logInfo(s"num points according to hist: ${cellHistogram.map(_._2).sum}")
-    
-    val bsp = new BSP(mbb.minVec.toArray, mbb.maxVec.toArray,
+
+    val start = NRectRange(NPoint(mbb.minVec.toArray), NPoint(mbb.maxVec.toArray))
+
+    val bsp = new BSP(/*mbb.minVec.toArray, mbb.maxVec.toArray,*/
+      start,
       cellHistogram.map{ case (r,i) => (Cell(r),i)}, // _cellHistogram: Array[(Cell, Int)],
       cellSize, // 2 * eps
       maxPoints.toDouble,

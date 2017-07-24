@@ -133,20 +133,16 @@ object SpatialPartitioner {
 
 /**
   * Base class for spatial partitioners
-  * @param _minX The min value in x dimension
-  * @param _maxX The max value in x dimension
-  * @param _minY The min value in y dimension
-  * @param _maxY The max value in y dimension
+  * @param minX The min value in x dimension
+  * @param maxX The max value in x dimension
+  * @param minY The min value in y dimension
+  * @param maxY The max value in y dimension
   */
 abstract class SpatialPartitioner(
-    private val _minX: Double, private val _maxX: Double, private val _minY: Double, private val _maxY: Double
+    val minX: Double, var maxX: Double, val minY: Double, var maxY: Double
   ) extends Partitioner {
 
-  def minX = _minX
-  def maxX = _maxX
-  def minY = _minY
-  def maxY = _maxY
-  
+
   def partitionBounds(idx: Int): Cell
   def partitionExtent(idx: Int): NRectRange
 }

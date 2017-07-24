@@ -46,7 +46,7 @@ object BSPartitioner {
   */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)],
-    sideLength: Double,
+    val sideLength: Double,
     maxCostPerPartition: Double,
     withExtent: Boolean,
     _minX: Double,
@@ -67,30 +67,58 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
            withExtent: Boolean = false) =
     this(rdd, sideLength, maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
 
-  
-//  lazy val maxCostPerPartition: Double = _maxCostPerPartition
 
-  protected[spatial] var numXCells: Int = Math.ceil(math.abs(maxX - minX) / sideLength).toInt
-  protected[spatial] var numYCells: Int = Math.ceil(math.abs(maxY - minY) / sideLength).toInt
-  
+//  val s = Cell(0, NRectRange(NPoint(ll), NPoint(ur)))
+  //
+  //    val cellsPerDim = cellsPerDimension(s.range)
+  //
+  //    val newUr = ur.zipWithIndex.map { case (_, dim) =>
+  //      if(ll(dim) + cellsPerDim(dim) * sideLength > ur(dim))
+  //        ll(dim) + cellsPerDim(dim) * sideLength
+  //      else
+  //        ur(dim)
+  //    }
+  //
+  //    ur = newUr
+
+  protected[spatial] val numXCells: Int = {
+    val xCells = Math.ceil(math.abs(maxX - minX) / sideLength).toInt
+    maxX = minX + xCells*sideLength
+    Math.ceil(math.abs(maxX - minX) / sideLength).toInt
+  }
+
+  protected[spatial] val numYCells: Int = {
+    val yCells = Math.ceil(math.abs(maxY - minY) / sideLength).toInt
+    maxY = minY + yCells*sideLength
+    Math.ceil(math.abs(maxY - minY) / sideLength).toInt
+  }
+
   /**
-   * The cells which contain elements and the number of elements
-   * 
-   * We iterate over all elements in the RDD, determine to which
-   * cell it belongs and then simply aggregate by cell
-   */
+    * The cells which contain elements and the number of elements
+    *
+    * We iterate over all elements in the RDD, determine to which
+    * cell it belongs and then simply aggregate by cell
+    */
   protected[spatial] val cells: Array[(Cell, Int)] =
     SpatialPartitioner.buildHistogram(rdd,withExtent,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
+  val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
+
   protected[spatial] var bsp = new BSP(
-      Array(minX, minY), 
-      Array(maxX, maxY), 
-      cells, // for BSP we only need calculated cell sizes and their respective counts 
-      sideLength,
-      maxCostPerPartition,
-      withExtent,
-      BSPartitioner.numCellThreshold)
-  
+  //    Array(minX, minY),
+  //    Array(maxX, maxY),
+    start,
+  cells, // for BSP we only need calculated cell sizes and their respective counts
+  sideLength,
+  maxCostPerPartition,
+  withExtent,
+  BSPartitioner.numCellThreshold
+  )
+
+
+
+
+
 //  protected[spatial] var bsp = new BSPBinary(
 //      Array(minX, minY), 
 //      Array(maxX, maxY), 
@@ -117,7 +145,6 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
   def printHistogram(fName: java.nio.file.Path) {
     
-//    println(s"num in hist: ${cells.map(_._2).sum}")
     val list = cells.map(_._1.range).map { c => s"${c.ll(1)},${c.ll(0)},${c.ur(1)},${c.ur(0)}" }.toList.asJava
     java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
     

@@ -28,8 +28,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   private def createRDD(points: Seq[String] = List("POINT(2 2)", "POINT(2.5 2.5)", "POINT(2 4)", "POINT(4 2)", "POINT(4 4)")): RDD[(STObject, Long)] = 
     sc.parallelize(points,4).zipWithIndex()
       .map { case (string, id) => (new WKTReader().read(string), id) }
-  
-  "The BSP partitioner" should "find correct min/max values" in {
+
+//  "The BSP partitioner"
+  it  should "find correct min/max values" in {
     
     val rdd = createRDD()    
     
@@ -37,24 +38,24 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     withClue("wrong minX value") { parti.minX shouldBe 2 }
     withClue("wrong minX value") { parti.minY shouldBe 2 }
-    withClue("wrong minX value") { parti.maxX shouldBe 4 + SpatialPartitioner.EPS } // max values are set to +1 to have "right open" intervals
-    withClue("wrong minX value") { parti.maxY shouldBe 4 + SpatialPartitioner.EPS } // max values are set to +1 to have "right open" intervals
+    withClue("wrong minX value") { parti.maxX shouldBe 4 + parti.sideLength } // max values are set to +1 to have "right open" intervals
+    withClue("wrong minX value") { parti.maxY shouldBe 4 + parti.sideLength } // max values are set to +1 to have "right open" intervals
   }
   
-  it should "have the correct min/max in real world scenario" in {
+  it  should "have the correct min/max in real world scenario" in {
 
     val rdd = TestUtils.createRDD(sc)
 
     val parti = new BSPartitioner(rdd,1, 10)
 
     parti.minX shouldBe -35.8655
-    parti.maxX shouldBe 61.5 + SpatialPartitioner.EPS
+    parti.maxX shouldBe 62.1345
     parti.minY shouldBe -157.74538
-    parti.maxY shouldBe 153.02235 + SpatialPartitioner.EPS
+    parti.maxY shouldBe 153.25462
 
   }
 
-  it should "have the correct number of x cells in reald world scenario with length = 1" in {
+  it  should "have the correct number of x cells in reald world scenario with length = 1" in {
 
     val rdd = TestUtils.createRDD(sc)
 
@@ -65,7 +66,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
 
-  it should "find the correct number of cells for X dimension" in {
+  it  should "find the correct number of cells for X dimension" in {
     val rdd = createRDD()
 
     val parti = new BSPartitioner(rdd, 1, 1)
@@ -73,7 +74,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     parti.numXCells shouldBe 3
   }
 
-  it should "create correct number of cells" in {
+  it  should "create correct number of cells" in {
 
     val rdd = createRDD()
 
@@ -84,7 +85,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     parti.cells.length shouldBe 9
   }
 
-  it should "create correct cell histogram" in {
+  it  should "create correct cell histogram" in {
 
     val rdd = createRDD()
 
@@ -130,7 +131,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
 
-  it should "return the correct partition id" in {
+  it  should "return the correct partition id" in {
     val rdd = createRDD()
     val parti = new BSPartitioner(rdd, 1, 1)
 
@@ -149,7 +150,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
 
-  it should "return all points for one partition" in {
+  it  should "return all points for one partition" in {
 
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
@@ -162,7 +163,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
-  it should "return all points for two partitions" in {
+  it  should "return all points for two partitions" in {
 
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
@@ -178,7 +179,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
-  it should "return all points for max cost 100 & sidelength = 1" in {
+  it  should "return all points for max cost 100 & sidelength = 1" in {
 
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
@@ -194,7 +195,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
-  it should "return only one partition if max cost equals input size" in {
+  it  should "return only one partition if max cost equals input size" in {
 
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
@@ -210,7 +211,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
    *
    * The result was that the cell bounds for the histogram where created wrong.
    */
-  it should "work with 0 0 " in {
+  it  should "work with 0 0 " in {
     val rdd = sc.textFile("src/test/resources/taxi_sample.csv", Runtime.getRuntime.availableProcessors())
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -266,55 +267,66 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMax = SpatialPartitioner.getMinMax(rdd)
+    val minMax = SpatialPartitioner.getMinMax(rdd)
 
-      BSPartitioner.numCellThreshold = 8
-      val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4)
+//    BSPartitioner.numCellThreshold = -5
+    val parti = new BSPartitioner(rdd, 1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4)
 
-      val nonempty = parti.cells.filter(_._2 > 0)
-      nonempty.length shouldBe 7
-      parti.numPartitions shouldBe 7
+    val nonempty = parti.cells.filter(_._2 > 0)
+//    withClue("number of non empty cells") { nonempty.length shouldBe 7 }
 
-      val cnt = rdd.count()
+    val cnt = rdd.count()
 
-      nonempty.map(_._2).sum shouldBe cnt
+    val coveredCells = parti.bsp.partitions.flatMap(p => parti.bsp.getCellsIn(p.range)).sorted
+    val distinctCells = coveredCells.distinct.sorted
 
-      rdd.collect().foreach { case (st, name) =>
-        try {
-          val pNum = parti.getPartition(st)
-          withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
-        } catch {
-        case e:IllegalStateException =>
+    withClue("covered cells") { coveredCells should contain theSameElementsAs distinctCells }
 
-          val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
-          val yOk = st.getGeo.getCentroid.getY >= minMax._3 && st.getGeo.getCentroid.getY <= minMax._4
 
-          parti.bsp.partitions.foreach { cell =>
-
-            val xOk = st.getGeo.getCentroid.getX >= cell.range.ll(0) && st.getGeo.getCentroid.getX <= cell.range.ur(0)
-            val yOk = st.getGeo.getCentroid.getY >= cell.range.ur(1) && st.getGeo.getCentroid.getY <= cell.range.ur(1)
-
-            println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
-          }
-
-          val containingCell = parti.cells.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
-          if(containingCell.isDefined) {
-            println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
-          } else {
-            println("No cell contains this point!")
-          }
+    withClue("number of elements in covered cells") {parti.bsp.partitions.flatMap { p =>
+      parti.bsp.getCellsIn(p.range)
+    }.filter(_ < parti.cells.length).map(idx => parti.cells(idx)._2).sum shouldBe cnt }
 
 
 
-          fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
+    withClue("number of elements in partitions") {nonempty.map(_._2).sum shouldBe cnt}
+
+    rdd.collect().foreach { case (st, name) =>
+      try {
+        val pNum = parti.getPartition(st)
+        withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
+      } catch {
+      case e:IllegalStateException =>
+
+        val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
+        val yOk = st.getGeo.getCentroid.getY >= minMax._3 && st.getGeo.getCentroid.getY <= minMax._4
+
+        parti.bsp.partitions.foreach { cell =>
+
+          val xOk = st.getGeo.getCentroid.getX >= cell.range.ll(0) && st.getGeo.getCentroid.getX <= cell.range.ur(0)
+          val yOk = st.getGeo.getCentroid.getY >= cell.range.ur(1) && st.getGeo.getCentroid.getY <= cell.range.ur(1)
+
+          println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
 
+        val containingCell = parti.cells.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        if(containingCell.isDefined) {
+          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+        } else {
+          println("No cell contains this point!")
+        }
+
+
+
+        fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
       }
+
+    }
 
 
   }
 
-  it should "create real partitions correctly for taxi" taggedAs Slow in {
+  it  should "create real partitions correctly for taxi" taggedAs Slow in {
     val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -361,7 +373,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
-  it should "do yello sample" in {
+  it  should "do yello sample" in {
     val rdd = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -385,7 +397,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       val res = new LiveIndexedSpatialRDDFunctions(rdd, 5).join(rddtaxi, JoinPredicate.CONTAINS, None)
   }
 
-  it should "correctly partiton random points" in {
+  it  should "correctly partiton random points" in {
     val rdd = sc.textFile("src/test/resources/points.wkt")
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
@@ -409,7 +421,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     }
   }
 
-  it should "correctly join with single point and polygon" in {
+  it  should "correctly join with single point and polygon" in {
 
     val pointsRDD = sc.parallelize(Seq(
       (STObject("POINT (77.64656066894531  23.10247055501927)"),1)))
@@ -430,7 +442,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joined.collect().length shouldBe 1
   }
 
-  it should "correctly join with single point and polygon containedby" in {
+  it  should "correctly join with single point and polygon containedby" in {
 
     val pointsRDD = sc.parallelize(Seq(
       (STObject("POINT (77.64656066894531  23.10247055501927)"),1)))
@@ -451,7 +463,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joined.collect().length shouldBe 1
   }
 
-  it should "correctly join with single point and polygon intersect point-poly" in {
+  it  should "correctly join with single point and polygon intersect point-poly" in {
 
     val pointsRDD = sc.parallelize(Seq(
       (STObject("POINT (77.64656066894531  23.10247055501927)"),1)))
@@ -472,7 +484,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joined.collect().length shouldBe 1
   }
 
-  it should "correctly join with single point and polygon intersect poly-point" in {
+  it  should "correctly join with single point and polygon intersect poly-point" in {
 
     val pointsRDD = sc.parallelize(Seq(
       (STObject("POINT (77.64656066894531  23.10247055501927)"),1)))
@@ -494,8 +506,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
 
-  ignore should "correctly partition wikimapia" in {
-    val rdd = sc.textFile("src/test/resources/wiki_full.wkt")
+  ignore  should "correctly partition wikimapia" in {
+    val rdd = sc.textFile("/home/hg/Documents/uni/stuff/stark/fix_shi/wiki_full.wkt")
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 
@@ -523,13 +535,13 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   ignore should "compute correct join contains" in {
-    val points = sc.textFile("src/test/resources/points10k.csv")
+    val points = sc.textFile("/home/hg/Documents/uni/stuff/stark/fix_shi/points10k.csv")
                     .map(_.split(","))
                       .map(arr => s"POINT(${arr(1)} ${arr(0)})")
                       .map(s => (STObject(s),9))
 
 
-    val wiki = sc.textFile("src/test/resources/wiki_full.wkt")
+    val wiki = sc.textFile("/home/hg/Documents/uni/stuff/stark/fix_shi/wiki_full.wkt")
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 
@@ -553,15 +565,15 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
 
-  ignore should "compute correct join containedby" in {
-    val pointsWkt = sc.textFile("src/test/resources/points10k.csv")
+  ignore  should "compute correct join containedby" in {
+    val pointsWkt = sc.textFile("/home/hg/Documents/uni/stuff/stark/fix_shi/points10k.csv")
       .map(_.split(","))
       .map(arr => s"POINT(${arr(1)} ${arr(0)})")
 
     val points = pointsWkt.map(s => (STObject(s),9))
 
 
-    val wiki = sc.textFile("src/test/resources/wiki_full.wkt")
+    val wiki = sc.textFile("/home/hg/Documents/uni/stuff/stark/fix_shi/wiki_full.wkt")
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 

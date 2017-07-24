@@ -9,23 +9,6 @@ import scala.reflect.ClassTag
 
 
 object BSPartitioner {
-  /**
-   * Compute the bounds of a cell with the given ID
-   * @param id The ID of the cell to compute the bounds for
-   */
-  protected[spatial] def getCellBounds(id: Int, xCells: Int, _sideLength: Double, minX: Double, minY: Double): NRectRange = {
-      
-    val dy = id / xCells
-    val dx = id % xCells
-    
-    val llx = dx * _sideLength + minX
-    val lly = dy * _sideLength + minY
-    
-    val urx = llx + _sideLength
-    val ury = lly + _sideLength
-      
-    NRectRange(NPoint(llx, lly), NPoint(urx, ury))
-  }
   
   def withGridPPD[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
     _gridPPD: Double,
@@ -51,8 +34,8 @@ object BSPartitioner {
   * by He, Tan, Luo, Feng, Fan
   *
   * @param rdd Th RDD
-  * @param _sideLength Length of a cell
-  * @param _maxCostPerPartition Maximum allowed cost/number of elements per parititon
+  * @param sideLength Length of a cell
+  * @param maxCostPerPartition Maximum allowed cost/number of elements per parititon
   * @param withExtent Regard the element's extent
   * @param _minX Minimum x value
   * @param _maxX Maximum x value
@@ -63,8 +46,8 @@ object BSPartitioner {
   */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)],
-    _sideLength: Double,
-    _maxCostPerPartition: Double,
+    sideLength: Double,
+    maxCostPerPartition: Double,
     withExtent: Boolean,
     _minX: Double,
     _maxX: Double,
@@ -72,24 +55,23 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   def this(rdd: RDD[(G,V)],
-      _sideLength: Double,
-      _maxCostPerPartition: Double,
-      withExtent: Boolean, 
-      minMax: (Double, Double, Double, Double)) = 
-    this(rdd, _sideLength, _maxCostPerPartition, withExtent, minMax._1, minMax._2, minMax._3, minMax._4)  
+           sideLength: Double,
+           maxCostPerPartition: Double,
+           withExtent: Boolean,
+           minMax: (Double, Double, Double, Double)) =
+    this(rdd, sideLength, maxCostPerPartition, withExtent, minMax._1, minMax._2, minMax._3, minMax._4)
   
   def this(rdd: RDD[(G,V)],
-      _sideLength: Double,
-      _maxCostPerPartition: Double,
-      withExtent: Boolean = false) = 
-    this(rdd, _sideLength, _maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
+           sideLength: Double,
+           maxCostPerPartition: Double,
+           withExtent: Boolean = false) =
+    this(rdd, sideLength, maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
 
   
-  lazy val maxCostPerPartition: Double = _maxCostPerPartition
-  lazy val sideLength: Double = _sideLength
-  
-  protected[spatial] var numXCells: Int = Math.ceil(math.abs(maxX - minX) / _sideLength).toInt
-  protected[spatial] var numYCells: Int = Math.ceil(math.abs(maxY - minY) / _sideLength).toInt
+//  lazy val maxCostPerPartition: Double = _maxCostPerPartition
+
+  protected[spatial] var numXCells: Int = Math.ceil(math.abs(maxX - minX) / sideLength).toInt
+  protected[spatial] var numYCells: Int = Math.ceil(math.abs(maxY - minY) / sideLength).toInt
   
   /**
    * The cells which contain elements and the number of elements
@@ -97,75 +79,15 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
    * We iterate over all elements in the RDD, determine to which
    * cell it belongs and then simply aggregate by cell
    */
-  protected[spatial] var cells: Array[(Cell, Int)] = {
+  protected[spatial] val cells: Array[(Cell, Int)] =
+    SpatialPartitioner.buildHistogram(rdd,withExtent,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
-    // create the array we want to store the cells in
-    val histo = Array.tabulate(numXCells * numYCells){ i => //(0 until numXCells * numYCells).map{ i => //
-      val cellBounds = BSPartitioner.getCellBounds(i, numXCells, sideLength, minX, minY)
-      (Cell(i,cellBounds), 0)
-    }
-    
-    /* fill the array. If with extent, we need to keep the exent of each element and combine it later
-     * to create the extent of a cell based on the extents of its contained objects     
-     */
-    if(withExtent) {
-    
-      rdd.map { case (g, _) =>
-        val p = Utils.getCenter(g.getGeo)
-        
-        val env = g.getEnvelopeInternal
-        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-        
-        val x = math.floor(math.abs(p.getX - minX) / _sideLength).toInt
-        val y = math.floor(math.abs(p.getY - minY) / _sideLength).toInt
-        
-        val cellId = y * numXCells + x
-        
-        (cellId,(1, extent))
-      }
-      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) => 
-        val cnt = lCnt + rCnt
-        
-        val extent = lExtent.extend(rExtent)
-        
-        (cnt, extent)
-        
-      }
-      .collect
-      .foreach{case (cellId, (cnt,ex)) => 
-        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
-      }
-      
-    } else {
-      rdd.map{ case (g,_) =>
-        val p = g.getGeo.getCentroid  
-        
-        val x = math.floor(math.abs(p.getX - minX) / _sideLength).toInt
-        val y = math.floor(math.abs(p.getY - minY) / _sideLength).toInt
-        
-        val cellId = y * numXCells + x
-        
-        (cellId, 1)
-      }
-      .reduceByKey(_ + _)
-      .collect
-      .foreach{ case (cellId, cnt) => 
-        histo(cellId) = (histo(cellId)._1, cnt)
-      }
-      
-    }
-    histo
-  }
-
-  
-  
-  
   protected[spatial] var bsp = new BSP(
       Array(minX, minY), 
       Array(maxX, maxY), 
       cells, // for BSP we only need calculated cell sizes and their respective counts 
-      _sideLength, 
-      _maxCostPerPartition,
+      sideLength,
+      maxCostPerPartition,
       withExtent,
       BSPartitioner.numCellThreshold)
   

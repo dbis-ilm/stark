@@ -1,7 +1,7 @@
 package dbis.stark.spatial.partitioner
 
 import dbis.stark.STObject
-import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
+import dbis.stark.spatial.{Cell, NRectRange, Utils}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -48,53 +48,13 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
   private val partitions: Array[Cell] = {
-    val arr = Array.tabulate(numPartitions){ i => SpatialGridPartitioner.getCellBounds(i, numPartitions, partitionsPerDimension, minX, minY, xLength, yLength) }
+    val arr = if(withExtent) {
+      SpatialPartitioner.buildHistogram(rdd,withExtent,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
+    } else {
+      SpatialPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
+    }
 
-    /*val arr = */if(withExtent) {
-
-//      def seqOp(m: Array[Cell], c: (Int, NRectRange)): Array[Cell] = {
-//        if(m(c._1) != null)
-//          m(c._1).extend(c._2)
-//        else
-//          m(c._1) = Cell(c._1, c._2)
-//
-//        m
-//      }
-//
-//      def combOp(l: Array[Cell], r:  Array[Cell]):  Array[Cell] = {
-//        l.foreach{cell =>
-//          if(cell != null)
-//            seqop(r, (cell.id, cell.extent)) }
-//
-//        l
-//      }
-//
-//
-//      val a = new Array[Cell](numPartitions)
-      rdd.map{ case (g,_) =>
-        val center = Utils.getCenter(g.getGeo)
-
-        val id = SpatialGridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
-
-        val env = g.getEnvelopeInternal
-  		  val gExtent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-//        println(s"$center --> $id")
-  		  (id,gExtent)
-      }
-      .reduceByKey{case(a,b) => a.extend(b)}
-      .collect
-      .foreach { case (id, extent) =>
-        arr(id) = Cell(arr(id).range, extent)
-      }
-//        .aggregate(Array.empty[Cell])(seqOp, combOp)
-    } /*else {
-      Array.tabulate(numPartitions){ i => SpatialGridPartitioner.getCellBounds(i, numPartitions, partitionsPerDimension, minX, minY, xLength, yLength) }
-    }*/
-
-
-//    arr.foreach(c => println(s"$withExtent;${c.extent.wkt}"))
-
-    arr
+    arr.map(_._1)
   }
 
 
@@ -117,52 +77,10 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
     val center = Utils.getCenter(g.getGeo)
 
-    val id = SpatialGridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
+    val id = SpatialPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
 
     id
   }
-
-}
-object SpatialGridPartitioner {
-
-  /**
-    * Compute the cell bounds for the given cell id
-    * @param id The ID of the cell to compute the bounds for
-    * @param numPartitions The total number of partitions
-    * @param partitionsPerDimension Number of partitions per dimensions
-    * @param minX Minimum x value
-    * @param minY Minimum y value
-    * @param xLength Length of a cell on x axis
-    * @param yLength Length of a cell on y axis
-    * @return Returns the cell object for the given ID. The cell object contains the bounds
-    */
-  protected[spatial] def getCellBounds(id: Int, numPartitions: Int, partitionsPerDimension: Int, minX: Double, minY: Double, xLength: Double, yLength: Double): Cell = {
-
-    require(id >= 0 && id < numPartitions, s"Invalid cell id (0 .. $numPartitions): $id")
-
-    val dy = id / partitionsPerDimension
-    val dx = id % partitionsPerDimension
-
-    val llx = dx * xLength + minX
-    val lly = dy * yLength + minY
-
-    val urx = llx + xLength
-    val ury = lly + yLength
-
-    Cell(id, NRectRange(NPoint(llx, lly), NPoint(urx, ury)))
-  }
-
-  private def getCellId(_x: Double, _y: Double, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double, partitionsPerDimension: Int): Int = {
-        require(_x >= minX && _x <= maxX || _y >= minY || _y <= maxY, s"(${_x},${_y}) out of range!")
-
-    val x = math.floor(math.abs(_x - minX) / xLength).toInt
-    val y = math.floor(math.abs(_y - minY) / yLength).toInt
-
-    val cellId = y * partitionsPerDimension + x
-
-    cellId
-  }
-
 }

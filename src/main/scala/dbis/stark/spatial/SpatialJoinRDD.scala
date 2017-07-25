@@ -155,7 +155,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       // For the results of a query we have to perform candidates check
       right.iterator(split.rightPartition, context).flatMap { case (rg, rv) =>
         tree.query(rg) // index query
-          .filter{ case (lg, _) => predicateFunc(rg, lg) } // candidate check and apply join condidion
+          .filter{ case (lg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
           .map{ case (_,lv) => (lv,rv)} // result is the combined tuple of the payload items
       }
 

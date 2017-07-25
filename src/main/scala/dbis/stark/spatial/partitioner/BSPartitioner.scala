@@ -1,5 +1,7 @@
 package dbis.stark.spatial.partitioner
 
+import java.nio.file.Paths
+
 import dbis.stark.STObject
 import dbis.stark.spatial._
 import org.apache.spark.rdd.RDD
@@ -102,21 +104,20 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[spatial] val cells: Array[(Cell, Int)] =
     SpatialPartitioner.buildHistogram(rdd,withExtent,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
-  val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
+  protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
   protected[spatial] var bsp = new BSP(
-  //    Array(minX, minY),
-  //    Array(maxX, maxY),
     start,
-  cells, // for BSP we only need calculated cell sizes and their respective counts
-  sideLength,
-  maxCostPerPartition,
-  withExtent,
-  BSPartitioner.numCellThreshold
-  )
+    cells, // for BSP we only need calculated cell sizes and their respective counts
+    sideLength,
+    maxCostPerPartition,
+    withExtent,
+    BSPartitioner.numCellThreshold
+    )
 
 
-
+//  printPartitions(Paths.get(System.getProperty("user.home"), "partis.wkt"))
+//  printHistogram(Paths.get(System.getProperty("user.home"), "histo.wkt"))
 
 
 //  protected[spatial] var bsp = new BSPBinary(
@@ -133,27 +134,15 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   override def partitionExtent(idx: Int): NRectRange = bsp.partitions(idx).extent
   
   def printPartitions(fName: java.nio.file.Path) {
-    val list = bsp.partitions.map(_.range).map { p => s"${p.ll(1)},${p.ll(0)},${p.ur(1)},${p.ur(0)}" }.toList.asJava
-    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING) 
-    
-    val list2 = bsp.partitions.map{ cell => s"${cell.id};${cell.range.wkt}"}.toList.asJava
-    java.nio.file.Files.write(fName.getParent.resolve("partitions_wkt.csv"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-    
-//    val list3 = bsp.partitions.map{ cell => s"${cell.range.id};${cell.extent.getWKTString()}"}.toList.asJava
-//    java.nio.file.Files.write(fName.getParent.resolve("partitions_wkt_extent.csv"), list3, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-  } 
-    
+    val list2 = bsp.partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList.asJava
+    java.nio.file.Files.write(fName, list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+  }
+
   def printHistogram(fName: java.nio.file.Path) {
-    
-    val list = cells.map(_._1.range).map { c => s"${c.ll(1)},${c.ll(0)},${c.ur(1)},${c.ur(0)}" }.toList.asJava
-    java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-    
+
     val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList.asJava
-    java.nio.file.Files.write(fName.getParent.resolve("histogram_wkt.csv"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-    
-//    val list3 = cells.map{ case (cell,cnt) => s"${cell.range.id};${cell.extent.getWKTString()}"}.toList.asJava
-//    java.nio.file.Files.write(fName.getParent.resolve("histo_wkt_extent.csv"), list3, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-      
+    java.nio.file.Files.write(fName, list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+
   } 
   
   override def numPartitions: Int = bsp.partitions.length
@@ -179,8 +168,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     } else {
 //      println("error: no partition found")
 //      println(bsp.partitions.mkString("\n"))
-      val histoFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_histogram")
-      val partitionFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_partitions")
+      val histoFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_histogram.wkt")
+      val partitionFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_partitions.wkt")
       
 //      println(s"saving historgram to $histoFile")
       printHistogram(histoFile)

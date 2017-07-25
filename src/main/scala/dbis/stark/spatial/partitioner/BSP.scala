@@ -1,13 +1,10 @@
 package dbis.stark.spatial.partitioner
 
-import java.nio.file.Paths
-
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 
 import scala.collection.immutable.IndexedSeq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.JavaConverters._
 
 /**
  * A data class to store information about the created partitioning
@@ -99,7 +96,6 @@ class BSP(private val _start: NRectRange,
 
     // the cellId of the lower left point of the given range
     val llCellId = cellId(r.ll)
-//    val llCellId = SpatialPartitioner.getCellId(r.ll(0),r.ll(1), ll(0),ll(1),ur(0),ur(1),sideLength,sideLength,numXCells)
 
     (0 until numCells(1)).flatMap { i =>
       llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells
@@ -330,7 +326,7 @@ class BSP(private val _start: NRectRange,
 
         val part = queue.dequeue()
         if((costEstimation(part.range) > maxCostPerPartition) &&
-          getCellsIn(part.range).length > 1 /*part.range.lengths.exists(_ > _sideLength)*/ ) {
+          /*getCellsIn(part.range).length > 1 */ part.range.lengths.exists(_ > sideLength) ) {
 
 
           val (p1, p2) = costBasedSplit(part)
@@ -360,59 +356,17 @@ class BSP(private val _start: NRectRange,
         } else {
           resultPartitions += part.clone()
         }
-
-
-//        val fName = Paths.get(System.getProperty("user.home"),s"partition_$recursionDepth")
-//        val list = ps.map{ cell => s"${cell.id};${cell.range.wkt}"}.toList.asJava
-//        java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-//        recursionDepth += 1
-
       }
     }
 
     // FIXME: this is a dirty workaround for a bug that does not add all non-empty cells to partitions
     // somehow there are non-empty cells that also exceed max cost but which are not added to the result partitions
-//    val usedCell = Array.fill(_cellHistogram.length)(false)
-//    resultPartitions.foreach{ p =>
-//      getCellsIn(p.range).withFilter(_ < _cellHistogram.length).foreach(c =>
-//        usedCell(c) = true)
-//    }
-//
-//    usedCell.iterator.zipWithIndex.withFilter{case (b,i) => !b && _cellHistogram(i)._2 > 0}.foreach { case (_, i) =>
-//      resultPartitions += _cellHistogram(i)._1
-//    }
-//
+
     // index is the ID of the partition
     resultPartitions.iterator.zipWithIndex.foreach { case (p, i) =>
       p.id = i
     }
-//
-//    //verify
-//    val covered = resultPartitions.flatMap(p => getCellsIn(p.range))
-//    val coveredDistinct = covered.distinct
-//
-//    if(covered.length != coveredDistinct.length) {
-//
-//      val fName = Paths.get("/home/hage/Documents/uni/stuff/stark/fix_shi/usedcells.wkt")
-//      val list = usedCell.iterator.zipWithIndex.withFilter{ case (b,_) => b}.map{ case (_,cellId) =>
-//        val cell = _cellHistogram(cellId)._1
-//        s"${cell.id};${cell.range.wkt}"}.toList.asJava
-//      java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-//
-//      val list2 = Seq(start.range.wkt).toList.asJava
-//      java.nio.file.Files.write(Paths.get("/home/hage/Documents/uni/stuff/stark/fix_shi/start.wkt"), list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-//
-//
-//      val coveredSum = covered.iterator.map(c => _cellHistogram(c)._2).sum
-//      val totalSum = _cellHistogram.iterator.map(_._2).sum
-//      throw new IllegalStateException(s"${covered.length} != ${coveredDistinct.length} (coveredSum = $coveredSum vs $totalSum)")
-//    }
 
-
-
-
-//    val endTime = System.currentTimeMillis()
-//    println(s"partitioning took ${endTime - startTime} ms")
     resultPartitions.toArray
 
   }

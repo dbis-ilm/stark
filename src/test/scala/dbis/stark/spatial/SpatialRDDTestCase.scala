@@ -4,7 +4,7 @@ import com.vividsolutions.jts.io.WKTReader
 import dbis.stark.STObject._
 import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._
-import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
+import dbis.stark.spatial.partitioner.SpatialGridPartitioner
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -67,7 +67,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "find all elements that contain a given point with spatial partitioner" in {
     val rdd1 = TestUtils.createRDD(sc)
 
-    val rdd = rdd1.partitionBy(new SpatialGridPartitioner(rdd1,10))
+    val rdd = rdd1.partitionBy(new SpatialGridPartitioner(rdd1,10, false))
 
     // we look for all elements that contain a given point.
     // thus, the result should be all points in the RDD with the same coordinates

@@ -34,7 +34,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     
     val rdd = createRDD()    
     
-    val parti = new BSPartitioner(rdd, 1, 1)
+    val parti = new BSPartitioner(rdd, 1, 1, false)
     
     withClue("wrong minX value") { parti.minX shouldBe 2 }
     withClue("wrong minX value") { parti.minY shouldBe 2 }
@@ -46,7 +46,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val rdd = TestUtils.createRDD(sc)
 
-    val parti = new BSPartitioner(rdd,1, 10)
+    val parti = new BSPartitioner(rdd,1, 10, false)
 
     parti.minX shouldBe -35.8655
     parti.maxX shouldBe 62.1345
@@ -59,7 +59,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val rdd = TestUtils.createRDD(sc)
 
-    val parti = new BSPartitioner(rdd,1, 10)
+    val parti = new BSPartitioner(rdd,1, 10, false)
 
     parti.numXCells shouldBe 98 // ?
 
@@ -69,7 +69,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it  should "find the correct number of cells for X dimension" in {
     val rdd = createRDD()
 
-    val parti = new BSPartitioner(rdd, 1, 1)
+    val parti = new BSPartitioner(rdd, 1, 1, false)
 
     parti.numXCells shouldBe 3
   }
@@ -78,7 +78,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val rdd = createRDD()
 
-    val parti = new BSPartitioner(rdd, 1, 1)
+    val parti = new BSPartitioner(rdd, 1, 1, false)
 
 //    println(s"${parti.cells.mkString("\n")}")
 
@@ -89,7 +89,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val rdd = createRDD()
 
-    val parti = new BSPartitioner(rdd, 1, 1)
+    val parti = new BSPartitioner(rdd, 1, 1, false)
 
     val shouldSizes = Array(
       (Cell(NRectRange(NPoint(2,2), NPoint(3,3)),NRectRange(NPoint(2,2), NPoint(3,3))), 2), // 0
@@ -109,7 +109,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "have correct grid" in {
     val rdd = createRDD()
 
-    val parti = new BSPartitioner(rdd, 1, 1)
+    val parti = new BSPartitioner(rdd, 1, 1, false)
 
     val shouldSizes = Array(
       Cell(NRectRange(NPoint(2,2), NPoint(3,3)),NRectRange(NPoint(2,2), NPoint(3,3))), // 0
@@ -133,7 +133,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it  should "return the correct partition id" in {
     val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1)
+    val parti = new BSPartitioner(rdd, 1, 1, false)
 
 //    val partIds = Array(0,0,1,2,3)
 
@@ -155,7 +155,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
-    val parti = new BSPartitioner(rdd, 2, maxCostPerPartition = 1000)
+    val parti = new BSPartitioner(rdd, 2, maxCostPerPartition = 1000, pointsOnly = false)
 
     val shuff = new ShuffledRDD(rdd, parti)
 
@@ -168,7 +168,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
-    val parti = new BSPartitioner(rdd, 2, maxCostPerPartition = 500)
+    val parti = new BSPartitioner(rdd, 2, maxCostPerPartition = 500, pointsOnly = false)
 
     val shuff = new ShuffledRDD(rdd, parti)
     // insert dummy action to make sure Shuffled RDD is evaluated
@@ -184,7 +184,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
-    val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 100)
+    val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 100, pointsOnly = false)
 
     val shuff = new ShuffledRDD(rdd, parti)
     // insert dummy action to make sure Shuffled RDD is evaluated
@@ -200,7 +200,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
-    val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 1000)
+    val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 1000, pointsOnly = false)
 
     parti.numPartitions shouldBe 1
 
@@ -402,7 +402,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 
-    val parti = new BSPartitioner(rdd, 0.5,1000)
+    val parti = new BSPartitioner(rdd, 0.5,1000, pointsOnly = false)
 
     val numparts = parti.numPartitions
 
@@ -431,10 +431,10 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = false)
+    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = false)
     val pointsPart = pointsRDD.partitionBy(pointsBSP)
 
-    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = true)
+    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsBSP)
 
     val joined = polygonsPart.join(pointsPart, JoinPredicate.CONTAINS)
@@ -452,10 +452,10 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = false)
+    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = false)
     val pointsPart = pointsRDD.partitionBy(pointsBSP)
 
-    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = true)
+    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsBSP)
 
     val joined = pointsPart.join(polygonsPart, JoinPredicate.CONTAINEDBY)
@@ -473,10 +473,10 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = false)
+    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = false)
     val pointsPart = pointsRDD.partitionBy(pointsBSP)
 
-    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = true)
+    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsBSP)
 
     val joined = pointsPart.join(polygonsPart, JoinPredicate.INTERSECTS)
@@ -494,10 +494,10 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = false)
+    val pointsBSP = new BSPartitioner(pointsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = false)
     val pointsPart = pointsRDD.partitionBy(pointsBSP)
 
-    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, withExtent = true)
+    val polygonsBSP = new BSPartitioner(polygonsRDD, sideLength = 0.5, maxCostPerPartition = 1000, pointsOnly = true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsBSP)
 
     val joined = polygonsPart.join(pointsPart, JoinPredicate.INTERSECTS)
@@ -511,7 +511,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 
-    val parti = new BSPartitioner(rdd, 0.5,1000, withExtent = true)
+    val parti = new BSPartitioner(rdd, 0.5,1000, pointsOnly = true)
 
     val numparts = parti.numPartitions
 
@@ -550,8 +550,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     jWOPart should not be empty
 
-    val pointBSP = new BSPartitioner(points, 0.5, 100, withExtent = false)
-    val polyBSP = new BSPartitioner(wiki, 0.5, 100, withExtent = true)
+    val pointBSP = new BSPartitioner(points, 0.5, 100, pointsOnly = false)
+    val polyBSP = new BSPartitioner(wiki, 0.5, 100, pointsOnly = true)
 
     val pointsParted = points.partitionBy(pointBSP)
     val polyParted = wiki.partitionBy(polyBSP)
@@ -582,8 +582,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     jWOPart should not be empty
 
-    val pointBSP = new BSPartitioner(points, 0.5, 100, withExtent = false)
-    val polyBSP = new BSPartitioner(wiki, 0.5, 100, withExtent = true)
+    val pointBSP = new BSPartitioner(points, 0.5, 100, pointsOnly = false)
+    val polyBSP = new BSPartitioner(wiki, 0.5, 100, pointsOnly = true)
 
     val pointsParted = points.partitionBy(pointBSP)
     val polyParted = wiki.partitionBy(polyBSP)

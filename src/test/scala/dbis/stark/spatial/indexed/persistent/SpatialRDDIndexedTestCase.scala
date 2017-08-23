@@ -120,7 +120,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "find the correct nearest neighbors with Grid Partitioning" in { 
     val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.index(new SpatialGridPartitioner(rddRaw, partitionsPerDimension = 5), order= 5)
+    val rdd = rddRaw.index(new SpatialGridPartitioner(rddRaw, partitionsPerDimension = 5, pointsOnly = false), order= 5)
 	  
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -133,7 +133,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "find the correct nearest neighbors with BSP" in { 
     val rddRaw = TestUtils.createRDD(sc)
-    val rdd = rddRaw.index(new BSPartitioner(rddRaw,  1, 100), order= 5) // 0.5
+    val rdd = rddRaw.index(new BSPartitioner(rddRaw,  1, 100, pointsOnly = false), order= 5) // 0.5
 	  
     val k = 6
     
@@ -298,7 +298,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val qryT = STObject(qry.getGeo, Interval(TestUtils.makeTimeStamp(2013, 1, 1), TestUtils.makeTimeStamp(2013, 1, 31)))
     
-    val res = rdd.index(new SpatialGridPartitioner(rdd, 5), 10).intersects(qryT)
+    val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).intersects(qryT)
     
     res.count() shouldBe 1    
   }
@@ -309,7 +309,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
     
-    val res = rdd.index(new SpatialGridPartitioner(rdd, 5), 10).contains(q)
+    val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).contains(q)
     
     res.count() shouldBe 2
   }
@@ -320,7 +320,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
     
-    val res = rdd.index(new SpatialGridPartitioner(rdd, 5), 10).containedby(q)
+    val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).containedby(q)
     
     res.count() shouldBe 2
   }
@@ -331,7 +331,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", Interval(TestUtils.makeTimeStamp(2013, 6, 1),TestUtils.makeTimeStamp(2013, 6, 30) ))
     
-    val res = rdd.index(new SpatialGridPartitioner(rdd, 5), 10).containedby(q)
+    val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).containedby(q)
     
     res.count() shouldBe 4
   }

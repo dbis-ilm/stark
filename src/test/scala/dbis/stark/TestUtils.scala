@@ -74,7 +74,7 @@ object TestUtils {
       order: Int = 10) = {
     
     val rdd = TestUtils.createRDD(sc, file, sep, numParts, distinct)
-    rdd.index(new BSPartitioner(rdd, cellSize, cost), order)
+    rdd.index(new BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
   } 
   
   def distinct[V](rdd: RDD[(STObject, V)]) = {

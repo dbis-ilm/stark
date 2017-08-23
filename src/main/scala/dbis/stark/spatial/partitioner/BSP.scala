@@ -64,7 +64,7 @@ class BSP(private val _start: NRectRange,
           protected[stark] val cellHistogram: Array[(Cell, Int)],
           private val sideLength: Double,
           private val maxCostPerPartition: Double,
-          private val withExtent: Boolean = false,
+          private val pointsOnly: Boolean,
           private val numCellThreshold: Int = -1
             ) extends Serializable {
 
@@ -214,7 +214,11 @@ class BSP(private val _start: NRectRange,
 
           val range = NRectRange(part.range.ll.clone(), NPoint(ur))
 
-          val cell = if(withExtent) {
+          val cell = if(pointsOnly) {
+
+            Cell(range)
+          } else {
+
             /* we create the extent of this new partition from the extent of
              * all contained cells
              * TODO: for each iteration, we could re-use the extent from the
@@ -225,14 +229,13 @@ class BSP(private val _start: NRectRange,
             val diffRangeExtent = extentForRange(diffRange)
             val extent = prevP1Range.map{ p => p.extent.extend(diffRangeExtent)}.getOrElse(diffRangeExtent)
             Cell(range, extent)
-          } else {
-            Cell(range)
+
           }
 
           cell
         }
 
-        if(withExtent) {
+        if(!pointsOnly) {
           prevP1Range = Some(p1)
         }
 
@@ -248,12 +251,12 @@ class BSP(private val _start: NRectRange,
            */
           val range = NRectRange(NPoint(rll), part.range.ur.clone())
 
-          val cell = if(withExtent) {
-//            val thecells = getCellsIn(range, ll(0), ll(1))
+          val cell = if(pointsOnly) {
+            Cell(range)
+          } else {
+            //            val thecells = getCellsIn(range, ll(0), ll(1))
             val extent = extentForRange(range)
             Cell(range, extent)
-          } else {
-            Cell(range)
           }
 
           cell

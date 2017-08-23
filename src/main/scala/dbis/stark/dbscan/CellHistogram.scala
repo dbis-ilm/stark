@@ -24,7 +24,7 @@ object CellHistogram {
   }
 
   def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
-    val buckets = new Array[(NRectRange, Int)](histo1.buckets.size)
+    val buckets = new Array[(NRectRange, Int)](histo1.buckets.length)
     for (i <- buckets.indices) {
       buckets(i) = (histo1.buckets(i)._1, histo1.buckets(i)._2 + histo2.buckets(i)._2)
     }

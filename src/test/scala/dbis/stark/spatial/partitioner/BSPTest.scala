@@ -52,7 +52,8 @@ class BSPTest extends FlatSpec with Matchers {
       whole,
       histo,
       sideLength,
-      maxCost      
+      maxCost,
+      pointsOnly= false
     )
     
     val cells = bsp.getCellsIn(NRectRange(NPoint(llStartX,llStartY), NPoint(llStartX+4*sideLength,llStartY+3*sideLength)))
@@ -78,7 +79,8 @@ class BSPTest extends FlatSpec with Matchers {
       whole,
       histo,
       sideLength,
-      maxCost      
+      maxCost,
+      pointsOnly = false
     )
     
     val cells = bsp.getCellsIn(
@@ -122,7 +124,7 @@ class BSPTest extends FlatSpec with Matchers {
       histo,
       sideLength,
       maxCost,
-      withExtent = true
+      pointsOnly = false
     )
     
     val cells = bsp.getCellsIn(NRectRange(ll,ur))
@@ -154,7 +156,7 @@ class BSPTest extends FlatSpec with Matchers {
       histo,
       sideLength,
       maxCost,
-      withExtent = true
+      pointsOnly = true
     )
 
     val cells = bsp.getCellsIn(whole)
@@ -195,7 +197,7 @@ class BSPTest extends FlatSpec with Matchers {
         histo,
         4, //side Length
         20,
-        withExtent = true
+      pointsOnly = true
       )
     
     val start = Cell(NRectRange(ll,ur))  
@@ -239,7 +241,7 @@ class BSPTest extends FlatSpec with Matchers {
         histo,
         4, //side Length
         20,
-        withExtent = true
+      pointsOnly = false
       )
     
     val start = Cell(NRectRange(ll,ur))  

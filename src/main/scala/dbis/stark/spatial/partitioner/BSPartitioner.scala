@@ -38,7 +38,7 @@ object BSPartitioner {
   * @param rdd Th RDD
   * @param sideLength Length of a cell
   * @param maxCostPerPartition Maximum allowed cost/number of elements per parititon
-  * @param withExtent Regard the element's extent
+  * @param pointsOnly Regard the element's extent
   * @param _minX Minimum x value
   * @param _maxX Maximum x value
   * @param _minY Minimum y value
@@ -47,27 +47,27 @@ object BSPartitioner {
   * @tparam V Payload data type
   */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[(G,V)],
-    val sideLength: Double,
-    maxCostPerPartition: Double,
-    withExtent: Boolean,
-    _minX: Double,
-    _maxX: Double,
-    _minY: Double,
-    _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+                                                            rdd: RDD[(G,V)],
+                                                            val sideLength: Double,
+                                                            maxCostPerPartition: Double,
+                                                            pointsOnly: Boolean,
+                                                            _minX: Double,
+                                                            _maxX: Double,
+                                                            _minY: Double,
+                                                            _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   def this(rdd: RDD[(G,V)],
            sideLength: Double,
            maxCostPerPartition: Double,
-           withExtent: Boolean,
+           pointsOnly: Boolean,
            minMax: (Double, Double, Double, Double)) =
-    this(rdd, sideLength, maxCostPerPartition, withExtent, minMax._1, minMax._2, minMax._3, minMax._4)
-  
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, minMax._1, minMax._2, minMax._3, minMax._4)
+
   def this(rdd: RDD[(G,V)],
            sideLength: Double,
            maxCostPerPartition: Double,
-           withExtent: Boolean = false) =
-    this(rdd, sideLength, maxCostPerPartition, withExtent, SpatialPartitioner.getMinMax(rdd))
+           pointsOnly: Boolean) =
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd))
 
 
 //  val s = Cell(0, NRectRange(NPoint(ll), NPoint(ur)))
@@ -102,7 +102,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     * cell it belongs and then simply aggregate by cell
     */
   protected[spatial] val cells: Array[(Cell, Int)] =
-    SpatialPartitioner.buildHistogram(rdd,withExtent,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
+    SpatialPartitioner.buildHistogram(rdd,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
@@ -111,7 +111,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     cells, // for BSP we only need calculated cell sizes and their respective counts
     sideLength,
     maxCostPerPartition,
-    withExtent,
+    pointsOnly,
     BSPartitioner.numCellThreshold
     )
 

@@ -1,12 +1,11 @@
 package dbis.stark.dbscan
 
-import dbis.stark.spatial.{NRectRange, NPoint}
 import dbis.stark.spatial.partitioner.BSP
-import org.apache.log4j.Logger
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
+
 import scala.reflect.ClassTag
-import dbis.stark.spatial.Cell
 
 /**
   * Created by kai on 10.02.16.
@@ -83,7 +82,7 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
       cellHistogram.map{ case (r,i) => (Cell(r),i)}, // _cellHistogram: Array[(Cell, Int)],
       cellSize, // 2 * eps
       maxPoints.toDouble,
-      withExtent = false)
+      pointsOnly = true)
 
     bsp.partitions.map{ rrange => MBB(rrange.range.ll, rrange.range.ur) }.toList
   }

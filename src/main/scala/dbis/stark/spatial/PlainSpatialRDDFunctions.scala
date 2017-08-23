@@ -205,7 +205,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
 
     // TODO: specify parititoner as parameter - but it has to work on distance RDD...
-    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, withExtent = false)
+    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, pointsOnly = false)
     val partedDistRDD = distanceRDD.partitionBy(partitioner)
 
     val cachedDistRDD = if(allowCache) partedDistRDD.cache() else partedDistRDD

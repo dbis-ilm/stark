@@ -18,29 +18,29 @@ import scala.reflect.ClassTag
  * @param dimensions The dimensionality of the input data
  */
 class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[(G,V)],
-    partitionsPerDimension: Int,
-    withExtent: Boolean,
-    _minX: Double,
-    _maxX: Double,
-    _minY: Double,
-    _maxY: Double,
-    dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+                                                                     rdd: RDD[(G,V)],
+                                                                     partitionsPerDimension: Int,
+                                                                     pointsOnly: Boolean,
+                                                                     _minX: Double,
+                                                                     _maxX: Double,
+                                                                     _minY: Double,
+                                                                     _maxY: Double,
+                                                                     dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   require(dimensions == 2, "Only 2 dimensions supported currently")
 
   def this(rdd: RDD[(G,V)],
-      partitionsPerDimension: Int,
-      withExtent: Boolean,
-      minMax: (Double, Double, Double, Double),
-      dimensions: Int) =
-    this(rdd, partitionsPerDimension, withExtent, minMax._1, minMax._2, minMax._3, minMax._4, dimensions)
+           partitionsPerDimension: Int,
+           pointsOnly: Boolean,
+           minMax: (Double, Double, Double, Double),
+           dimensions: Int) =
+    this(rdd, partitionsPerDimension, pointsOnly, minMax._1, minMax._2, minMax._3, minMax._4, dimensions)
 
   def this(rdd: RDD[(G,V)],
-      partitionsPerDimension: Int,
-      withExtent: Boolean = false,
-      dimensions: Int = 2) =
-    this(rdd, partitionsPerDimension, withExtent, SpatialPartitioner.getMinMax(rdd), dimensions)
+           partitionsPerDimension: Int,
+           pointsOnly: Boolean,
+           dimensions: Int = 2) =
+    this(rdd, partitionsPerDimension, pointsOnly, SpatialPartitioner.getMinMax(rdd), dimensions)
 
 
   protected[this] val xLength: Double = math.abs(maxX - minX) / partitionsPerDimension
@@ -48,13 +48,13 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
   private val partitions: Array[Cell] = {
-    val arr = if(withExtent) {
-      SpatialPartitioner.buildHistogram(rdd,withExtent,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
-    } else {
+    (if(pointsOnly) {
       SpatialPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
-    }
+    } else {
+      SpatialPartitioner.buildHistogram(rdd,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
 
-    arr.map(_._1)
+    }).map(_._1)
+
   }
 
 

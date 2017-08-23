@@ -23,7 +23,7 @@ object SpatialPartitioner {
     * @tparam V The type for payload data
     * @return Returns a 4-tuple for min/max values in the two dimensions in the form <code>(min-x, max-x, min-y, max-y)</code>
     */
-  protected[stark] def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]) = {
+  protected[stark] def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) = {
     val (minX, maxX, minY, maxY) = rdd.map{ case (g,_) =>
       val env = g.getEnvelopeInternal
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
@@ -72,38 +72,14 @@ object SpatialPartitioner {
   }
 
 
-  def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], withExtent: Boolean, numXCells: Int, numYCells: Int, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double): Array[(Cell,Int)] = {
+  def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double): Array[(Cell,Int)] = {
 
     val histo = buildGrid(numXCells,numYCells, xLength, yLength, minX,minY)
 
     /* fill the array. If with extent, we need to keep the exent of each element and combine it later
      * to create the extent of a cell based on the extents of its contained objects
      */
-    if(withExtent) {
-
-      rdd.map { case (g, _) =>
-          val p = Utils.getCenter(g.getGeo)
-
-          val env = g.getEnvelopeInternal
-          val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-          val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-
-          (cellId,(1, extent))
-        }
-        .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
-          val cnt = lCnt + rCnt
-
-          val extent = lExtent.extend(rExtent)
-
-          (cnt, extent)
-
-        }
-        .collect
-        .foreach{case (cellId, (cnt,ex)) =>
-          histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
-        }
-
-    } else {
+    if(pointsOnly) {
       rdd.map{ case (g,_) =>
         val p = Utils.getCenter(g.getGeo)
 
@@ -117,12 +93,37 @@ object SpatialPartitioner {
           histo(cellId) = (histo(cellId)._1, cnt)
         }
 
+
+    } else {
+
+      rdd.map { case (g, _) =>
+        val p = Utils.getCenter(g.getGeo)
+
+        val env = g.getEnvelopeInternal
+        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
+
+        (cellId,(1, extent))
+      }
+        .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
+          val cnt = lCnt + rCnt
+
+          val extent = lExtent.extend(rExtent)
+
+          (cnt, extent)
+
+        }
+        .collect
+        .foreach{case (cellId, (cnt,ex)) =>
+          histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
+        }
     }
     histo
 
   }
 
-  def buildGrid(numXCells: Int, numYCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double) = Array.tabulate(numXCells * numYCells){ i =>
+  def buildGrid(numXCells: Int, numYCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): Array[(Cell, Int)] =
+    Array.tabulate(numXCells * numYCells){ i =>
       val cellBounds = getCellBounds(i, numXCells, xLength, yLength, minX, minY)
       (Cell(i,cellBounds), 0)
     }

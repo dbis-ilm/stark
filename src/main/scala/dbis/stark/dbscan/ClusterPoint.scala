@@ -25,11 +25,11 @@ import scala.reflect.ClassTag
   * @param isMerge true if the point is a merge candidate, i.e. appears in multiple overlapping partitions
   */
 case class ClusterPoint[K, T : ClassTag](
-    val id: K,
+		id: K,
     override val vec: Vector,
 		var clusterId: Int = 0,
     var label: ClusterLabel = Unclassified,
-    val payload: Option[T] = None,
+		payload: Option[T] = None,
 		var isMerge: Boolean = false
 	) extends Point(vec) with java.io.Serializable {
 

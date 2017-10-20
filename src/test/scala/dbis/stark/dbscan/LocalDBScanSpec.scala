@@ -31,11 +31,15 @@ class LocalDBScanSpec extends FlatSpec with Matchers {
       ClusterPoint[Int, Int](9,Vectors.dense(9.09417446372015,-140.061523108837))
     )
     val start = ClusterPoint[Int, Int](10,Vectors.dense(52.7498085418551,-9.04225181250282))
-    val res = dbscan.expandCluster(start, 42, points)
+
+    val res = dbscan.expandCluster(start, 42, points.toStream)
+
     res should be (true)
 
     val expectedClusterIDs = List(42,42,42,0,42,42,0,42,42,42)
-    points.zip(expectedClusterIDs).foreach{ case (p, c) => p.clusterId should be (c) }
+    points.zip(expectedClusterIDs).foreach{ case (p, c) =>
+      withClue("cluster id ") { p.clusterId shouldBe c }
+    }
   }
 
   it should "not expand a cluster for a noise point" in {
@@ -57,7 +61,7 @@ class LocalDBScanSpec extends FlatSpec with Matchers {
       ClusterPoint[Int, Int](9,Vectors.dense(9.09417446372015,-140.061523108837))
     )
     val start = ClusterPoint[Int, Int](10,Vectors.dense(27.3622293956578,-1401.01916939022))
-    val res = dbscan.expandCluster(start, 42, points)
+    val res = dbscan.expandCluster(start, 42, points.toStream)
 
     res should be (false)
   }
@@ -83,10 +87,10 @@ class LocalDBScanSpec extends FlatSpec with Matchers {
   it should "update cluster ids of points using a mapping table" in {
     val dbscan = new DBScan[Int, Int]()
     val map = Map[Int, Int](2 -> 10, 3 -> 10, 4 -> 10, 5 -> 10, 6 -> 20, 7 -> 20)
-    dbscan.mapClusterId(ClusterPoint[Int,Int](1,Vectors.zeros(2), 2, ClusterLabel.Core, None, true), map).clusterId should be (10)
-    dbscan.mapClusterId(ClusterPoint[Int,Int](2,Vectors.zeros(2), 4, ClusterLabel.Core, None, true), map).clusterId should be (10)
-    dbscan.mapClusterId(ClusterPoint[Int,Int](3,Vectors.zeros(2), 6, ClusterLabel.Core, None, true), map).clusterId should be (20)
-    dbscan.mapClusterId(ClusterPoint[Int,Int](4,Vectors.zeros(2), 1, ClusterLabel.Core, None, true), map).clusterId should be (1)
+    dbscan.mapClusterId(ClusterPoint[Int,Int](1,Vectors.zeros(2), 2, ClusterLabel.Core, None, isMerge = true), map).clusterId should be (10)
+    dbscan.mapClusterId(ClusterPoint[Int,Int](2,Vectors.zeros(2), 4, ClusterLabel.Core, None, isMerge = true), map).clusterId should be (10)
+    dbscan.mapClusterId(ClusterPoint[Int,Int](3,Vectors.zeros(2), 6, ClusterLabel.Core, None, isMerge = true), map).clusterId should be (20)
+    dbscan.mapClusterId(ClusterPoint[Int,Int](4,Vectors.zeros(2), 1, ClusterLabel.Core, None, isMerge = true), map).clusterId should be (1)
   }
 
   it should "compute a global mapping table from a list of mappings" in {
@@ -102,9 +106,9 @@ class LocalDBScanSpec extends FlatSpec with Matchers {
     val partitioner = new GridPartitioner().setMBB(mbb).setPPD(2)
     val partitionList = partitioner.computePartitioning()
     partitionList.length should be (4)
-    partitionList should contain theSameElementsAs (List(MBB(Vectors.dense(0.0, 0.0), Vectors.dense(50.0, 50.0)),
+    partitionList should contain theSameElementsAs List(MBB(Vectors.dense(0.0, 0.0), Vectors.dense(50.0, 50.0)),
       MBB(Vectors.dense(50.0, 0.0), Vectors.dense(100.0, 50.0)),
       MBB(Vectors.dense(0.0, 50.0), Vectors.dense(50.0, 100.0)),
-      MBB(Vectors.dense(50.0, 50.0), Vectors.dense(100.0, 100.0)) ))
+      MBB(Vectors.dense(50.0, 50.0), Vectors.dense(100.0, 100.0)))
   }
 }

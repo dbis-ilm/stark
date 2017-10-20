@@ -31,7 +31,7 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   it  should "derive a partitioning" in {
     val data = sc.textFile("src/test/resources/labeled_data.csv")
       .map(line => line.split(","))
-      .map(t => (Vectors.dense(t(0).toDouble, t(1).toDouble)))
+      .map(t => Vectors.dense(t(0).toDouble, t(1).toDouble))
 
     val cellSize = 0.3
       
@@ -48,7 +48,7 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
       
     val partitions = partitioner.computePartitioning()
 //    println(s"${partitions.length} partitions: ---> \n${partitions.mkString("\n")}")
-    partitioner.cellHistogram.size shouldBe 196
+    partitioner.cellHistogram.length shouldBe 196
 //    partitions.size shouldBe 26
     
   }

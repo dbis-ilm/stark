@@ -88,26 +88,9 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       s2 <- right.partitions
       if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
 
-//        val lExtent = leftParti.get.partitionExtent(s1.index)
-//        val rExtent = rightParti.get.partitionExtent(s2.index)
-//
-//        println(lExtent)
-//        println(lExtent.wkt)
-//
-//        println
-//
-//        println(rExtent)
-//        println(rExtent.wkt)
-//
-//        val i = lExtent.intersects(rExtent)
-//        println(i)
-//
-//        if(i) {
-          val p = new JoinPartition(idx, left, right, s1.index, s2.index)
-//          println(s"marking $p for processing")
-          parts += p
-          idx += 1
-//        }
+      val p = new JoinPartition(idx, left, right, s1.index, s2.index)
+      parts += p
+      idx += 1
 
     }
     parts.toArray

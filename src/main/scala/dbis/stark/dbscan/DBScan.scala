@@ -1,14 +1,13 @@
 package dbis.stark.dbscan
 
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd._
-import org.apache.spark.mllib.linalg.{Vectors, Vector}
+
+import scala.collection.mutable
 import scala.reflect.ClassTag
-import scalax.collection.mutable.Graph
-import scalax.collection.GraphPredef._
 import scalax.collection.GraphEdge._
-import scalax.collection.edge.Implicits._
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.Set
+import scalax.collection.GraphPredef._
+import scalax.collection.mutable.Graph
 
 /**
   * A Spark implementation of DBSCAN. The implementation is a Spark adaption of the approach
@@ -109,7 +108,6 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     *   6. map the local cluster ids to global ids
     *   7. construct a DBScanModel representing the clustering result
     *
-    * @param sc the Spark context of the script
     * @param input the input RDD consisting of Vectors (of an arbitrary number of dimensions)
     * @return a clustering model containing the objects with their cluster id as label
     */
@@ -146,8 +144,8 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     //logInfo("step 3: start local DBSCAN")
     val clusterSets = mappedPoints.groupBy(k => k._1)
     // TODO: try .repartition(partitionMBBs.length)
-    val clusterResults = clusterSets.mapPartitions(iter => applyLocalDBScan(iter, broadcastMBBs.value), true)
-    val clusteredData = clusterResults.flatMap{case (idx, x) => x}
+    val clusterResults = clusterSets.mapPartitions(iter => applyLocalDBScan(iter, broadcastMBBs.value), preservesPartitioning = true)
+    val clusteredData = clusterResults.flatMap{case (_, x) => x}
 
     /*
      * we need the data twice, so let's cache them.
@@ -167,9 +165,10 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
      * with different cluster ids we have to add it to the map
      */
     val clusterPairs = clusterGroups.mapPartitions{ iter => buildClusterPairs(iter)}
-      .coalesce(1, true)
-      .collect
+//      .coalesce(1, shuffle = true)
+//      .collect
       .distinct
+        .collect() // FIXME: Bad! will collect all data in the driver! may be way too large!
 
     /*
      * if a point appears in multiple partitions we take only one instance of it
@@ -322,9 +321,10 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     * @param points the list of points to be considered
     * @return true if p belongs to a cluster and isn't noise
     */
-  protected[dbscan] def expandCluster(p: ClusterPoint[K,T], clusterID: Int, points: List[ClusterPoint[K,T]]) : Boolean = {
+  protected[dbscan] def expandCluster(p: ClusterPoint[K,T], clusterID: Int, points: Stream[ClusterPoint[K,T]]) : Boolean = {
     // we consider only points within the eps distance
     var seeds = points.filter(l => distanceFun(p.vec, l.vec) < eps).toBuffer
+
     if (seeds.size < minPts) {
       // if we don't have enough points in our epsilon distance then p is considered as noise
       p.label = ClusterLabel.Noise
@@ -362,9 +362,10 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     * @param startId the first available cluster identifier
     * @return the list of clustered points (i.e. label and clusterId are set now)
     */
-  protected[dbscan] def localDBScan(points: List[ClusterPoint[K,T]], startId: Int) : List[ClusterPoint[K,T]] = {
+  protected[dbscan] def localDBScan(points: Stream[ClusterPoint[K,T]], startId: Int) : Stream[ClusterPoint[K,T]] = {
     // prepare the next available cluster id
     var nextClusterID: Int = startId + 1
+
     points.foreach(p => {
       // we choose a point not yet seen as a potential cluster seed
       // and try to expand the cluster
@@ -389,24 +390,41 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     */
   protected[dbscan] def applyLocalDBScan(iter: Iterator[(Int, Iterable[(Int, ClusterPoint[K,T])])], mbbs: List[MBB]):
     Iterator[(Int, Iterable[ClusterPoint[K,T]])] = {
-    val clusteredData = ListBuffer[(Int,Iterable[ClusterPoint[K,T]])]()
-    while (iter.hasNext) {
-      val (partitionId, objIter) = iter.next()
+
+
+    iter.map{ case (partitionId, objIter) =>
+
       // determine a new starting cluster id for the partition
       // here we assume to not having more than 1000 clusters
       val startId = partitionId * 1000
-
-      val points = objIter.toList.map(pair => pair._2)
+      val points = objIter.map(_._2).toStream
 
       // perform the actual clustering
       val data = localDBScan(points, startId)
 
       // check for border points, i.e. if a point is at the border of mbbs(idx)
-      clusteredData += ((partitionId, data))
-
-      //logInfo(s"computeLocalDBScan for partition #$partitionId with ${points.size} objects")
+      (partitionId, data)
     }
-    clusteredData.iterator
+
+//    val clusteredData = ListBuffer[(Int,Iterable[ClusterPoint[K,T]])]()
+//
+//    while (iter.hasNext) {
+//      val (partitionId, objIter) = iter.next()
+//      // determine a new starting cluster id for the partition
+//      // here we assume to not having more than 1000 clusters
+//      val startId = partitionId * 1000
+//
+//      val points = objIter.map(pair => pair._2)
+//
+//      // perform the actual clustering
+//      val data = localDBScan(points, startId)
+//
+//      // check for border points, i.e. if a point is at the border of mbbs(idx)
+//      clusteredData += ((partitionId, data))
+//
+//      //logInfo(s"computeLocalDBScan for partition #$partitionId with ${points.size} objects")
+//    }
+//    clusteredData.iterator
   }
 
   /*-----------------------------------------------------------------------------------------------------*/
@@ -454,7 +472,7 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     // then, we process all nodes
     for (node <- graph.nodes) {
       // construct a set of nodes in its transitive closure
-      var nodes = Set[Int]()
+      var nodes = mutable.Set[Int]()
       for (p <- node.outerNodeTraverser) { nodes += p }
       // assign them the same new cluster id
       val id = nextId()
@@ -471,24 +489,37 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     * @return an iterator to a list of cluster-id mappings
     */
   protected[dbscan] def buildClusterPairs(iter: Iterator[(Vector, Iterable[ClusterPoint[K,T]])]) : Iterator[(Int, Int)] = {
-    var clusterSet : Set[(Int, Int)] = Set()
-    var lastVec: Vector = Vectors.zeros(0)
-    var lastCluster: Int = -1
-    
-    while (iter.hasNext) {
-      val (_, pointIter) = iter.next()
-      
-      for (p <- pointIter)  {
-        if (p.clusterId > 0 && lastVec == p.vec && lastCluster != p.clusterId) {
-          clusterSet += ((lastCluster, p.clusterId))
-        }
-        if (p.clusterId > 0) {
-          lastVec = p.vec
-          lastCluster = p.clusterId
-        }
-      }
+
+    // TODO: is this better?
+    val a = iter.flatMap(_._2).filter(_.clusterId > 0).toStream.groupBy(p => p.vec).flatMap{ case (_, idList) =>
+      for {
+         ClusterPoint(_,_,aId, _,_,_) <- idList
+         ClusterPoint(_,_,bId, _,_,_) <- idList
+         if aId < bId
+        } yield (aId,bId)
     }
-    clusterSet.iterator
+
+    a.iterator
+
+
+//    //FIXE: how big can this Set get? may be too large for memory?
+//    var clusterSet : mutable.Set[(Int, Int)] = mutable.Set()
+//    var lastVec: Vector = Vectors.zeros(0)
+//    var lastCluster: Int = -1
+//    while (iter.hasNext) {
+//      val (_, pointIter) = iter.next()
+//
+//      for (p <- pointIter)  {
+//        if (p.clusterId > 0 && lastVec == p.vec && lastCluster != p.clusterId) {
+//          clusterSet += ((lastCluster, p.clusterId))
+//        }
+//        if (p.clusterId > 0) {
+//          lastVec = p.vec
+//          lastCluster = p.clusterId
+//        }
+//      }
+//    }
+//    clusterSet.iterator
   }
 
   /**
@@ -501,7 +532,7 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     */
   protected[dbscan] def eliminateDuplicates(iter: Iterator[(Vector, Iterable[ClusterPoint[K,T]])]) : Iterator[ClusterPoint[K,T]] = {
     
-    val seenIds = Set.empty[K]
+    val seenIds = mutable.Set.empty[K]
     
     iter.flatMap{ case (_, pointIter) => pointIter.filter{ p => 
         val res = !seenIds.contains(p.id)

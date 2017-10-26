@@ -1,5 +1,6 @@
 package dbis.stark.dbscan
 
+import dbis.stark.spatial.partitioner
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd._
 
@@ -58,16 +59,6 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     val data = input.map{ case (id, v, p) => new ClusterPoint(id, v, payload = Some(p))}
     performClustering(data, globalMBB)
   }
-
-//  def run(sc: SparkContext, input: RDD[Vector]): DBScanModel = {
-//    /*
-//      * step 1: determine the optimal partitioning, i.e. a list of MBBs describing the
-//      *         partitions in the n-dimensional space and send it around as broadcast
-//      *         variable
-//      */
-//    val globalMBB = getGlobalMBB(input)
-//    performClustering(sc, input.map(v => new ClusterPoint(v, payload = None)), globalMBB)
-//  }
 
   /**
     * Compute partitions for the whole dataset. Depending on the parameter either a
@@ -302,7 +293,7 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
   protected[dbscan] def partitionInput(input: RDD[ClusterPoint[K,T]], partitions: List[MBB]): RDD[(Int,ClusterPoint[K,T])] =
     input.flatMap{ point =>
       val partitionList = containingPartitions(partitions, point.vec)
-      require(partitionList.nonEmpty)
+      require(partitionList.nonEmpty,"no partition found!")
       partitionList.map(p => (p, ClusterPoint(point, merge = partitionList.length > 1, pload = point.payload)))
     }
 
@@ -491,7 +482,7 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
   protected[dbscan] def buildClusterPairs(iter: Iterator[(Vector, Iterable[ClusterPoint[K,T]])]) : Iterator[(Int, Int)] = {
 
     // TODO: is this better?
-    val a = iter.flatMap(_._2).filter(_.clusterId > 0).toStream.groupBy(p => p.vec).flatMap{ case (_, idList) =>
+    val a = iter.flatMap(_._2).filter(_.clusterId > 0).toStream.groupBy(p => p.vec).iterator.flatMap{ case (_, idList) =>
       for {
          ClusterPoint(_,_,aId, _,_,_) <- idList
          ClusterPoint(_,_,bId, _,_,_) <- idList
@@ -499,7 +490,7 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
         } yield (aId,bId)
     }
 
-    a.iterator
+    a
 
 
 //    //FIXE: how big can this Set get? may be too large for memory?

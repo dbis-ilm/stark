@@ -1,7 +1,6 @@
 package dbis.stark.dbscan
 
-import dbis.stark.spatial.partitioner
-import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd._
 
 import scala.collection.mutable

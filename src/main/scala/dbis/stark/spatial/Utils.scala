@@ -7,9 +7,14 @@ import dbis.stark.STObject.GeoType
 object Utils {
   
   def toEnvelope(r: NRectRange): Envelope = {
-      val s = s"""POLYGON ((${r.ll(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ll(1)}))"""
-      new WKTReader().read(s).getEnvelopeInternal 
-    }
+    val s = s"""POLYGON ((${r.ll(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ll(1)}))"""
+    new WKTReader().read(s).getEnvelopeInternal
+  }
+
+  def fromEnvelope(g: GeoType): NRectRange = {
+    val env = g.getEnvelopeInternal
+    NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+  }
 
   def getCenter(g: GeoType): Point = {
     var center = g.getCentroid

@@ -13,7 +13,10 @@ package dbis.stark.spatial
  * @param ur The upper right point (max value in each dimension)
  */
 case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
-    
+
+  def dist(p: NPoint) = math.sqrt(center.c.iterator.zip(p.c.iterator).map{ case (l,r) => l - r}.map(math.pow(_,2)).sum)
+
+
   require(ll.dim >= 2, "dimension must be >= 2")
 	require(ll.dim == ur.dim, "ll and ur points must be of same dimension")
 //  require(ll.c.zipWithIndex.forall { case (e,i) => e < ur(i) }, s"ll must be smaller than ur (ll: $ll  ur: $ur)")
@@ -75,6 +78,11 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
       this.ll.mergeMin(other.ll).mergeMin(other.ur),
       this.ur.mergeMax(other.ur).mergeMax(other.ll)
     )
+
+  def extend(p: NPoint, eps: Double = 0) = NRectRange(
+    this.ll.mergeMin(p),
+    this.ur.mergeMax(if(eps <= 0) p else NPoint(p.c.map(_ + eps)))
+  )
   
   def diff(other: NRectRange): NRectRange = {
     

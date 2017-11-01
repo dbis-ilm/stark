@@ -72,7 +72,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
            sampleFraction: Double = 0) =
-    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd, sampleFraction), sampleFraction)
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd), sampleFraction)
 
 
   protected[spatial] val numXCells: Int = {
@@ -150,7 +150,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 //      val minPartitionId12 = iter.map{ case Cell(id, range, _) => (id, range.dist(pc)) }.minBy(_._2)._1
 
       var minDist = Double.MaxValue
-      var minPartitionId: Int = 0
+      var minPartitionId: Int = -1
       var first = true
 
       for(partition <- partitions) {

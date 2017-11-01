@@ -571,7 +571,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "produce same join results with sampling as without" taggedAs (Sampling,Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
 //    BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
     val parti = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
@@ -579,7 +579,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
     val partiTaxi = new BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
       pointsOnly = true, sampleFraction = 0.1)
@@ -608,12 +608,12 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
       pointsOnly = false, sampleFraction = 0)
 
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), treeOrder = 5).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).count()
-    joinResPlain shouldBe > (0L)
+    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), treeOrder = 5).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).collect()
+    joinResPlain.length shouldBe > (0)
 
-    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedBlocks, treeOrder = 5).join(partedTaxi, JoinPredicate.CONTAINS, None).count()
-    joinResSam shouldBe > (0L)
-//    joinResSam should contain theSameElementsAs joinResPlain
+    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedBlocks, treeOrder = 5).join(partedTaxi, JoinPredicate.CONTAINS, None).collect()
+    joinResSam.length shouldBe > (0)
+    joinResSam should contain theSameElementsAs joinResPlain
   }
 
   ignore  should "correctly partition wikimapia" in {

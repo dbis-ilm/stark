@@ -1,5 +1,7 @@
 package dbis.stark.spatial.partitioner
 
+import java.nio.file.Paths
+
 import com.vividsolutions.jts.io.WKTReader
 import dbis.stark.{STObject, TestUtils}
 import dbis.stark.spatial.SpatialRDD._
@@ -596,5 +598,28 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     jWOPart should contain theSameElementsAs jWPart
   }
 
+  it should "produce same join results with sampling as without" taggedAs Slow in {
+    val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+
+    val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+
+
+    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, treeOrder = 5).join(rddTaxi, JoinPredicate.CONTAINS, None).sortByKey().collect()
+
+
+    val taxiPartiNoSample = new BSPartitioner(rddTaxi, sideLength = 0.3, maxCostPerPartition = 100, pointsOnly = true)
+
+
+    val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100, pointsOnly = false)
+
+    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), treeOrder = 5).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
+    joinResPlain.length shouldBe > (0)
+
+    withClue("join part no sample does not have same results as no partitioning") { joinResPlain should contain theSameElementsAs joinResNoPart }
+  }
 
 }

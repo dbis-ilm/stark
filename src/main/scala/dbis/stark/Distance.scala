@@ -98,6 +98,8 @@ object ScalarDistance {
   */
 object Distance {
 
+  implicit def scalarToDouble(d: ScalarDistance): Double = d.value
+
 
   implicit def distanceOrdering: Ordering[Distance] = Ordering.fromLessThan(_ < _)
   implicit def scalarDistanceOrdering: Ordering[ScalarDistance] = Ordering.fromLessThan(_ < _)

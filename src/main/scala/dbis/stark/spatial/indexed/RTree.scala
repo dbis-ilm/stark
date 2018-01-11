@@ -4,7 +4,7 @@ import com.vividsolutions.jts.geom.{Coordinate, Envelope}
 import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
 import dbis.stark.{Distance, STObject}
 
-import scala.collection.JavaConversions.asScalaBuffer
+import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
 protected[indexed] class Data[G <: STObject,T](/*var ts: Int, */val data: T, val so: G) extends Serializable
@@ -38,7 +38,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @return Returns all elements of the tree that intersect with the query geometry
    */
     def query(geom: STObject): Iterator[D] =
-      super.query(geom.getEnvelopeInternal).map(_.asInstanceOf[Data[G,D]].data).iterator
+      super.query(geom.getEnvelopeInternal).iterator().map(_.asInstanceOf[Data[G,D]].data)
   
   /**
    * A read only query variant of the tree.
@@ -65,7 +65,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
         new Coordinate(env.getMinX - maxDist.maxValue - 1, env.getMinY - maxDist.maxValue - 1),
         new Coordinate(env.getMaxX + maxDist.maxValue + 1, env.getMaxY + maxDist.maxValue + 1))
     
-    super.query(env2).map(_.asInstanceOf[Data[G,D]]).iterator.filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
+    super.query(env2).iterator().map(_.asInstanceOf[Data[G,D]]).filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
   }
   
 //  private def doQueryRO(qry: STObject, env: Envelope, pred: (STObject, STObject) => Boolean) = {
@@ -89,11 +89,11 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param l The list that contains plain elements and other lists
    * @return Returns a flat list Data
    */
-  private def unnest[T](l: java.util.ArrayList[_]): List[Data[G,D]] = 
+  private def unnest[T](l: java.lang.Iterable[_]): Iterator[Data[G,D]] =
     l.flatMap {
-      case d: Data[G, D] => List(d)
+      case d: Data[G, D] => Iterator.single(d)
       case a: java.util.ArrayList[_] => unnest(a)
-    }.toList
+    }.toIterator
   
   /**
    * Get all items in the tree
@@ -101,11 +101,12 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @return Returns a list containing all Data items in the tree
    */
   protected[indexed] def items = super.itemsTree()
+      .iterator()
       .flatMap{ l => (l: @unchecked) match {
-        case d: Data[G,D] => List(d)
+        case d: Data[G,D] => Iterator.single(d)
         case a: java.util.ArrayList[_] => unnest(a)
         } 
-      } 
+      }
   
   /**
    * If the tree was queried using the *RO methods you can use this method
@@ -125,7 +126,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
     if(size <= 0)
       Iterator.empty
     else
-      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance(distFunc), k).map(_.data).iterator
+      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance(distFunc), k).iterator().map(_.data)
   }
 }
 

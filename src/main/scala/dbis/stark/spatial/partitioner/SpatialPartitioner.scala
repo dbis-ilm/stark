@@ -87,11 +87,13 @@ object SpatialPartitioner {
 
         (cellId, 1)
       }
-        .reduceByKey(_ + _)
-        .collect
-        .foreach{ case (cellId, cnt) =>
-          histo(cellId) = (histo(cellId)._1, cnt)
-        }
+      .reduceByKey(_ + _)
+//      .collect
+      .cache()
+      .toLocalIterator
+      .foreach{ case (cellId, cnt) =>
+        histo(cellId) = (histo(cellId)._1, cnt)
+      }
 
 
     } else {
@@ -105,18 +107,20 @@ object SpatialPartitioner {
 
         (cellId,(1, extent))
       }
-        .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
-          val cnt = lCnt + rCnt
+      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
+        val cnt = lCnt + rCnt
 
-          val extent = lExtent.extend(rExtent)
+        val extent = lExtent.extend(rExtent)
 
-          (cnt, extent)
+        (cnt, extent)
 
-        }
-        .collect
-        .foreach{case (cellId, (cnt,ex)) =>
-          histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
-        }
+      }
+//        .collect
+      .cache()
+      .toLocalIterator
+      .foreach{case (cellId, (cnt,ex)) =>
+        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
+      }
     }
     histo
 

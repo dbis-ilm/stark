@@ -8,6 +8,7 @@ libraryDependencies ++= Seq(
    "com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),
    "org.apache.spark" %% "spark-core" % "2.1.0" % "provided" withSources() withJavadoc(),
    "org.apache.spark"  %% "spark-mllib" % "2.1.0" % "provided",
+   "org.apache.spark" %% "spark-sql" % "2.1.0" % "provided",
    //"fm.void.jetm" % "jetm" % "1.2.3",
    "org.scalatest" %% "scalatest" % "3.0.1" % "test" withSources(),
    "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
@@ -17,6 +18,7 @@ libraryDependencies ++= Seq(
 )
 
 test in assembly := {}
+
 logBuffered in Test := false
 
 parallelExecution in Test := false

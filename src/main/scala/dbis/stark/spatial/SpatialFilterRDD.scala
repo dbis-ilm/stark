@@ -1,15 +1,22 @@
 package dbis.stark.spatial
 
-import dbis.stark.STObject
+import dbis.stark.{Interval, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.{IntervalTree1, RTree}
 import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
 import org.apache.spark.annotation.DeveloperApi
+import dbis.stark.spatial.IndexTyp.IndexTyp
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, Partitioner, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
+
+object IndexTyp extends Enumeration {
+  type IndexTyp = Value
+  val NONE, SPATIAL, TEMPORAL = Value
+}
+
 
 /**
   * A stpatio-temporal filter implementation
@@ -25,32 +32,19 @@ import scala.reflect.ClassTag
 class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
   private val parent: RDD[(G,V)],
   qry: G,
+  predicate: JoinPredicate,
   predicateFunc: (G,G) => Boolean,
+  indexType: IndexTyp,
   treeOrder: Int,
   private val checkParties: Boolean) extends RDD[(G,V)](parent) {
 
-  /**
-    * A stpatio-temporal filter implementation
-    *
-    * @param parent The parent RDD serving as input
-    * @param qry The query object used in the filter evaluation
-    * @param predicateFunc The predicate to apply in the filter
-    * @return Creates a new instance of this class
-    */
-  def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
-    this(parent, qry, predicateFunc, -1, false)
+  require(indexType != IndexTyp.SPATIAL || treeOrder > 0)
 
-  /**
-    * A stpatio-temporal filter implementation
-    *
-    * @param parent The parent RDD serving as input
-    * @param qry The query object used in the filter evaluation
-    * @param predicate The predicate to apply in the filter
-    * @param treeOrder The (optional) order of the tree. <= 0 to not apply indexing
-    * @return Creates a new instance of this class
-    */
-  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate, treeOrder: Int = -1) =
-    this(parent, qry, JoinPredicate.predicateFunction(predicate), treeOrder, true)
+  def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean,indexType: IndexTyp) =
+    this(parent, qry,null, predicateFunc,indexType, -1, false)
+
+  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate,indexType: IndexTyp, treeOrder: Int = -1) =
+    this(parent, qry, predicate,JoinPredicate.predicateFunction(predicate), indexType,treeOrder, true)
 
   /**
     * The partitioner of this RDD.
@@ -62,7 +56,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
   /**
     * Return the partitions that have to be processed.
     *
-    * We apply partition pruning in this step: If a [[SpatialPartitioner]]
+    * We apply partition pruning in this step: If a [[dbis.stark.spatial.partitioner.SpatialPartitioner]]
     * is present, we check if the partition can contain candidates. If not, it is not returned
     * here.
     *
@@ -96,8 +90,47 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
         }
 
         spatialParts.toArray
+      case tp: TemporalPartitioner =>
 
-      // if it's not a spatial partitioner, we cannot apply partition pruning
+        val spatialParts = ListBuffer.empty[Partition]
+
+        val qryEnv = qry.getGeo.getEnvelopeInternal
+        var i = 0
+        var cnt = 0
+        val numParentParts = parent.getNumPartitions
+        while (i < numParentParts) {
+          predicate match {
+            case JoinPredicate.INTERSECTS =>
+              if (tp.partitionBounds(i).intersects(qry.getTemp.get)) {
+                spatialParts += SpatialPartition(cnt, i, parent)
+                cnt += 1
+              }
+            case JoinPredicate.CONTAINEDBY =>
+              val newi = {
+                if (i == tp.numPartitions - 1) {
+                  tp.partitionBounds(i)
+                } else {
+                  Interval(tp.partitionBounds(i).start, tp.partitionBounds(i + 1).start)
+                }
+              }
+              if (newi.intersects(qry.getTemp.get)) {
+                spatialParts += SpatialPartition(cnt, i, parent)
+                cnt += 1
+              }
+            case JoinPredicate.CONTAINS =>
+              //println(tp.partitionBounds(i).contains(qry.getTemp.get))
+              if (tp.partitionBounds(i).contains(qry.getTemp.get)) {
+                spatialParts += SpatialPartition(cnt, i, parent)
+                cnt += 1
+              }
+            case _ =>
+              spatialParts += SpatialPartition(cnt, i, parent)
+              cnt += 1
+          }
+          i += 1
+
+        }
+        spatialParts.toArray
       case _ =>
         parent.partitions
 
@@ -115,28 +148,29 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
       case _ => inputSplit
     }
 
-    /* distinguish between no and live indexing
-     * of tree order is zero or smaller, indexing is _not_ applied.
-     *
-     * It it is greater than 0, we will perform live indexing
-     */
-    if(treeOrder <= 0) {
 
-      // simply iterate over all items in this partition and apply the predicate function
-      parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
-    } else {
+    indexType match {
+      case IndexTyp.NONE =>
+        parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
 
-      // create tree object
-      val tree = new RTree[G,(G,V)](treeOrder)
+      case IndexTyp.SPATIAL =>
+        val tree = new RTree[G, (G, V)](treeOrder)
+        // insert everything into the tree
+        parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
 
-      // insert everything into the tree
-      parent.iterator(split, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
+        // query tree and perform candidates check
+        tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
 
-      // build the tree
-      tree.build()
+      case IndexTyp.TEMPORAL =>
+        val indexTree = new IntervalTree1[G, V]()
+        // insert everything into the tree
+        parent.iterator(split, context).foreach { case (g, v) => indexTree.insert(g, (g, v)) }
+        indexTree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
 
-      // query tree and perform candidates check
-      tree.query(qry).filter{ case (g, _) => predicateFunc(g, qry) }
+//      case _ =>
+//        parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
+
+
     }
 
   }

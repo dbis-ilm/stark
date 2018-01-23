@@ -48,8 +48,8 @@ class RTreeTest extends FlatSpec with Matchers {
     entries.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
     
     tree.size() shouldBe entries.size
-    val l = tree.items.map(_.asInstanceOf[Data[STObject,(STObject, Int)]]).map(_.data)
-    l should contain theSameElementsAs (entries)
+    val l = tree.items.map(_.data).toArray
+    l should contain theSameElementsAs entries
   }
   
   it should "return the correct results for points" in {

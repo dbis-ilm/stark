@@ -10,8 +10,26 @@ import org.apache.spark.rdd.RDD
 
 
 object TestUtils {
-  case class FileOperationError(msg: String) extends RuntimeException(msg)
+  def createIntervalRDD(
+                         sc: SparkContext,
+                         file: String = "src/test/resources/intervaltest.csv",
+                         sep: Char = ';',
+                         numParts: Int = 8,
+                         distinct: Boolean = false) = {
 
+    val rdd = sc.textFile(file, if(distinct) 1 else numParts) // let's start with only one partition and repartition later
+      .map { line => line.split(sep) }
+      .map { arr =>
+        (arr(0), STObject(arr(1),Interval(arr(2).toInt, arr(3).toInt))) }
+      .keyBy( _._2)
+
+    if(distinct)
+      TestUtils.distinct(rdd).repartition(numParts)
+    else
+      rdd
+  }
+
+  case class FileOperationError(msg: String) extends RuntimeException(msg)
 
   def rmrf(root: String): Unit = rmrf(new File(root))
 
@@ -81,7 +99,7 @@ object TestUtils {
     
     val set = scala.collection.mutable.Set.empty[STObject]
     
-    rdd.filter{ case (st, value) => 
+    rdd.filter{ case (st, _) =>
       val contains = set.contains(st)
       if(contains)
         false

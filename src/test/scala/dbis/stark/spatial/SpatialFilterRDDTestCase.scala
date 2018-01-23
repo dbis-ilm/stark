@@ -24,7 +24,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
 
     val q: STObject = "POINT (53.483437 -2.2040706)"
 
-    val filter = new SpatialFilterRDD(raw, q, JoinPredicate.INTERSECTS)
+    val filter = new SpatialFilterRDD(raw, q, JoinPredicate.INTERSECTS, IndexTyp.NONE)
 
     filter.getPartitions.length shouldBe raw.getNumPartitions
   }
@@ -38,7 +38,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
     val gridRdd = raw.partitionBy(grid)
     val q: STObject = "POINT (53.483437 -2.2040706)"
 
-    val filter = new SpatialFilterRDD(gridRdd, q, JoinPredicate.INTERSECTS)
+    val filter = new SpatialFilterRDD(gridRdd, q, JoinPredicate.INTERSECTS, IndexTyp.NONE)
 
     gridRdd.partitioner should not be None
     gridRdd.partitioner.get shouldBe an[SpatialGridPartitioner[STObject, (String, Long, String, STObject)]]
@@ -60,7 +60,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
     val bspRdd = raw.partitionBy(bsp)
     val q: STObject = "POINT (53.483437 -2.2040706)"
 
-    val filter = new SpatialFilterRDD(bspRdd, q, JoinPredicate.INTERSECTS)
+    val filter = new SpatialFilterRDD(bspRdd, q, JoinPredicate.INTERSECTS, IndexTyp.NONE)
 
     bspRdd.partitioner should not be None
     bspRdd.partitioner.get shouldBe an[BSPartitioner[STObject, (String, Long, String, STObject)]]

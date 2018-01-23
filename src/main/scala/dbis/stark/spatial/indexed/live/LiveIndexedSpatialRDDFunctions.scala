@@ -1,25 +1,28 @@
 package dbis.stark.spatial.indexed.live
 
-import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.{SpatialFilterRDD, _}
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.{IndexTyp, SpatialFilterRDD, _}
+import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
+object LiveIndexedSpatialRDDFunctions {
+  var skipFilter = false
+}
 
-class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
-     rdd: RDD[(G,V)],
-     treeOrder: Int
-  ) extends SpatialRDDFunctions[G,V] with Serializable {
+class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
+                                                                             rdd: RDD[(G, V)],
+                                                                             treeOrder: Int
+                                                                           ) extends SpatialRDDFunctions[G, V] with Serializable {
 
-  def intersects(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.INTERSECTS, treeOrder)
+  def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, IndexTyp.SPATIAL, treeOrder)
 
-  def contains(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINS, treeOrder)
+  def contains(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINS, IndexTyp.SPATIAL, treeOrder)
 
-  def containedby(qry: G) = new SpatialFilterRDD[G,V](rdd, qry, JoinPredicate.CONTAINEDBY, treeOrder)
+  def containedby(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINEDBY, IndexTyp.SPATIAL, treeOrder)
 
   def withinDistance(
 		  qry: G,
@@ -72,7 +75,6 @@ class   LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           .map { case (g,v) => (g, (distFunc(g,qry), v)) }
           .sortBy(_._2._1, ascending = true)
           .take(k)
-
 
     rdd.sparkContext.parallelize(r)
   }

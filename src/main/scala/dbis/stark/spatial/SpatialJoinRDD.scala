@@ -32,6 +32,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
   private val numPartitionsInRight = right.getNumPartitions
 
+
   /**
     * Create a new join operator with the given predicate.
     *
@@ -44,7 +45,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
   def this(left: RDD[(G,V)], right: RDD[(G,V2)],
            predicate: JoinPredicate.JoinPredicate,
            capacity: Int = -1) =
-    this(left, right, JoinPredicate.predicateFunction(predicate), capacity, checkParties = true)
+      this(left, right, JoinPredicate.predicateFunction(predicate), capacity, checkParties = true)
 
   /**
     * Create a new join operator with the given predicate function.
@@ -105,7 +106,6 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
   }
 
   override def compute(s: Partition, context: TaskContext): Iterator[(V, V2)] = {
-
     // in getPartitions we created JoinPartition that link to two partitions that have to be joined
     val split = s.asInstanceOf[JoinPartition]
 
@@ -116,7 +116,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
       // loop over the left partition and check join condition on every element in the right partition's array
       left.iterator(split.leftPartition, context).flatMap{ case (lg, lv) =>
-        rightList.filter{ case (rg, _) =>
+        rightList.withFilter{ case (rg, _) =>
           val res = predicateFunc(lg,rg)
 //          println(s"check ($predicateFunc) $lg -- $rg --> $res")
             res
@@ -129,7 +129,8 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       val tree = new RTree[G,(G,V)](capacity = treeOrder)
 
       // insert everything into the tree
-      left.iterator(split.leftPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
+      left.iterator(split.leftPartition, context).foreach{ case (g, v) =>
+        tree.insert(g, (g,v)) }
 
       // build the tree
       tree.build()
@@ -138,7 +139,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       // For the results of a query we have to perform candidates check
       right.iterator(split.rightPartition, context).flatMap { case (rg, rv) =>
         tree.query(rg) // index query
-          .filter{ case (lg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
+          .withFilter{ case (lg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
           .map{ case (_,lv) => (lv,rv)} // result is the combined tuple of the payload items
       }
 

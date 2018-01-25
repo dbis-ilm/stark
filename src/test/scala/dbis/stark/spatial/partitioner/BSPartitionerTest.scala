@@ -19,7 +19,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   private var sc: SparkContext = _
   
   override def beforeAll() {
-    val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2").set("spark.driver.memory","1G").set("spark.executor.memory","2G")
+    val conf = new SparkConf().setMaster(s"local[3]").setAppName("paritioner_test2").set("spark.driver.memory","2G").set("spark.executor.memory","4G")
     sc = new SparkContext(conf)
   }
   
@@ -206,7 +206,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 1000, pointsOnly = true)
 
-    parti.numPartitions shouldBe 1+4 // 4 overflow partitions
+    parti.numPartitions shouldBe 1
 
   }
 
@@ -331,22 +331,77 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it  should "create real partitions correctly for taxi" taggedAs Slow in {
+    val start = System.currentTimeMillis()
     val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMax = SpatialPartitioner.getMinMax(rdd)
+    val minMax = SpatialPartitioner.getMinMax(rdd)
 
-      BSPartitioner.numCellThreshold = -1
-      val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
+    BSPartitioner.numCellThreshold = -1
+    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
 
-      parti.numPartitions shouldBe 9+4 // 4 overflow partitions
+    parti.numPartitions shouldBe 9
 
-      rdd.collect().foreach { case (st, name) =>
-        try {
-          val pNum = parti.getPartition(st)
-          withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
-        } catch {
+    val end = System.currentTimeMillis()
+    println(s"long version: ${end - start} ms")
+
+    rdd.collect().foreach { case (st, name) =>
+      try {
+        val pNum = parti.getPartition(st)
+        withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
+      } catch {
+      case e:IllegalStateException =>
+
+        val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
+        val yOk = st.getGeo.getCentroid.getY >= minMax._3 && st.getGeo.getCentroid.getY <= minMax._4
+
+        parti.bsp.partitions.foreach { cell =>
+
+          val xOk = st.getGeo.getCentroid.getX >= cell.range.ll(0) && st.getGeo.getCentroid.getX <= cell.range.ur(0)
+          val yOk = st.getGeo.getCentroid.getY >= cell.range.ur(1) && st.getGeo.getCentroid.getY <= cell.range.ur(1)
+
+          println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
+        }
+
+        val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        if(containingCell.isDefined) {
+          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+        } else {
+          println("No cell contains this point!")
+        }
+
+
+
+        fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
+      }
+
+    }
+  }
+
+  it  should "create real partitions correctly for taxi with sampling" taggedAs Slow in {
+
+    val start = System.currentTimeMillis()
+    val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}
+
+    val minMax = SpatialPartitioner.getMinMax(rdd)
+
+    BSPartitioner.numCellThreshold = -1
+    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0.1) // disable sampling
+
+    parti.numPartitions should be > 0
+
+    val end = System.currentTimeMillis()
+    println(s"sample version: ${end - start} ms")
+
+
+    rdd.collect().foreach { case (st, name) =>
+      try {
+        val pNum = parti.getPartition(st)
+        withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
+      } catch {
         case e:IllegalStateException =>
 
           val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
@@ -370,9 +425,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 
           fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
-        }
-
       }
+
+    }
 
 
   }
@@ -574,33 +629,34 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
 //    BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-    val parti = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
+    val partiBlocksSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
       pointsOnly = false, sampleFraction = 0.1)
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
-    val partiTaxi = new BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
+    val partiTaxiSample = new BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
       pointsOnly = true, sampleFraction = 0.1)
 
 
-    val partedBlocks = rddBlocks.partitionBy(parti)
-    println(s"blocks done: ${partedBlocks.count()}")
+    val partedBlocksSample = rddBlocks.partitionBy(partiBlocksSample)
+    println(s"blocks done: ${partedBlocksSample.count()}")
 
-    val partedTaxi = rddTaxi.partitionBy(partiTaxi)
+    val partedTaxiSample = rddTaxi.partitionBy(partiTaxiSample)
 
     try {
 
-      println(s"taxi done: ${partedTaxi.count()}")
+      println(s"taxi done: ${partedTaxiSample.count()}")
     } catch {
       case e: Throwable =>
         import scala.collection.JavaConverters._
         val fName = Paths.get(System.getProperty("user.home"),"taxi_sample.wkt")
-        val list = partiTaxi.theRDD.map { case (o, v) => s"${o.getGeo.toText};$v"}.collect().toList.asJava
+        val list = partiTaxiSample.theRDD.map { case (o, v) => s"${o.getGeo.toText};$v"}.collect().toList.asJava
         java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
         fail(e.getMessage)
     }
+
 
     val taxiPartiNoSample = new BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
       pointsOnly = true, sampleFraction = 0)
@@ -608,12 +664,29 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
       pointsOnly = false, sampleFraction = 0)
 
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), treeOrder = 5).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).collect()
-    joinResPlain.length shouldBe > (0)
+    val tPartedNoSample = rddTaxi.partitionBy(taxiPartiNoSample)
+    val pPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
 
-    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedBlocks, treeOrder = 5).join(partedTaxi, JoinPredicate.CONTAINS, None).collect()
-    joinResSam.length shouldBe > (0)
-    joinResSam should contain theSameElementsAs joinResPlain
+    val start = System.currentTimeMillis()
+    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, treeOrder = 50).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None)//.collect()
+    val joinResSamCnt = joinResSam.count()
+    val end = System.currentTimeMillis()
+
+
+    joinResSamCnt shouldBe > (0L)
+
+    val start2 = System.currentTimeMillis()
+    val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, treeOrder = 50).join(pPartedNoSample, JoinPredicate.CONTAINEDBY, None)//.collect()
+    val joinResPlainCnt = joinResPlain.count()
+    val end2 = System.currentTimeMillis()
+
+    joinResPlainCnt shouldBe > (0L)
+    joinResSamCnt should equal(joinResPlainCnt)
+
+    println(s"sampled join: ${end - start} ms")
+    println(s"plain join: ${end2 - start2} ms")
+
+//    joinResSam should contain theSameElementsAs joinResPlain
   }
 
   ignore  should "correctly partition wikimapia" in {
@@ -706,7 +779,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     jWOPart should contain theSameElementsAs jWPart
   }
 
-  it should "produce same join results with sampling as without" taggedAs Slow in {
+  it should "produce same join results with sampling as without short" taggedAs (Sampling, Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)

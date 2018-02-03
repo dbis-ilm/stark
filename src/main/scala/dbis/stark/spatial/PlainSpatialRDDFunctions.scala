@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
  */
 class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[(G,V)]
-  ) extends SpatialRDDFunctions[G,V] with Serializable {
+  ) extends SpatialRDDFunctions[G,V](rdd) with Serializable {
 
 
   def saveAsStarkTextFile(path: String): Unit = rdd.partitioner.foreach {

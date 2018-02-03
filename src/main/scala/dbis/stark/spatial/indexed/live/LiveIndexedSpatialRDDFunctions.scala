@@ -16,7 +16,7 @@ object LiveIndexedSpatialRDDFunctions {
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                              rdd: RDD[(G, V)],
                                                                              treeOrder: Int
-                                                                           ) extends SpatialRDDFunctions[G, V] with Serializable {
+                                                                           ) extends SpatialRDDFunctions[G, V](rdd) with Serializable {
 
   def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, IndexTyp.SPATIAL, treeOrder)
 

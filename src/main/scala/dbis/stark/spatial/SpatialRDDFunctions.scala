@@ -5,11 +5,11 @@ import com.vividsolutions.jts.geom.Envelope
 import scala.reflect.ClassTag
 import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.partitioner.SpatialPartitioner
-import dbis.stark.visualization.{JVisualization, Visualization}
+import dbis.stark.visualization.Visualization
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.RDD
 
-abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](@transient rdd: RDD[(G,V)]) extends Serializable {
+abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: RDD[(G,V)]) extends Serializable {
   
   def intersects(qry: G): RDD[(G,V)]
 
@@ -35,9 +35,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](@tran
                 range: (Double,Double,Double,Double) = SpatialPartitioner.getMinMax(rdd),
                 flipImageVert: Boolean = false) = {
 
-    //    val vis = new Visualization()
-
-    val vis = new JVisualization()
+    val vis = new Visualization()
     val jsc = new JavaSparkContext(rdd.context)
 
     val env = new Envelope(range._1, range._2, range._3, range._4)

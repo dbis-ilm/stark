@@ -13,7 +13,7 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.util.Objects;
+import java.util.Collections;
 import java.util.stream.StreamSupport;
 
 public class Visualization implements Serializable {
@@ -28,7 +28,16 @@ public class Visualization implements Serializable {
     private boolean flipImageVert;
 
     public <G extends STObject, T> boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tuple2<G, T>> rdd,
-                                                     int imageWidth, int imageHeight, Envelope envelope, boolean flipImageVert, String outputPath, String outputType) {
+                                                     int imageWidth, int imageHeight, Envelope envelope,
+                                                     boolean flipImageVert, String outputPath, String outputType) {
+
+        return visualize(sparkContext, rdd, imageWidth, imageHeight, envelope, flipImageVert, outputPath, outputType, 1);
+    }
+
+    public <G extends STObject, T> boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tuple2<G, T>> rdd,
+                                                     int imageWidth, int imageHeight, Envelope envelope,
+                                                     boolean flipImageVert, String outputPath, String outputType,
+                                                     int pointSize) {
 
         this.imageHeight = imageHeight;
         this.imageWidth = imageWidth;
@@ -39,10 +48,10 @@ public class Visualization implements Serializable {
 
         Broadcast<Envelope> env = sparkContext.broadcast(envelope);
 
-        return draw(rdd, env, outputPath, outputType);
+        return draw(rdd, env, outputPath, outputType, pointSize);
     }
 
-    private <G extends STObject,T> boolean draw(JavaRDD<Tuple2<G, T>> rdd, Broadcast<Envelope> env, String outputPath, String outputType) {
+    private <G extends STObject,T> boolean draw(JavaRDD<Tuple2<G, T>> rdd, Broadcast<Envelope> env, String outputPath, String outputType, int pointSize) {
 
         BufferedImage finalImage = rdd.mapPartitions(iter -> {
             BufferedImage imagePartition = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
@@ -52,15 +61,14 @@ public class Visualization implements Serializable {
 
             Iterable<Tuple2<G,T>> iterable = () -> iter;
 
-            return StreamSupport.stream(iterable.spliterator(),false) // make iterator a stream (in Java iterator does not support map function
-                .map(tuple -> { // draw every tuple
+            StreamSupport.stream(iterable.spliterator(),false) // make iterator a stream (in Java iterator does not support map function
+                .forEach(tuple -> { // draw every tuple
                     try {
-                        drawSTObject(tuple._1, imageGraphic, envelope);
-                        return new ImageSerializableWrapper(imagePartition);
-                    } catch(Exception e) { return null; } // in case of an error just ignore and return null
-                })
-                .filter(Objects::nonNull) // remove all NULLs
-                .iterator(); // convert back to iterator
+                        drawSTObject(tuple._1, imageGraphic, envelope, pointSize);
+                    } catch(Exception ignored) { } // in case of an error just ignore
+                });
+            return Collections.singletonList(new ImageSerializableWrapper(imagePartition)).iterator();
+
         })
         .reduce((v1,v2) -> { // merge the RDD of images into a single image
             BufferedImage combinedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
@@ -86,12 +94,12 @@ public class Visualization implements Serializable {
         return true;
     }
 
-    private void drawSTObject(STObject obj, Graphics2D g, Envelope env) throws Exception {
+    private void drawSTObject(STObject obj, Graphics2D g, Envelope env, int pointSize) throws Exception {
         Geometry geo = obj.getGeo();
 
         if(geo instanceof Point) {
             Tuple2<Integer, Integer> p = getImageCoordinates(geo.getCoordinate(), env);
-            if(p != null) drawPoint(g, p);
+            if(p != null) drawPoint(g, p, pointSize);
         } else if(geo instanceof Polygon) {
             Coordinate[] coordinates = geo.getCoordinates();
             java.awt.Polygon poly = new java.awt.Polygon();
@@ -107,8 +115,7 @@ public class Visualization implements Serializable {
         }
     }
 
-    private void drawPoint(Graphics2D g, Tuple2<Integer, Integer> p) {
-        int pointSize = 1;
+    private void drawPoint(Graphics2D g, Tuple2<Integer, Integer> p, int pointSize) {
         g.fillRect(p._1, p._2, pointSize, pointSize);
     }
 
@@ -125,7 +132,7 @@ public class Visualization implements Serializable {
         int resultX = (int) ((x - envelope.getMinX()) * scaleX);
         int resultY = (int) ((y - envelope.getMinY()) * scaleY);
 
-        return new Tuple2<Integer, Integer>(resultX, resultY);
+        return new Tuple2<>(resultX, resultY);
     }
 
     class ImageSerializableWrapper implements Serializable {

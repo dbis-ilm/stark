@@ -295,77 +295,76 @@ class ResultIterator<T> implements Iterator<T> {
         this.searchBounds = env;
         this.iOp = index.getIntersectsOp();
         this.stack.push(new Pair(index.root, 0));
-
-        findNextObject();
     }
 
     @Override
     public boolean hasNext() {
+
+        findNextObject();
+
         //noinspection unchecked
         return !Objects.isNull(next);
     }
 
     @Override
     public T next() {
-        System.out.println("next called");
         if(Objects.isNull(next))
             throw new IllegalStateException("empty iterator!");
 
-        T result = next;
-
-        System.out.println("getting new next");
-        findNextObject();
-
-
-
-        System.out.println("return "+result + "  - new is "+next);
-        return result;
-
+        return next;
     }
 
     private void findNextObject() {
 
-        while(!stack.isEmpty() && next == null) {
-            System.out.println("iterating...");
-            Pair pair = stack.peek();
-            System.out.println("finding next - useing " + pair);
+        T found = null;
+        while(found == null && !stack.isEmpty()) {
+//            System.out.println("iterating...");
+            Pair pair = stack.pop();
+//            System.out.println("finding next - useing " + pair);
             int i;
-            System.out.println("start idx: " + pair.i);
+//            System.out.println("start idx: " + pair.i);
             for (i = pair.i; i < pair.b.getChildBoundables().size(); ++i) {
-                System.out.println("  current idx: " + i);
+//                System.out.println("  current idx: " + i);
                 Boundable child = (Boundable) pair.b.getChildBoundables().get(i);
 
 
                 if (!iOp.intersects(child.getBounds(), searchBounds)) {
-                    System.out.println("    does not intersect");
+//                    System.out.println("    does not intersect");
                     continue;
                 }
 
                 if (child instanceof AbstractNode) {
-                    System.out.println("    is abstract node");
+//                    System.out.println("    is abstract node");
                     Pair p = new Pair((AbstractNode) child, 0);
                     if (!stack.contains(p)) {
-                        System.out.println("      pushing " + p);
+//                        System.out.println("      pushing " + p);
                         stack.push(p);
-                    } else
-                        System.out.println("      already present " + p);
+                    } else {
+//                        System.out.println("      already present " + p);
+                    }
 
                 } else if (child instanceof ItemBoundable) {
-                    System.out.println("    is item");
+//                    System.out.println("    is item");
                     //noinspection unchecked
-                    next = (T) ((ItemBoundable) child).getItem();
+                    found = (T) ((ItemBoundable) child).getItem();
                     break;
                 }
             }
 
-            if (i == pair.b.getChildBoundables().size()) {
-                System.out.println("  reached the end");
-                stack.pop();
-            } else {
-                System.out.println("  update curr idx to " + i);
-                pair.i = i;
+//            if (i == pair.b.getChildBoundables().size()) {
+////                System.out.println("  reached the end");
+//                stack.pop();
+//            } else {
+//                System.out.println("  update curr idx to " + i);
+
+            if(i < pair.b.getChildBoundables().size()) {
+                pair.i = i+1;
+                stack.push(pair);
+                next = found;
             }
+
+//            }
         }
-        System.out.println("exit findnextobject");
+//        System.out.println("exit findnextobject");
     }
 }

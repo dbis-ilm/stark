@@ -36,6 +36,7 @@ package com.vividsolutions.jts.index.strtree;
 import java.util.*;
 
 import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.index.ItemVisitor;
 import com.vividsolutions.jts.util.PriorityQueue;
 
 /**
@@ -97,6 +98,11 @@ public class STRtreePlus<T> extends STRtree
     super(nodeCapacity);
   }
 
+
+
+  public ResultIterator<T> iteratorQuery(Envelope env, ItemVisitor visitor) {
+      return null;
+  }
   
   /**
    * Finds the item in this tree which is nearest to the given {@link Object}, 
@@ -239,4 +245,35 @@ public class STRtreePlus<T> extends STRtree
     return kNearestNeighbors;
   }
 
+}
+
+class ResultIterator<T> implements Iterator<T> {
+
+    private final STRtreePlus<T> index;
+    private final Object searchBounds;
+
+//    private AbstractNode currentNode;
+    private int currentIdx = -1;
+
+    private final Queue<AbstractNode> todos;
+
+    public ResultIterator(STRtreePlus<T> index, Object env) {
+        this.index = index;
+        this.searchBounds = env;
+
+        this.todos = new LinkedList<>();
+        this.todos.add(index.root);
+
+    }
+
+    @Override
+    public boolean hasNext() {
+        return todos.size() > 0 && todos.peek().getChildBoundables().stream().anyMatch(b -> index.getIntersectsOp().intersects(b,searchBounds));
+    }
+
+    @Override
+    public T next() {
+
+        return null;
+    }
 }

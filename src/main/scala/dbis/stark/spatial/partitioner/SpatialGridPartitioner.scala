@@ -1,5 +1,7 @@
 package dbis.stark.spatial.partitioner
 
+import java.nio.file.Path
+
 import dbis.stark.STObject
 import dbis.stark.spatial.{Cell, NRectRange, Utils}
 import org.apache.spark.rdd.RDD
@@ -57,6 +59,11 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
   }
 
+  override def printPartitions(fName: Path): Unit = {
+    val list2 = partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList
+    super.writeToFile(list2, fName)
+
+  }
 
   override def partitionBounds(idx: Int): Cell = partitions(idx) //getCellBounds(idx)
 

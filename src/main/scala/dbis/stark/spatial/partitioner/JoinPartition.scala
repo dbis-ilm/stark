@@ -19,7 +19,9 @@ protected[stark] class JoinPartition(
                                       @transient private val left: RDD[_],
                                       @transient private val right: RDD[_],
                                       leftIndex: Int,
-                                      rightIndex: Int
+                                      rightIndex: Int,
+                                      leftContainsRight: Boolean,
+                                      rightContainsLeft: Boolean
   ) extends Partition {
 
   var leftPartition: Partition = left.partitions(leftIndex)

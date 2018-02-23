@@ -4,7 +4,7 @@ import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
+import org.apache.spark._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
@@ -64,6 +64,10 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     val checkPartitions = checkParties && leftParti.isDefined && rightParti.isDefined
     var idx = 0
 
+
+//    leftParti.foreach(_.printPartitions("/tmp/left_partitions.wkt"))
+//    rightParti.foreach(_.printPartitions("/tmp/right_partitions.wkt"))
+
     // Which of the following two loop constructs are fastest? Is there a significant difference?
 
 //    var s1Index = 0
@@ -88,28 +92,17 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       s2 <- right.partitions
       if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
 
-//        val lExtent = leftParti.get.partitionExtent(s1.index)
-//        val rExtent = rightParti.get.partitionExtent(s2.index)
-//
-//        println(lExtent)
-//        println(lExtent.wkt)
-//
-//        println
-//
-//        println(rExtent)
-//        println(rExtent.wkt)
-//
-//        val i = lExtent.intersects(rExtent)
-//        println(i)
-//
-//        if(i) {
-          val p = new JoinPartition(idx, left, right, s1.index, s2.index)
-//          println(s"marking $p for processing")
+        val leftContainsRight = leftParti.get.partitionExtent(s1.index).contains(rightParti.get.partitionExtent(s2.index))
+        val rightContainsLeft = if(!leftContainsRight) rightParti.get.partitionExtent(s1.index).contains(leftParti.get.partitionExtent(s2.index)) else false
+
+          val p = new JoinPartition(idx, left, right, s1.index, s2.index, leftContainsRight, rightContainsLeft)
           parts += p
           idx += 1
-//        }
 
     }
+
+//    println(s"num left: ${left.partitions.length}")
+//    println(s"num right: ${right.partitions.length}")
     parts.toArray
   }
 
@@ -123,23 +116,26 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
   override def compute(s: Partition, context: TaskContext): Iterator[(V, V2)] = {
 
+
     // in getPartitions we created JoinPartition that link to two partitions that have to be joined
     val split = s.asInstanceOf[JoinPartition]
+//    println(s"left = ${split.leftPartition.index} -- right: ${split.rightPartition.index}")
 
     // if treeOrder is <= 0 we do not use indexing
     if(treeOrder <= 0) {
       // collect the right partition into an array
-      val rightList = right.iterator(split.rightPartition, context).toArray
+      val rightList = right.iterator(split.rightPartition, context).toList
 
       // loop over the left partition and check join condition on every element in the right partition's array
-      left.iterator(split.leftPartition, context).flatMap{ case (lg, lv) =>
-        rightList.filter{ case (rg, _) =>
-          val res = predicateFunc(lg,rg)
-//          println(s"check ($predicateFunc) $lg -- $rg --> $res")
-            res
-          }.map{ case (_,rv) => (lv,rv) }
-
+      val resultIter = left.iterator(split.leftPartition, context).flatMap { case (lg, lv) =>
+        rightList.iterator.filter { case (rg, _) =>
+          val res = predicateFunc(lg, rg)
+//        println(s"check ($predicateFunc) $lg -- $rg --> $res")
+          res
+        }.map { case (_, rv) => (lv, rv) }
       }
+      new InterruptibleIterator(context, resultIter)
+
     } else { // we should apply indexing
 
       // the index
@@ -153,13 +149,13 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 
       // loop over every element in the left partition and query tree.
       // For the results of a query we have to perform candidates check
-      right.iterator(split.rightPartition, context).flatMap { case (rg, rv) =>
+      val resultIter = right.iterator(split.rightPartition, context).flatMap { case (rg, rv) =>
         tree.query(rg) // index query
           .filter{ case (lg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
           .map{ case (_,lv) => (lv,rv)} // result is the combined tuple of the payload items
       }
 
-
+      new InterruptibleIterator(context, resultIter)
     }
   }
 

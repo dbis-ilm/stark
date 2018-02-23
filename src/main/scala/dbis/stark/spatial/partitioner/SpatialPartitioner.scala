@@ -1,5 +1,8 @@
 package dbis.stark.spatial.partitioner
 
+import java.nio.file.{Path, Paths}
+
+import scala.collection.JavaConverters._
 import dbis.stark.STObject
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.Partitioner
@@ -150,5 +153,14 @@ abstract class SpatialPartitioner(
 
   def partitionBounds(idx: Int): Cell
   def partitionExtent(idx: Int): NRectRange
+
+  def printPartitions(fName: java.nio.file.Path): Unit
+
+  def printPartitions(fName: String): Unit = {
+    printPartitions(Paths.get(fName))
+  }
+
+  protected[stark] def writeToFile(strings: List[String], fName: Path) =
+    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
 }
 

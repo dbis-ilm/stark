@@ -1,6 +1,6 @@
 package dbis.stark
 
-import com.vividsolutions.jts.index.intervalrtree.SortedPackedIntervalRTree
+import org.locationtech.jts.index.intervalrtree.SortedPackedIntervalRTree
 import dbis.stark.spatial.indexed.{Data, IntervalTree1}
 import org.apache.spark.sql.{Dataset, SparkSession, SQLContext}
 import utils.InvertavlTreeVisitor

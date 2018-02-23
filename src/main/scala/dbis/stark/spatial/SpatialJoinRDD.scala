@@ -92,10 +92,10 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       s2 <- right.partitions
       if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
 
-        val leftContainsRight = leftParti.get.partitionExtent(s1.index).contains(rightParti.get.partitionExtent(s2.index))
-        val rightContainsLeft = if(!leftContainsRight) rightParti.get.partitionExtent(s1.index).contains(leftParti.get.partitionExtent(s2.index)) else false
+//        val leftContainsRight = leftParti.get.partitionExtent(s1.index).contains(rightParti.get.partitionExtent(s2.index))
+//        val rightContainsLeft = if(!leftContainsRight) rightParti.get.partitionExtent(s1.index).contains(leftParti.get.partitionExtent(s2.index)) else false
 
-          val p = new JoinPartition(idx, left, right, s1.index, s2.index, leftContainsRight, rightContainsLeft)
+          val p = new JoinPartition(idx, left, right, s1.index, s2.index)//, leftContainsRight, rightContainsLeft)
           parts += p
           idx += 1
 
@@ -150,7 +150,8 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       // loop over every element in the left partition and query tree.
       // For the results of a query we have to perform candidates check
       val resultIter = right.iterator(split.rightPartition, context).flatMap { case (rg, rv) =>
-        tree.query(rg) // index query
+//        tree.query(rg) // index query
+        tree.query(rg)
           .filter{ case (lg, _) => predicateFunc(lg, rg) } // candidate check and apply join condidion
           .map{ case (_,lv) => (lv,rv)} // result is the combined tuple of the payload items
       }

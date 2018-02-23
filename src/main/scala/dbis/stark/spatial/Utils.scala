@@ -1,12 +1,12 @@
 package dbis.stark.spatial
 
-import com.vividsolutions.jts.io.WKTReader
-import com.vividsolutions.jts.geom.{Envelope, GeometryFactory, Point}
-import dbis.stark.STObject.GeoType
+import org.locationtech.jts.io.WKTReader
+import org.locationtech.jts.geom.{GeometryFactory, Point}
+import dbis.stark.STObject.{GeoType, MBR}
 
 object Utils {
   
-  def toEnvelope(r: NRectRange): Envelope = {
+  def toEnvelope(r: NRectRange): MBR = {
       val s = s"""POLYGON ((${r.ll(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ll(1)}))"""
       new WKTReader().read(s).getEnvelopeInternal 
     }

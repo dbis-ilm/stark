@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed
 
-import com.vividsolutions.jts.index.intervalrtree.SortedPackedIntervalRTree
+import org.locationtech.jts.index.intervalrtree.SortedPackedIntervalRTree
 import dbis.stark.STObject
 import utils.InvertavlTreeVisitor
 

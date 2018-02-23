@@ -2,12 +2,12 @@ package dbis.stark.spatial.indexed
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import com.vividsolutions.jts.index.strtree.STRtree
-import com.vividsolutions.jts.io.WKTReader
-import com.vividsolutions.jts.geom.Geometry
 
 import scala.collection.JavaConversions.asScalaBuffer
 import dbis.stark.STObject
+import org.locationtech.jts.geom.Geometry
+import org.locationtech.jts.index.strtree.STRtree
+import org.locationtech.jts.io.WKTReader
 
 class RTreeTest extends FlatSpec with Matchers {
   

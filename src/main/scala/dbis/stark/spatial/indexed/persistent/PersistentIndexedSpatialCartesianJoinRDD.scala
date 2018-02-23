@@ -1,8 +1,8 @@
 package dbis.stark.spatial.indexed.persistent
 
 
-import com.vividsolutions.jts.geom.Envelope
 import dbis.stark.STObject
+import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import dbis.stark.spatial.{SpatialRDD, Utils}
@@ -62,7 +62,7 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
   		 * 
   		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
-      val indexBounds = tree.getRoot.getBounds.asInstanceOf[Envelope]
+      val indexBounds = tree.getRoot.getBounds.asInstanceOf[MBR]
       
       val partitionCheck = rightParti.forall { p =>
         indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.rightPartition.index)))

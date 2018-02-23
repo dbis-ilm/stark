@@ -1,8 +1,11 @@
 package dbis.stark
 
 import com.vividsolutions.jts.geom.{Geometry, Point}
-import STObject._
 import com.vividsolutions.jts.io.WKTReader
+import STObject._
+
+//import org.locationtech.jts.geom.Geometry
+//import org.locationtech.jts.io.WKTReader
 
 /**
  * A STObject represents some spatial geometry. It can also have
@@ -71,7 +74,26 @@ case class STObject(
   def before(t: TemporalExpression) = time.map(_ < t)
   
   def after(t: TemporalExpression) = time.map(_ > t)
-  
+
+  def getMaxX = this.g.getCoordinates.iterator.map(c => c.x).max
+  def getMinX = this.g.getCoordinates.iterator.map(c => c.x).min
+  def getMaxY = this.g.getCoordinates.iterator.map(c => c.y).max
+  def getMinY = this.g.getCoordinates.iterator.map(c => c.y).min
+  def getMinZ = this.g.getCoordinates.iterator.map(c => c.z).min
+  def getMaxZ = this.g.getCoordinates.iterator.map(c => c.z).max
+
+  def getMinMaxXY = this.g.getCoordinates.iterator.map(c => (c.x, c.y, c.x,c.y)).reduce( (l,r) => {
+    val minX = math.min(l._1, r._1)
+    val minY = math.min(l._2, r._2)
+
+    val maxX = math.max(l._3, r._3)
+    val maxY = math.max(l._4, r._4)
+
+    (minX, minY, maxX, maxY)
+  })
+
+  def getStart = time.map(_.start)
+  def getEnd = time.flatMap(_.end)
   
   /**
    * Check if this NRechtRange is equal to some other object.

@@ -1,12 +1,10 @@
 package dbis.stark.spatial.partitioner
 
-import java.nio.file.Paths
-
 import dbis.stark.STObject
 import dbis.stark.spatial._
 import org.apache.spark.rdd.RDD
 
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
 
@@ -133,16 +131,15 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   override def partitionBounds(idx: Int): Cell = bsp.partitions(idx)
   override def partitionExtent(idx: Int): NRectRange = bsp.partitions(idx).extent
   
-  def printPartitions(fName: java.nio.file.Path) {
-    val list2 = bsp.partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList.asJava
-    java.nio.file.Files.write(fName, list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+  override def printPartitions(fName: java.nio.file.Path) {
+    val list2 = bsp.partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList
+    super.writeToFile(list2, fName)
   }
 
   def printHistogram(fName: java.nio.file.Path) {
 
-    val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList.asJava
-    java.nio.file.Files.write(fName, list2, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-
+    val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList
+    super.writeToFile(list2, fName)
   } 
   
   override def numPartitions: Int = bsp.partitions.length

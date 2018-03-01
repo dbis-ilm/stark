@@ -46,7 +46,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
     super.query(box.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[G,D]].data)
 
   def query(box: STObject): Iterator[D] =
-    super.iteratorQuery(box.getEnvelopeInternal).map(_.data)
+    super.iteratorQuery(box.getEnvelopeInternal).asScala.map(_.data)
 
   /**
    * A read only query variant of the tree.

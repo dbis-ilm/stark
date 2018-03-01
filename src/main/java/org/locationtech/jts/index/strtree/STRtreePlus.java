@@ -33,11 +33,10 @@
  */
 package org.locationtech.jts.index.strtree;
 
-import java.util.*;
-
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.index.ItemVisitor;
 import org.locationtech.jts.util.PriorityQueue;
+
+import java.util.*;
 
 /**
  *  A query-only R-tree created using the Sort-Tile-Recursive (STR) algorithm.
@@ -276,7 +275,7 @@ class ResultIterator<T> implements Iterator<T> {
         @Override
         public String toString() {
             return "Pair{" +
-                    "b=" + b +
+                    "b=" + b.getBounds() +
                     ", i=" + i +
                     '}';
         }
@@ -317,54 +316,51 @@ class ResultIterator<T> implements Iterator<T> {
     private void findNextObject() {
 
         T found = null;
-        while(found == null && !stack.isEmpty()) {
-//            System.out.println("iterating...");
+        do {
+            // get the next element to process ...
             Pair pair = stack.pop();
-//            System.out.println("finding next - useing " + pair);
+
+            // ... and iterate over all its children
             int i;
-//            System.out.println("start idx: " + pair.i);
             for (i = pair.i; i < pair.b.getChildBoundables().size(); ++i) {
-//                System.out.println("  current idx: " + i);
                 Boundable child = (Boundable) pair.b.getChildBoundables().get(i);
 
-
+                // the current child does not intersect with the search region,
+                // we do not need to consider it further
                 if (!iOp.intersects(child.getBounds(), searchBounds)) {
-//                    System.out.println("    does not intersect");
                     continue;
                 }
 
+                // if the current child is an inner node add it to our to-do stack
                 if (child instanceof AbstractNode) {
-//                    System.out.println("    is abstract node");
                     Pair p = new Pair((AbstractNode) child, 0);
                     if (!stack.contains(p)) {
-//                        System.out.println("      pushing " + p);
                         stack.push(p);
-                    } else {
-//                        System.out.println("      already present " + p);
                     }
-
                 } else if (child instanceof ItemBoundable) {
-//                    System.out.println("    is item");
+                    /* it is a leaf node, we know from the previous check that it intersects
+                     * with the search region. we can stop the search for now and return this
+                     * child as the next element for the iterator
+                     */
+
                     //noinspection unchecked
                     found = (T) ((ItemBoundable) child).getItem();
                     break;
                 }
             }
 
-//            if (i == pair.b.getChildBoundables().size()) {
-////                System.out.println("  reached the end");
-//                stack.pop();
-//            } else {
-//                System.out.println("  update curr idx to " + i);
-
+            // the for loop finished completely if i has the same
+            // value as the number of children of the current node
+            // if i is smaller, than we left the loop using a break
             if(i < pair.b.getChildBoundables().size()) {
                 pair.i = i+1;
                 stack.push(pair);
-                next = found;
             }
 
-//            }
-        }
-//        System.out.println("exit findnextobject");
+            // continue the search if nothing was found yet but there are other nodes to process
+        } while(found == null && !stack.isEmpty()) ;
+
+        // return the found value - or null if nothing was left to find
+        next = found;
     }
 }

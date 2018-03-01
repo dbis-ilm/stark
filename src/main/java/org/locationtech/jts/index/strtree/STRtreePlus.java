@@ -31,13 +31,12 @@
  *     (250)385-6040
  *     www.vividsolutions.com
  */
-package com.vividsolutions.jts.index.strtree;
+package org.locationtech.jts.index.strtree;
+
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.util.PriorityQueue;
 
 import java.util.*;
-
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.index.ItemVisitor;
-import com.vividsolutions.jts.util.PriorityQueue;
 
 /**
  *  A query-only R-tree created using the Sort-Tile-Recursive (STR) algorithm.
@@ -68,7 +67,7 @@ import com.vividsolutions.jts.util.PriorityQueue;
  * 
  * @version 1.7
  */
-public class STRtreePlus<T> extends STRtree 
+public class STRtreePlus<T> extends STRtree
 {
 
   /**
@@ -100,10 +99,11 @@ public class STRtreePlus<T> extends STRtree
 
 
 
-  public ResultIterator<T> iteratorQuery(Envelope env, ItemVisitor visitor) {
-      return null;
+  public ResultIterator<T> iteratorQuery(Envelope env) {
+      super.build();
+      return new ResultIterator<T>(this, env);
   }
-  
+
   /**
    * Finds the item in this tree which is nearest to the given {@link Object}, 
    * using {@link ItemDistance} as the distance metric.
@@ -120,7 +120,7 @@ public class STRtreePlus<T> extends STRtree
    * @param itemDist a distance metric applicable to the items in this tree and the query item
    * @return the nearest item in this tree
    */
-  public List<T> kNearestNeighbour(Envelope env, Object item, ItemDistance itemDist,int k)
+  public List<T> kNearestNeighbour(Envelope env, Object item, ItemDistance itemDist, int k)
   {
     Boundable bnd = new ItemBoundable(env, item);
     BoundablePair bp = new BoundablePair(this.getRoot(), bnd, itemDist);
@@ -249,31 +249,118 @@ public class STRtreePlus<T> extends STRtree
 
 class ResultIterator<T> implements Iterator<T> {
 
-    private final STRtreePlus<T> index;
-    private final Object searchBounds;
+    private static final class Pair {
+        protected final AbstractNode b;
+        protected int i;
 
-//    private AbstractNode currentNode;
-    private int currentIdx = -1;
+        public Pair(AbstractNode b, int i) {
+            this.b = b;
+            this.i = i;
+        }
 
-    private final Queue<AbstractNode> todos;
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Pair pair = (Pair) o;
+            return i == pair.i &&
+                    Objects.equals(b, pair.b);
+        }
 
-    public ResultIterator(STRtreePlus<T> index, Object env) {
-        this.index = index;
+        @Override
+        public int hashCode() {
+            return Objects.hash(b, i);
+        }
+
+        @Override
+        public String toString() {
+            return "Pair{" +
+                    "b=" + b.getBounds() +
+                    ", i=" + i +
+                    '}';
+        }
+    }
+
+    private final Envelope searchBounds;
+    private final AbstractSTRtree.IntersectsOp iOp;
+
+    private final Stack<Pair> stack = new Stack<>();
+
+
+    private T next = null;
+
+    ResultIterator(STRtreePlus<?> index, Envelope env) {
+
         this.searchBounds = env;
-
-        this.todos = new LinkedList<>();
-        this.todos.add(index.root);
-
+        this.iOp = index.getIntersectsOp();
+        this.stack.push(new Pair(index.root, 0));
     }
 
     @Override
     public boolean hasNext() {
-        return todos.size() > 0 && todos.peek().getChildBoundables().stream().anyMatch(b -> index.getIntersectsOp().intersects(b,searchBounds));
+
+        findNextObject();
+
+        //noinspection unchecked
+        return !Objects.isNull(next);
     }
 
     @Override
     public T next() {
+        if(Objects.isNull(next))
+            throw new IllegalStateException("empty iterator!");
 
-        return null;
+        return next;
+    }
+
+    private void findNextObject() {
+
+        T found = null;
+        do {
+            // get the next element to process ...
+            Pair pair = stack.pop();
+
+            // ... and iterate over all its children
+            int i;
+            for (i = pair.i; i < pair.b.getChildBoundables().size(); ++i) {
+                Boundable child = (Boundable) pair.b.getChildBoundables().get(i);
+
+                // the current child does not intersect with the search region,
+                // we do not need to consider it further
+                if (!iOp.intersects(child.getBounds(), searchBounds)) {
+                    continue;
+                }
+
+                // if the current child is an inner node add it to our to-do stack
+                if (child instanceof AbstractNode) {
+                    Pair p = new Pair((AbstractNode) child, 0);
+                    if (!stack.contains(p)) {
+                        stack.push(p);
+                    }
+                } else if (child instanceof ItemBoundable) {
+                    /* it is a leaf node, we know from the previous check that it intersects
+                     * with the search region. we can stop the search for now and return this
+                     * child as the next element for the iterator
+                     */
+
+                    //noinspection unchecked
+                    found = (T) ((ItemBoundable) child).getItem();
+                    break;
+                }
+            }
+
+            // the for loop finished completely if i has the same
+            // value as the number of children of the current node
+            // if i is smaller, than we left the loop using a break
+            if(i < pair.b.getChildBoundables().size()) {
+                pair.i = i+1;
+                stack.push(pair);
+            }
+
+            // continue the search if nothing was found yet but there are other nodes to process
+        } while(found == null && !stack.isEmpty()) ;
+
+        // return the found value - or null if nothing was left to find
+        next = found;
     }
 }

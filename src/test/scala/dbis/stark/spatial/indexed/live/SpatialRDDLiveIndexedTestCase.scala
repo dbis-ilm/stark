@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.live
 
-import com.vividsolutions.jts.io.WKTReader
+import org.locationtech.jts.io.WKTReader
 import dbis.stark.STObject._
 import dbis.stark.spatial.PredicatesFunctions
 import dbis.stark.spatial.SpatialRDD._

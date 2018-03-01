@@ -95,14 +95,12 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 //        val leftContainsRight = leftParti.get.partitionExtent(s1.index).contains(rightParti.get.partitionExtent(s2.index))
 //        val rightContainsLeft = if(!leftContainsRight) rightParti.get.partitionExtent(s1.index).contains(leftParti.get.partitionExtent(s2.index)) else false
 
-          val p = new JoinPartition(idx, left, right, s1.index, s2.index)
+          val p = new JoinPartition(idx, left, right, s1.index, s2.index)//, leftContainsRight, rightContainsLeft)
           parts += p
           idx += 1
+//        }
 
     }
-
-//    println(s"num left: ${left.partitions.length}")
-//    println(s"num right: ${right.partitions.length}")
     parts.toArray
   }
 

@@ -1,11 +1,10 @@
 package dbis.stark
 
-import com.vividsolutions.jts.geom.{Geometry, Point}
-import com.vividsolutions.jts.io.WKTReader
+//import com.vividsolutions.jts.geom.{Envelope, Geometry, Point}
+//import com.vividsolutions.jts.io.WKTReader
 import STObject._
-
-//import org.locationtech.jts.geom.Geometry
-//import org.locationtech.jts.io.WKTReader
+import org.locationtech.jts.geom.{Envelope, Geometry}
+import org.locationtech.jts.io.WKTReader
 
 /**
  * A STObject represents some spatial geometry. It can also have
@@ -135,6 +134,7 @@ object STObject {
   def apply(x: Double, y: Double, z: Double, ts: Long): STObject = this(new WKTReader().read(s"POINT($x $y $z)"), ts)
 
   type GeoType = Geometry
+  type MBR = Envelope
   
   implicit def getInternal(s: STObject): GeoType = s.g
   

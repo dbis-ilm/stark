@@ -5,7 +5,8 @@ scalaVersion := "2.11.8"
 lazy val stark = (project in file("."))
 
 libraryDependencies ++= Seq(
-   "com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),
+   //"com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),
+   "org.locationtech.jts" % "jts-core" % "1.15.0",
    "org.apache.spark" %% "spark-core" % "2.1.0" % "provided" withSources() withJavadoc(),
    "org.apache.spark"  %% "spark-mllib" % "2.1.0" % "provided",
    "org.apache.spark" %% "spark-sql" % "2.1.0" % "provided",

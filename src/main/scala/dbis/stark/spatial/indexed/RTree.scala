@@ -1,9 +1,12 @@
 package dbis.stark.spatial.indexed
 
-import com.vividsolutions.jts.geom.{Coordinate, Envelope}
-import com.vividsolutions.jts.index.ItemVisitor
-import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
+//import com.vividsolutions.jts.geom.{Coordinate, Envelope}
+//import com.vividsolutions.jts.index.ItemVisitor
+//import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
+import org.locationtech.jts.index.strtree.{ItemBoundable, ItemDistance, STRtree, STRtreePlus}
 import dbis.stark.{Distance, STObject}
+import org.locationtech.jts.geom.{Coordinate, Envelope}
+import org.locationtech.jts.index.ItemVisitor
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -36,26 +39,14 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * Query the tree and find all elements in the tree that intersect
    * with the query geometry
    * 
-   * @param geom The geometry to compute intersection for
+   * @param box The geometry to compute intersection for
    * @return Returns all elements of the tree that intersect with the query geometry
    */
-    def query(geom: STObject): Iterator[D] =
-      super.query(geom.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[G,D]].data)
+  def oldQuery(box: STObject): Iterator[D] =
+    super.query(box.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[G,D]].data)
 
-  def iQuery(box: STObject): Iterator[D] = {
-    class MyVisitor() extends ItemVisitor {
-
-      override def visitItem(item: Any) {
-        val i = item.asInstanceOf[Data[G,D]]
-      }
-    }
-
-    val env = box.getEnvelopeInternal
-
-    val visitor = new MyVisitor()
-    super.query(env, visitor)
-    ???
-  }
+  def query(box: STObject): Iterator[D] =
+    super.iteratorQuery(box.getEnvelopeInternal).asScala.map(_.data)
 
   /**
    * A read only query variant of the tree.
@@ -98,8 +89,6 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
 //    super.query(env, new MyVisitor(timestamp))
 //    timestamp += 1 // increment timestamp for next query
 //  }
-
-
   
   /**
    * Helper method to convert and unnest a list of Data elements into 

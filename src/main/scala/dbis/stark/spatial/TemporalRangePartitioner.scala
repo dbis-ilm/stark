@@ -1,9 +1,6 @@
 package dbis.stark.spatial
 
-import java.io.ObjectOutputStream
-
-import dbis.stark.{Instant, Interval, STObject, TemporalExpression}
-import org.apache.spark.Partition
+import dbis.stark.{Interval, STObject, TemporalExpression}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -14,18 +11,20 @@ import scala.reflect.ClassTag
 
 
 object TemporalRangePartitioner {
+
   def getCellId(start: Long, cells: Array[Long], partitions: Int): Int = {
     //println(cells.mkString(" "))
-    for (i <- 1 to partitions - 1) {
+    for (i <- 1 until partitions) {
       //println(cells(i)+">"+start)
       if (cells(i) > start) {
         return i - 1
       }
     }
-    return partitions - 1
+    partitions - 1
   }
 
   def getCellId(start: Long, minT: Long, maxT: Long, partitions: Int): Int = {
+
     val length = (maxT * 1.3) - minT
     val interval = length / partitions
 
@@ -33,7 +32,7 @@ object TemporalRangePartitioner {
 
     val res = (position_in_range / interval).toInt
 
-    val s = " l: " + length + "  int: " + interval + " pos: " + position_in_range
+    lazy val s = " l: " + length + "  int: " + interval + " pos: " + position_in_range
 
     require(res >= 0 && res < partitions, s"Cell ID out of bounds (0 .. $partitions): $res " + " object:" + start + s)
     res
@@ -55,14 +54,17 @@ class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](
   //new Array[Long](partitions)
   private val cells: Array[Long] = {
     val arr = Array.fill[Long](partitions)(0)
+
     if (autoRange) {
-      val sample = rdd.sample(false, sampelsize).map(x => x._1.getTemp.get.start)
+      val sample = rdd.sample(withReplacement = false, sampelsize).map(x => x._1.getTemp.get.start)
       val sorted = sample.sortBy(k => k.value).collect()
-      println("autorange from Temporalpartitioner is on | sampelfaktor: " + sampelsize + " | sampelsize: " + sorted.size)
-      val maxitems = Math.round(sorted.size / (partitions))
+
+      println("autorange from Temporalpartitioner is on | sampelfaktor: " + sampelsize + " | sampelsize: " + sorted.length)
+
+      val maxitems = Math.round(sorted.length / partitions)
 
       arr(0) = 0
-      for (i <- 1 to partitions - 1) {
+      for (i <- 1 until partitions) {
         // println(i*maxitems +" " +(sorted(i*maxitems).value))
         arr(i) = sorted(i * maxitems).value
       }
@@ -71,7 +73,7 @@ class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](
       val range = maxT - minT
       val dist = Math.round(range / partitions)
       arr(0) = 0
-      for (i <- 1 to partitions - 1) {
+      for (i <- 1 until partitions) {
         arr(i) = minT + i * dist
       }
     }
@@ -80,7 +82,7 @@ class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](
 
   }
 
-  var bounds: Array[Long] = {
+  val bounds: Array[Long] = {
     val arr = new Array[Long](partitions)
     rdd.map { case (g, _) =>
       val end = g.getTemp.get.end.get.value
@@ -147,7 +149,7 @@ class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](
 
     val start = g.getTemp.get.start.value
 
-    var id = 0;
+    var id = 0
     // if(autoRange){
 
     id = TemporalRangePartitioner.getCellId(start, cells, partitions)

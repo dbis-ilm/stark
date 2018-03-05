@@ -13,10 +13,10 @@ object TemporalPartitioner {
 
   protected[stark] def getMinMax[G <: STObject, V](rdd: RDD[(G, V)]):(Long,Long) = {
     val (minT, maxT) = rdd.map { case (g, _) =>
-     // val time = g.getTemp.get
-     // (time.start.value, time.end.get.value)
-      val start = g.getTemp.get.start.value
-      (start,start)
+      val time = g.getTemp.get
+      (time.start.value, time.end.getOrElse(time.start).value)
+//      val start = g.getTemp.get.start.value
+//      (start,start)
 
     }.reduce { (oldMM, newMM) =>
       val newMinX = oldMM._1 min newMM._1

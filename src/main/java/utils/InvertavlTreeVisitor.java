@@ -1,6 +1,6 @@
 package utils;
 
-import com.vividsolutions.jts.index.ItemVisitor;
+import org.locationtech.jts.index.ItemVisitor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +12,7 @@ import java.util.List;
 public class InvertavlTreeVisitor implements ItemVisitor {
 
 
-    private List visitedItems = new ArrayList();
+    private List<Object> visitedItems = new ArrayList<>();
 
 
     @Override

@@ -2,7 +2,7 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Paths
 
-import com.vividsolutions.jts.io.WKTReader
+import org.locationtech.jts.io.WKTReader
 import dbis.stark.{STObject, TestUtils}
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial._

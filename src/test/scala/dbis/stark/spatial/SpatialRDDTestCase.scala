@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import com.vividsolutions.jts.io.WKTReader
+import org.locationtech.jts.io.WKTReader
 import dbis.stark.STObject._
 import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._

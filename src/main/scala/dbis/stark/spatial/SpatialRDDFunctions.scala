@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import com.vividsolutions.jts.geom.Envelope
+import dbis.stark.STObject.MBR
 
 import scala.reflect.ClassTag
 import dbis.stark.{Distance, STObject}
@@ -39,7 +39,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
     val vis = new Visualization()
     val jsc = new JavaSparkContext(rdd.context)
 
-    val env = new Envelope(range._1, range._2, range._3, range._4)
+    val env = new MBR(range._1, range._2, range._3, range._4)
 
     vis.visualize(jsc, rdd, imageWidth, imageHeight, env, flipImageVert, path, fileExt, pointSize = pointSize)
   }

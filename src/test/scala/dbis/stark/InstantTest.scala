@@ -1,13 +1,10 @@
 package dbis.stark
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-
-import TemporalExpressionMatchers._
-import InstantTest._
-import org.scalacheck.{Gen,Properties}
-import org.scalacheck.Prop.{forAll, BooleanOperators, atLeastOne}
-import org.scalacheck.Arbitrary
+import dbis.stark.InstantTest._
+import dbis.stark.TemporalExpressionMatchers._
+import org.scalacheck.Prop.{BooleanOperators, forAll}
+import org.scalacheck.{Arbitrary, Gen, Properties}
+import org.scalatest.{FlatSpec, Matchers}
   
 class InstantCheck extends Properties("Instant") {
   
@@ -34,7 +31,7 @@ class InstantCheck extends Properties("Instant") {
   }
   
   property("center") = forAll { (r: Instant) => 
-      r.center == Some(r)
+      r.center.contains(r)
   }
   
   property("==") = forAll { (r: Instant) => 
@@ -70,7 +67,7 @@ class InstantCheck extends Properties("Instant") {
   }
   
   property("length") = forAll { (r: Instant) => 
-      r.length == Some(0)
+      r.length.contains(0)
   }
   
   property("min") = forAll { (l: Long, r: Long) =>

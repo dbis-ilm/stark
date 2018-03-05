@@ -2,7 +2,7 @@ package dbis.stark
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import com.vividsolutions.jts.io.WKTReader
+import org.locationtech.jts.io.WKTReader
 
 class STObjectTest extends FlatSpec with Matchers {
     

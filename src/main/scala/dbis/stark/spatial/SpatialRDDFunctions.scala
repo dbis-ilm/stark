@@ -33,14 +33,15 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
                 path: String,
                 fileExt: String = "png",
                 range: (Double,Double,Double,Double) = SpatialPartitioner.getMinMax(rdd),
-                flipImageVert: Boolean = false) = {
+                flipImageVert: Boolean = false,
+                pointSize: Int = 1) = {
 
     val vis = new Visualization()
     val jsc = new JavaSparkContext(rdd.context)
 
     val env = new Envelope(range._1, range._2, range._3, range._4)
 
-    vis.visualize(jsc, rdd, imageWidth, imageHeight, env, flipImageVert, path, fileExt)
+    vis.visualize(jsc, rdd, imageWidth, imageHeight, env, flipImageVert, path, fileExt, pointSize = pointSize)
   }
 
   /**

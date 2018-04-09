@@ -101,7 +101,7 @@ val result = countriesIdx.contains(STObject("POINT( 50.681898, 10.938838 )"))
 
 
 ### Operators
-All operators can be executed on spatial partioned or unpartitioned data. If a spatial partitioning was applied, the operators can omit partitions that cannot, e.g., contain a point based on the spatial bounds of the respective partition.
+All operators can be executed on spatial partitioned or unpartitioned data. If a spatial partitioning was applied, the operators can omit partitions that cannot, e.g., contain a point based on the spatial bounds of the respective partition.
 
 #### Filter
 Supported predicates are:
@@ -133,14 +133,14 @@ val raw: RDD[(String, String, Double, Double, String)] = // see above
 val spatialRDD = raw.keyBy(_._5).map{case (k,v) => (STObject(k), v)} // results in RDD[(STObject, (String, String, Double, Double, String))]
 // meaning: (stobject, (date_time, id, gps_long, gps_lat, wkt))
 
-val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, (g,v) => v._2) // where v._2 is id
+val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, case { (g,v) => v._2 }) // where v._2 is id
 ```
 
 If data is already a 2-tuple, where the second (in this case the `Long`) element is a primary key:
 ```Scala
 val raw = RDD[(String, Long)] = ...
 val spatialRDD = raw.map{case (g,v) => (STObject(g), v)} // results in (STObject, Long)
-val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, (g,v) => v) // where v is id
+val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, {case (g,v) => v }) // where v is id
 ```
 
 #### k Nearest Neighbors

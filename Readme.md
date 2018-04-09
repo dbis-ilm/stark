@@ -117,11 +117,25 @@ leftRDD.join(rightRDD, JoinPredicate.CONTAINS)
 ```
 
 #### Clustering
-STARK includes a clustering operator that implements DBSCAN.
+STARK includes a clustering operator that implements DBSCAN. The operator needs to uniquely identify data objects during execution. Thus, your tuples need a field that identifies the tuple, similar to a primary key.
+When calling the clustering method, besides the ordinary parameters to DBSCAN the `key-extractor` function needs to be passed to extract that primary key field from your tuple.
+
+Suppose you have a dataset with the following schema:
+
+<!-- |-------------|-----| -->
+| date_time: string     | id: string| gps_long: double| gps_lat: double| wkt: string |
+| :------------- | :----------|:-|:-|:--- |
+
+To run clustering, create an RDD, transform it into a 2-tuple format and then call `cluster` function
 ```Scala
-val clusters  = rdd.dbscan(epsilon = 0.5, minPts = 20, (g,v) => v._1 )
+val raw: RDD[(String, String, Double, Double, String)] = // see above
+
+val spatialRDD = raw.keyBy(_._5) // results in RDD[(String, (String, String, Double, Double, String))]
+// meaning: (wkt, (date_time, id, gps_long, gps_lat, wkt))
+
+val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, (g,v) => v._2) // where v._2 is id
 ```
-Each data item in `rdd` must have an ID (like a primary key) to recognize duplicates. The `dbscan` operator needs a function that extracts this ID from the input tuple. In this case we return the first element of v, the `countries` example this would be the `ID` field.
+
 
 #### k Nearest Neighbors
 ```Scala

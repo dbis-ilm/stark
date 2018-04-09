@@ -130,12 +130,18 @@ To run clustering, create an RDD, transform it into a 2-tuple format and then ca
 ```Scala
 val raw: RDD[(String, String, Double, Double, String)] = // see above
 
-val spatialRDD = raw.keyBy(_._5) // results in RDD[(String, (String, String, Double, Double, String))]
-// meaning: (wkt, (date_time, id, gps_long, gps_lat, wkt))
+val spatialRDD = raw.keyBy(_._5).map{case (k,v) => (STObject(k), v)} // results in RDD[(STObject, (String, String, Double, Double, String))]
+// meaning: (stobject, (date_time, id, gps_long, gps_lat, wkt))
 
 val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, (g,v) => v._2) // where v._2 is id
 ```
 
+If data is already a 2-tuple, where the second (in this case the `Long`) element is a primary key:
+```Scala
+val raw = RDD[(String, Long)] = ...
+val spatialRDD = raw.map{case (g,v) => (STObject(g), v)} // results in (STObject, Long)
+val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, (g,v) => v) // where v is id
+```
 
 #### k Nearest Neighbors
 ```Scala

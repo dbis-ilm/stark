@@ -1,9 +1,9 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.{Index, RTree}
+import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
 import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -11,7 +11,7 @@ import scala.reflect.ClassTag
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     rdd: RDD[Index[G, (G,V)]]) extends Serializable {
 
-  def contains(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } } 
+  def contains(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } }
 
   def containedby(qry: G) = rdd.flatMap{ tree => tree.query(qry).filter{ c => c._1.containedBy(qry)} } 
 
@@ -25,12 +25,13 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     new PersistentIndexedSpatialJoinRDD(rdd, other, pred)
   
   
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance) = {
+  def kNN(qry: STObject, k: Int, distFunc: (STObject, STObject) => Distance) = {
 
     val nn = rdd.mapPartitions({ trees =>
-        trees.flatMap { tree => 
-        tree.kNN(qry, k, distFunc)
-      }
+        trees.flatMap { tree =>
+          require(tree.isInstanceOf[KnnIndex[_]], s"kNN function requires KnnIndex but got: ${tree.getClass}")
+          tree.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)
+        }
     }, true)
     .map { case (g,v) => (g, (distFunc(g,qry), v)) }
     .sortBy(_._2._1, ascending = true)
@@ -40,12 +41,12 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   }
   
 
-  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
+  def withinDistance(qry: STObject, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
     rdd.mapPartitions({ trees => 
     trees.flatMap{ tree =>
-//      tree.query(qry, Predicates.withinDistance(maxDist, distFunc) _)
-      tree.withinDistance(qry, distFunc, maxDist)
-      
+      require(tree.isInstanceOf[WithinDistanceIndex[_]], s"withinDistance function requires WithinDistanceIndex but got: ${tree.getClass}")
+      //  tree.query(qry, Predicates.withinDistance(maxDist, distFunc) _)
+      tree.asInstanceOf[WithinDistanceIndex[(G,V)]].withinDistance(qry, distFunc, maxDist)
     }
   }, true) // preserve partitioning
 

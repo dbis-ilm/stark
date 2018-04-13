@@ -163,7 +163,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
         tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
 
       case IndexTyp.TEMPORAL =>
-        val indexTree = new IntervalTree1[G, V]()
+        val indexTree = new IntervalTree1[G, (G,V)]()
         // insert everything into the tree
         parent.iterator(split, context).foreach { case (g, v) => indexTree.insert(g, (g, v)) }
         indexTree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }

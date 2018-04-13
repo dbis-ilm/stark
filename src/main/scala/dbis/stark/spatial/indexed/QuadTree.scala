@@ -1,29 +1,27 @@
 package dbis.stark.spatial.indexed
 
-import dbis.stark.{Distance, STObject}
+import dbis.stark.STObject
 import org.locationtech.jts.index.quadtree.NodeBase
 
-import scala.reflect.ClassTag
 import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
 
 class QuadTree[G <: STObject : ClassTag, D: ClassTag](
      private val maxDepth: Int,
      private val minNum: Int
-   ) extends org.locationtech.jts.index.quadtree.Quadtree {
+   ) extends org.locationtech.jts.index.quadtree.Quadtree with Index[G,D] {
 
-  def root(): NodeBase = ???
+  require(maxDepth > 0, "Max-Depth must be > 0")
+  require(minNum > 0, "Min-Num must be > 0")
+
+  override def root(): NodeBase = ???
 
 
-  def insert(k: G, v: D): Unit =
-    super.insert(k.getEnvelopeInternal, new Data(v,k))
+  override def insert(k: G, v: D): Unit =
+    super.insert(k.getEnvelopeInternal, new Data(v, k))
 
-  def query(box: STObject): Iterator[D] =
+  override def query(box: STObject): Iterator[D] =
     super.query(box.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[G,D]].data)
 
-  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[D] = {
-    ???
-  }
-
-  def withinDistance(qry: G, distFunc: (G,G) => Distance, maxDist: Distance): Iterator[D] = ???
-
+  override def build(): Unit = {}
 }

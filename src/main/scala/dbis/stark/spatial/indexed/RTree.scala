@@ -1,12 +1,8 @@
 package dbis.stark.spatial.indexed
 
-//import com.vividsolutions.jts.geom.{Coordinate, Envelope}
-//import com.vividsolutions.jts.index.ItemVisitor
-//import com.vividsolutions.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
-import org.locationtech.jts.index.strtree.{ItemBoundable, ItemDistance, STRtree, STRtreePlus}
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
-import org.locationtech.jts.index.ItemVisitor
+import org.locationtech.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -21,7 +17,7 @@ protected[indexed] class Data[G <: STObject,T](/*var ts: Int, */val data: T, val
  */
 class RTree[G <: STObject : ClassTag, D: ClassTag ](
     @transient private val capacity: Int
-  ) extends STRtreePlus[Data[G,D]](capacity)  { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
+  ) extends STRtreePlus[Data[G,D]](capacity) with Index[G,D] with KnnIndex[D] with WithinDistanceIndex[D] { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
 //  private var timestamp = 0
 //  protected[indexed] def ts: Int = timestamp
@@ -67,7 +63,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
 //  }
   
   
-  def withinDistance(qry: G, distFunc: (G,G) => Distance, maxDist: Distance) = {
+  override def withinDistance(qry: STObject, distFunc: (STObject,STObject) => Distance, maxDist: Distance) = {
     val env = qry.getGeo.getEnvelopeInternal
     val env2 = new Envelope(
         new Coordinate(env.getMinX - maxDist.maxValue - 1, env.getMinY - maxDist.maxValue - 1),
@@ -130,12 +126,14 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param geom The reference object
    * @param k The number of neighbors  
    */
-  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[D] = {
+  override def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[D] = {
     if(size <= 0)
       Iterator.empty
     else
       super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance(distFunc), k).iterator().map(_.data)
   }
+
+  override private[indexed] def root() = getRoot
 }
 
 /**

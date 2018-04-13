@@ -91,7 +91,7 @@ object TestF extends Serializable {
       case IndexTyp.TEMPORAL =>
 
         println("using temporal index")
-        val tree = new IntervalTree1[STObject, ESTO]()
+        val tree = new IntervalTree1[STObject, (STObject, ESTO)]()
 
         s.foreach(x => {
           val ob = STObject(x.stob, Interval(x.start, x.end))

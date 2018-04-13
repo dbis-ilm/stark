@@ -1,22 +1,15 @@
 package dbis.stark.spatial
 
-import dbis.stark.{Interval, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory, IntervalTree1}
+import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
+import dbis.stark.{Interval, STObject}
 import org.apache.spark.annotation.DeveloperApi
-import dbis.stark.spatial.IndexTyp.IndexTyp
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, Partitioner, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
-
-object IndexTyp extends Enumeration {
-  type IndexTyp = Value
-  val NONE, SPATIAL, TEMPORAL = Value
-}
-
 
 /**
   * A stpatio-temporal filter implementation
@@ -34,17 +27,14 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
                                                                          qry: G,
                                                                          predicate: JoinPredicate,
                                                                          predicateFunc: (G,G) => Boolean,
-                                                                         indexType: IndexTyp,
                                                                          indexConfig: Option[IndexConfig],
                                                                          private val checkParties: Boolean) extends RDD[(G,V)](parent) {
 
-  require(indexType != IndexTyp.SPATIAL || indexConfig.isDefined)
+  def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
+    this(parent, qry,null, predicateFunc, None, false)
 
-  def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean,indexType: IndexTyp) =
-    this(parent, qry,null, predicateFunc,indexType, None, false)
-
-  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate,indexType: IndexTyp, indexConfig: Option[IndexConfig] = None) =
-    this(parent, qry, predicate,JoinPredicate.predicateFunction(predicate), indexType, indexConfig, true)
+  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate, indexConfig: Option[IndexConfig] = None) =
+    this(parent, qry, predicate,JoinPredicate.predicateFunction(predicate), indexConfig, true)
 
   /**
     * The partitioner of this RDD.
@@ -149,30 +139,17 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
     }
 
 
-    indexType match {
-      case IndexTyp.NONE =>
-        parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
+    if (indexConfig.isDefined) {
 
-      case IndexTyp.SPATIAL =>
-//        val tree = new RTree[G, (G, V)](treeOrder)
-        val tree = IndexFactory.get[G, (G, V)](indexConfig.get)
-        // insert everything into the tree
-        parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
+      val tree = IndexFactory.get[G, (G, V)](indexConfig.get)
+      // insert everything into the tree
+      parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
 
-        // query tree and perform candidates check
-        tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
+      // query tree and perform candidates check
+      tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
 
-      case IndexTyp.TEMPORAL =>
-        val indexTree = new IntervalTree1[G, (G,V)]()
-        // insert everything into the tree
-        parent.iterator(split, context).foreach { case (g, v) => indexTree.insert(g, (g, v)) }
-        indexTree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
-
-//      case _ =>
-//        parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
-
-
+    } else {
+      parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
     }
-
   }
 }

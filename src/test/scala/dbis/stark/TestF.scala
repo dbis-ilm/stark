@@ -1,8 +1,7 @@
 package dbis.stark
 
-import dbis.stark.spatial.IndexTyp.IndexTyp
-import dbis.stark.spatial.indexed.{IntervalTree1, RTree}
-import dbis.stark.spatial.{IndexTyp, JoinPredicate}
+import dbis.stark.spatial.indexed._
+import dbis.stark.spatial.JoinPredicate
 import org.apache.spark.sql.Dataset
 
 /**
@@ -64,47 +63,21 @@ object TestF extends Serializable {
   }
 
 
-  def getf2(indexTyp: IndexTyp, order: Int, searchData: STObject): Iterator[ESTO] => Iterator[ESTO] = (s: Iterator[ESTO]) => {
+  def getf2(indexConfig: IndexConfig, order: Int, searchData: STObject): Iterator[ESTO] => Iterator[ESTO] = (s: Iterator[ESTO]) => {
     s
   }
 
 
-  def getf(indexTyp: IndexTyp, order: Int, searchData: STObject): Iterator[ESTO] => Iterator[ESTO] = (s: Iterator[ESTO]) => {
-    indexTyp match {
-      case IndexTyp.SPATIAL =>
-        println("using spatial index")
-        val tree = new RTree[STObject, (STObject, ESTO)](order)
+  def getf(indexConfig: IndexConfig, order: Int, searchData: STObject): Iterator[ESTO] => Iterator[ESTO] = (s: Iterator[ESTO]) => {
 
-        s.foreach(x => {
-          val ob = STObject(x.stob, Interval(x.start, x.end))
-          tree.insert(ob, (ob, x))
-        })
+    val tree = IndexFactory.get[STObject, (STObject, ESTO)](indexConfig)
 
-        /* while (s.hasNext) {
-           val x = s.next()
-           val ob = STObject(x.stob, Interval(x.start, x.end))
-           tree.insert(ob, (ob, x))
-         }*/
-
-        tree.build()
-        tree.query(searchData).map(x => x._2)
-      case IndexTyp.TEMPORAL =>
-
-        println("using temporal index")
-        val tree = new IntervalTree1[STObject, (STObject, ESTO)]()
-
-        s.foreach(x => {
-          val ob = STObject(x.stob, Interval(x.start, x.end))
-
-          tree.insert(ob, (ob, x))
-        })
-
-        /* while (s.hasNext) {
-           val x = s.next()
-           val ob = STObject(x.stob, Interval(x.start, x.end))
-           tree.insert(ob, (ob, x))
-         }*/
-        tree.query(searchData).map(x => x._2)
+    s.foreach{x =>
+      val ob = STObject(x.stob, Interval(x.start, x.end))
+      tree.insert(ob, (ob, x))
     }
+
+    tree.build()
+    tree.query(searchData).map(x => x._2)
   }
 }

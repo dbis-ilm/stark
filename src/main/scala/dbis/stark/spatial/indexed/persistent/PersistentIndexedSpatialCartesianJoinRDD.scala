@@ -3,7 +3,7 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.{Index, RTreeIndex}
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import dbis.stark.spatial.{SpatialRDD, Utils}
 import org.apache.spark._
@@ -14,7 +14,7 @@ import scala.reflect.ClassTag
 
 private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag, G2 <: STObject: ClassTag, V: ClassTag, V2: ClassTag](
     sc: SparkContext,
-    var rdd1 : RDD[RTree[G,(G,V)]],
+    var rdd1 : RDD[Index[G,(G,V)]],
     var rdd2 : RDD[(G2,V2)],
     predicate: (G,G2) => Boolean)
   extends RDD[(V, V2)](sc, Nil)
@@ -62,7 +62,10 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
   		 * 
   		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
-      val indexBounds = tree.getRoot.getBounds.asInstanceOf[MBR]
+
+      require(tree.isInstanceOf[RTreeIndex[G,(G,V)]], s"persistent join only supported for R-Trees currently, but is: ${tree.getClass}")
+
+      val indexBounds = tree.asInstanceOf[RTreeIndex[G,(G,V)]].root().getBounds.asInstanceOf[MBR]
       
       val partitionCheck = rightParti.forall { p =>
         indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.rightPartition.index)))

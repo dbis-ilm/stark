@@ -2,7 +2,7 @@ package dbis.stark.spatial
 
 import dbis.stark.{Interval, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.{IntervalTree1, RTree}
+import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory, IntervalTree1}
 import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
 import org.apache.spark.annotation.DeveloperApi
 import dbis.stark.spatial.IndexTyp.IndexTyp
@@ -24,27 +24,27 @@ object IndexTyp extends Enumeration {
   * @param parent The parent RDD serving as input
   * @param qry The query object used in the filter evaluation
   * @param predicateFunc The predicate to apply in the filter
-  * @param treeOrder The (optional) order of the tree. <= 0 to not apply indexing
+  * @param indexConfig The (optional) indexing configuration
   * @param checkParties Perform partition check
   * @tparam G The type representing spatio-temporal data
   * @tparam V The payload data
   */
 class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
-  private val parent: RDD[(G,V)],
-  qry: G,
-  predicate: JoinPredicate,
-  predicateFunc: (G,G) => Boolean,
-  indexType: IndexTyp,
-  treeOrder: Int,
-  private val checkParties: Boolean) extends RDD[(G,V)](parent) {
+                                                                         private val parent: RDD[(G,V)],
+                                                                         qry: G,
+                                                                         predicate: JoinPredicate,
+                                                                         predicateFunc: (G,G) => Boolean,
+                                                                         indexType: IndexTyp,
+                                                                         indexConfig: Option[IndexConfig],
+                                                                         private val checkParties: Boolean) extends RDD[(G,V)](parent) {
 
-  require(indexType != IndexTyp.SPATIAL || treeOrder > 0)
+  require(indexType != IndexTyp.SPATIAL || indexConfig.isDefined)
 
   def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean,indexType: IndexTyp) =
-    this(parent, qry,null, predicateFunc,indexType, -1, false)
+    this(parent, qry,null, predicateFunc,indexType, None, false)
 
-  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate,indexType: IndexTyp, treeOrder: Int = -1) =
-    this(parent, qry, predicate,JoinPredicate.predicateFunction(predicate), indexType,treeOrder, true)
+  def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate,indexType: IndexTyp, indexConfig: Option[IndexConfig] = None) =
+    this(parent, qry, predicate,JoinPredicate.predicateFunction(predicate), indexType, indexConfig, true)
 
   /**
     * The partitioner of this RDD.
@@ -154,7 +154,8 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
         parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
 
       case IndexTyp.SPATIAL =>
-        val tree = new RTree[G, (G, V)](treeOrder)
+//        val tree = new RTree[G, (G, V)](treeOrder)
+        val tree = IndexFactory.get[G, (G, V)](indexConfig.get)
         // insert everything into the tree
         parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
 

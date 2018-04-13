@@ -1,7 +1,7 @@
 package dbis.stark.spatial
 
 import dbis.stark.STObject
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark.rdd.RDD
 import org.apache.spark._
@@ -17,7 +17,7 @@ import scala.reflect.ClassTag
   * @param left The left input RDD
   * @param right The right input RDD
   * @param predicateFunc The predicate to apply in the join (join condition)
-  * @param treeOrder The (optional) order of the tree. <= 0 to not apply indexing
+  * @param indexConfig The (optional) configuration for indexing
   * @param checkParties Perform partition check
   * @tparam G The type representing spatio-temporal data
   * @tparam V The type representing payload data in left RDD
@@ -27,7 +27,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
   var left: RDD[(G,V)],
   var right: RDD[(G,V2)],
   predicateFunc: (G,G) => Boolean,
-  treeOrder: Int,
+  indexConfig: Option[IndexConfig],
   private val checkParties: Boolean)  extends RDD[(V,V2)](left.context, Nil) {
 
   private val numPartitionsInRight = right.getNumPartitions
@@ -39,12 +39,12 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     * @param left The left RDD
     * @param right The right RDD
     * @param predicate The predicate to use
-    * @param capacity The optional capacity (order) of the index tree. If <= 0 no indexing is applied
+    * @param indexConfig The optional configuration of the index to use. If [None] no index will be used
     */
   def this(left: RDD[(G,V)], right: RDD[(G,V2)],
            predicate: JoinPredicate.JoinPredicate,
-           capacity: Int = -1) =
-    this(left, right, JoinPredicate.predicateFunction(predicate), capacity, checkParties = true)
+           indexConfig: Option[IndexConfig] = None) =
+    this(left, right, JoinPredicate.predicateFunction(predicate), indexConfig, checkParties = true)
 
   /**
     * Create a new join operator with the given predicate function.
@@ -56,7 +56,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     */
   def this(left: RDD[(G,V)], right: RDD[(G,V2)],
            predicate: (G,G) => Boolean) =
-    this(left, right, predicate, -1, checkParties = false)
+    this(left, right, predicate, None, checkParties = false)
 
   override def getPartitions: Array[Partition] = {
     val parts = ArrayBuffer.empty[JoinPartition]
@@ -120,7 +120,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
 //    println(s"left = ${split.leftPartition.index} -- right: ${split.rightPartition.index}")
 
     // if treeOrder is <= 0 we do not use indexing
-    if(treeOrder <= 0) {
+    if(indexConfig.isEmpty) {
       // collect the right partition into an array
       val rightList = right.iterator(split.rightPartition, context).toList
 
@@ -137,7 +137,8 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     } else { // we should apply indexing
 
       // the index
-      val tree = new RTree[G,(G,V)](capacity = treeOrder)
+//      val tree = new RTree[G,(G,V)](capacity = treeOrder)
+      val tree = IndexFactory.get[G, (G,V)](indexConfig.get)
 
       // insert everything into the tree
       left.iterator(split.leftPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }

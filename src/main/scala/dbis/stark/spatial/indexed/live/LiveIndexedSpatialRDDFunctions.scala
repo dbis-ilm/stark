@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed.live
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.partitioner.SpatialPartitioner
 import dbis.stark.spatial.{IndexTyp, SpatialFilterRDD, _}
 import dbis.stark.{Distance, STObject}
@@ -15,14 +15,14 @@ object LiveIndexedSpatialRDDFunctions {
 
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                              rdd: RDD[(G, V)],
-                                                                             treeOrder: Int
+                                                                             indexConfig: IndexConfig
                                                                            ) extends SpatialRDDFunctions[G, V](rdd) with Serializable {
 
-  def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, IndexTyp.SPATIAL, treeOrder)
+  def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, IndexTyp.SPATIAL, Some(indexConfig))
 
-  def contains(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINS, IndexTyp.SPATIAL, treeOrder)
+  def contains(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINS, IndexTyp.SPATIAL, Some(indexConfig))
 
-  def containedby(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINEDBY, IndexTyp.SPATIAL, treeOrder)
+  def containedby(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINEDBY, IndexTyp.SPATIAL, Some(indexConfig))
 
   def withinDistance(
 		  qry: G,
@@ -31,7 +31,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 	  ): RDD[(G, V)] = rdd.mapPartitions({ iter =>
       // we don't know how the distance function looks like and thus have to scan all partitions
 
-	    val indexTree = new RTree[G,(G,V)](treeOrder)
+      require(indexConfig.idxType == IndexType.RTree)
+
+	    val indexTree = new RTree[G,(G,V)](indexConfig.asInstanceOf[RTreeConfig].order)
 
       // Build our index live on-the-fly
       iter.foreach{ case (geom, data) =>
@@ -58,7 +60,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
               }
 
               if(partitionCheck) {
-                val tree = new RTree[G,(G,V)](treeOrder)
+                require(indexConfig.idxType == IndexType.RTree)
+
+                val tree = new RTree[G,(G,V)](indexConfig.asInstanceOf[RTreeConfig].order)
 
                 iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
 
@@ -114,7 +118,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
           pred,
-          treeOrder)
+        Some(indexConfig))
   }
   
   def cluster[KeyType](

@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.{Index, RTree}
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.{Dependency, OneToOneDependency, Partition, SparkContext}
@@ -108,7 +108,7 @@ object SpatialRDD {
 	 * @param rdd The RDD to convert
 	 * @return Returns a IndexedSpatialRDDFunctions object that contains spatial methods that use indexing
 	 */
-	implicit def convertSpatialPersistedIndexing[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[RTree[G,(G,V)]]): PersistedIndexedSpatialRDDFunctions[G, V]
+	implicit def convertSpatialPersistedIndexing[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[Index[G,(G,V)]]): PersistedIndexedSpatialRDDFunctions[G, V]
     = new PersistedIndexedSpatialRDDFunctions(rdd)
 
 }

@@ -2,14 +2,14 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.{Index, RTree}
 import dbis.stark.spatial.partitioner.SpatialPartitioner
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[RTree[G, (G,V)]]) extends Serializable {
+    rdd: RDD[Index[G, (G,V)]]) extends Serializable {
 
   def contains(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } } 
 
@@ -22,10 +22,11 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
   
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) =    
-    new PersistantIndexedSpatialJoinRDD(rdd, other, pred)
+    new PersistentIndexedSpatialJoinRDD(rdd, other, pred)
   
   
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance) = {
+
     val nn = rdd.mapPartitions({ trees =>
         trees.flatMap { tree => 
         tree.kNN(qry, k, distFunc)

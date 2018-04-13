@@ -4,7 +4,7 @@ import java.nio.file.Paths
 
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.indexed.live.{LiveIndexedSpatialRDDFunctions, LiveIntervalIndexedSpatialRDDFunctions}
 import dbis.stark.spatial.partitioner.{SpatialGridPartitioner, SpatialPartitioner}
 import dbis.stark.{Distance, STObject}
@@ -273,14 +273,19 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   // LIVE
 
-  def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, order)
+  def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, RTreeConfig(order))
 
   def liveIndex(partitioner: SpatialPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] =
-    liveIndex(Some(partitioner), order)
+    liveIndex(Some(partitioner), RTreeConfig(order))
 
-  def liveIndex(partitioner: Option[SpatialPartitioner], order: Int) = {
+  def liveIndex(indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, indexConfig)
+  def liveIndex(partitioner: SpatialPartitioner, indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(Some(partitioner), indexConfig)
+
+  def liveIndex(partitioner: Option[SpatialPartitioner], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(partitioner, RTreeConfig(order))
+
+  def liveIndex(partitioner: Option[SpatialPartitioner], indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
-    new LiveIndexedSpatialRDDFunctions(reparted, order)
+    new LiveIndexedSpatialRDDFunctions(reparted, indexConfig)
   }
 
   def liveIntervalIndex(): LiveIntervalIndexedSpatialRDDFunctions[G,V] = liveIntervalIndex(None)
@@ -296,19 +301,20 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
-  def index(partitioner: SpatialPartitioner, order: Int): RDD[RTree[G,(G,V)]] = index(Some(partitioner), order)
+  def index(partitioner: SpatialPartitioner, order: Int): RDD[Index[G,(G,V)]] = index(Some(partitioner), RTreeConfig(order))
 
   /**
     * Create an index for each partition.
     *
     * This puts all data items of a partition into an Index structure, e.g., R-tree
-    * and thus changes the type of the RDD from RDD[(STObject, V)] to RDD[RTree[STObject, (STObject, V)]]
+    * and thus changes the type of the RDD from {{{ RDD[(STObject, V)]  }}} to
+    * {{{ RDD[Index[STObject, (STObject, V)]] }}}
     */
-  def index(partitioner: Option[SpatialPartitioner] = None, order: Int = 10): RDD[RTree[G,(G,V)]] = {
+  def index(partitioner: Option[SpatialPartitioner] = None, indexConfig: IndexConfig): RDD[Index[G,(G,V)]] = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
-    reparted.mapPartitions(iter => {
-      val tree = new RTree[G, (G, V)](order)
 
+    reparted.mapPartitions(iter => {
+      val tree = IndexFactory.get[G,(G,V)](indexConfig)
       for ((g, v) <- iter) {
         tree.insert(g, (g, v))
       }

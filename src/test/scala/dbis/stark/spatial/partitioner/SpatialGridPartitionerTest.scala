@@ -1,7 +1,6 @@
 package dbis.stark.spatial.partitioner
 
 import dbis.stark.STObject
-import dbis.stark.spatial._
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.JoinPredicate
 import org.apache.spark.{SparkConf, SparkContext}
@@ -57,10 +56,19 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
                   .map(_.split(";"))
                     .map(arr => (STObject(arr(0)),arr(1)))
 
-    val parti = new SpatialGridPartitioner(rdd, 5, false)
+//    val parti = new SpatialGridPartitioner(rdd, 5, false)
+
+//    val parted = rdd.partitionBy(parti)
+
+    val gridConfig = GridStategy(5, pointsOnly = false)
+
+    val parted = rdd.partitionBy(gridConfig)
+    val parti = parted.partitioner match {
+      case None => fail("partitioner not set!")
+      case Some(p) => p
+    }
 
     parti.numPartitions shouldBe 25
-    val parted = rdd.partitionBy(parti)
 
     parted.collect().foreach { case (st, name) =>
       try {

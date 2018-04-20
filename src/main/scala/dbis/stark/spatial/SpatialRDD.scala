@@ -1,11 +1,12 @@
 package dbis.stark.spatial
 
-import dbis.stark.spatial.indexed.{Index, RTree}
+import dbis.stark.spatial.indexed.Index
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
+import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory}
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.{Dependency, OneToOneDependency, Partition, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
+import org.apache.spark.{Dependency, OneToOneDependency, Partition, SparkContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -29,6 +30,8 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    * We do not repartition our data.
    */
   override protected def getPartitions: Array[Partition] = firstParent[(G,V)].partitions
+
+  def partitionBy(strategy: PartitionerConfig) = new PlainSpatialRDDFunctions(this).partitionBy(strategy)
 
   /**
    * Find all elements that are within a given radius around the given object
@@ -68,6 +71,8 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
    * @return Returns an RDD containing the k nearest neighbors of qry
    */
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = new PlainSpatialRDDFunctions(this).kNN(qry, k,distFunc)
+
+
 
 }
 

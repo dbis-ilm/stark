@@ -4,13 +4,19 @@ import dbis.stark.STObject.MBR
 
 import scala.reflect.ClassTag
 import dbis.stark.{Distance, STObject}
-import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
 import dbis.stark.visualization.Visualization
 import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 
-abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: RDD[(G,V)]) extends Serializable {
-  
+abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: RDD[(G,V)]) extends PairRDDFunctions[G,V](rdd) {
+
+  def partitionBy(strategy: PartitionerConfig) = {
+    val partitioner = PartitionerFactory.get(strategy, rdd)
+    rdd.partitionBy(partitioner)
+  }
+
+
   def intersects(qry: G): RDD[(G,V)]
 
   /**

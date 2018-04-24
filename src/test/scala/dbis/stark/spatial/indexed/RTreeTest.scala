@@ -108,5 +108,96 @@ class RTreeTest extends FlatSpec with Matchers {
     withClue("result size") { result.size shouldBe 0 }
     
   }
-  
+
+  it should "find the correct result for iterator query with one (smallest) element" in {
+    val entries = Array(
+      STObject("POINT(1 1)"),
+      STObject("POINT(1 2)"),
+      STObject("POINT(2 1)"),
+      STObject("POINT(2 2)"),
+
+      STObject("POINT(10 10)"),
+      STObject("POINT(10 20)"),
+      STObject("POINT(20 10)"),
+      STObject("POINT(20 20)")
+    )
+
+    val tree = new RTree[STObject, (STObject, Int)](2)
+    entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
+
+    val q = STObject("POLYGON((0.5 0.5, 1.5 0.5, 1.5 1.5, 0.5 1.5, 0.5 0.5))")
+
+    val res = tree.query(q).map(_._1).toList
+
+    res should contain only STObject("POINT(1 1)")
+  }
+
+  it should "find the correct result for iterator query with one (greatest) element" in {
+    val entries = Array(
+      STObject("POINT(1 1)"),
+      STObject("POINT(1 2)"),
+      STObject("POINT(2 1)"),
+      STObject("POINT(2 2)"),
+
+      STObject("POINT(10 10)"),
+      STObject("POINT(10 20)"),
+      STObject("POINT(20 10)"),
+      STObject("POINT(20 20)")
+    )
+
+    val tree = new RTree[STObject, (STObject, Int)](2)
+    entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
+
+    val q = STObject("POLYGON((15 15, 25 15, 25 25, 15 25, 15 15))")
+
+    val res = tree.query(q).map(_._1).toList
+
+    res should contain only STObject("POINT(20 20)")
+  }
+
+  it should "find the correct empty result for non-satisfiable query" in {
+    val entries = Array(
+      STObject("POINT(1 1)"),
+      STObject("POINT(1 2)"),
+      STObject("POINT(2 1)"),
+      STObject("POINT(2 2)"),
+
+      STObject("POINT(10 10)"),
+      STObject("POINT(10 20)"),
+      STObject("POINT(20 10)"),
+      STObject("POINT(20 20)")
+    )
+
+    val tree = new RTree[STObject, (STObject, Int)](2)
+    entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
+
+    val q = STObject("POLYGON((30 30, 40 30, 35 35, 30 30))")
+
+    val res = tree.query(q).map(_._1).toList
+
+    res shouldBe 'empty
+  }
+
+  it should "find all elements" in {
+    val entries = Array(
+      STObject("POINT(1 1)"),
+      STObject("POINT(1 2)"),
+      STObject("POINT(2 1)"),
+      STObject("POINT(2 2)"),
+
+      STObject("POINT(10 10)"),
+      STObject("POINT(10 20)"),
+      STObject("POINT(20 10)"),
+      STObject("POINT(20 20)")
+    )
+
+    val tree = new RTree[STObject, (STObject, Int)](2)
+    entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
+
+    val q = STObject("POLYGON((0 0, 50 0, 50 50, 0 50, 0 0))")
+
+    val res = tree.query(q).map(_._1).toList
+
+    res should contain theSameElementsAs entries
+  }
 }

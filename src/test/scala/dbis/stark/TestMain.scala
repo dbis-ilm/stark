@@ -2,8 +2,8 @@ package dbis.stark
 
 import dbis.stark.ScalarDistance._
 import dbis.stark.spatial.SpatialRDD._
-import dbis.stark.spatial.{IndexTyp, _}
-import dbis.stark.spatial.indexed.live.{LiveIndexedSpatialRDDFunctions, LiveIntervalIndexedSpatialRDDFunctions}
+import dbis.stark.spatial.indexed.{IndexConfig, IntervalTreeConfig, QuadTreeConfig, RTreeConfig}
+import dbis.stark.spatial._
 import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
@@ -147,9 +147,6 @@ class TestMain {
           case "-ca" => cache = true
           case "-ur" => useresult = true
           case "-dsfr" => datasetfromrdd = true
-          case "-nf" =>
-            LiveIntervalIndexedSpatialRDDFunctions.skipFilter = true
-            LiveIndexedSpatialRDDFunctions.skipFilter = true
           case "-cb" => method = 2
           case "-w" => method = 3
           case "-ps" =>
@@ -250,12 +247,12 @@ class TestMain {
 
     val predicateFunc = TestF.getJP(method)
 
-    var indexTyp = IndexTyp.NONE
-    index match {
-      case 0 => indexTyp = IndexTyp.NONE
-      case 1 => indexTyp = IndexTyp.TEMPORAL
-      case 2 => indexTyp = IndexTyp.SPATIAL
-      case _ => println(" wrong Index: " + index)
+    val indexTyp: Option[IndexConfig] = index match {
+      case 0 => None
+      case 1 => Some(IntervalTreeConfig())
+      case 2 => Some(RTreeConfig(order))
+      case 3 => Some(QuadTreeConfig(maxDepth = 10, minNum = 1))
+      case _ => throw new IllegalArgumentException(" wrong Index: " + index)
     }
 
     var res1: Array[ESTO] = null
@@ -265,9 +262,9 @@ class TestMain {
 
     val t1 = TestMain.time({
       var psa2 = psa
-      if (indexTyp != IndexTyp.NONE) {
+      if (indexTyp.isDefined) {
         println("index")
-        psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+        psa2 = psa.mapPartitions(TestF.getf(indexTyp.get, treeorder, searchData))
       }
       res_d= psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
       res1 = res_d.collect()
@@ -310,8 +307,8 @@ class TestMain {
       println("search data : " + searchData)
       val t2 = TestMain.time({
         var psa2 = psa
-        if (indexTyp != IndexTyp.NONE) {
-          psa2 = psa.mapPartitions(TestF.getf(indexTyp, treeorder, searchData))
+        if (indexTyp.isDefined) {
+          psa2 = psa.mapPartitions(TestF.getf(indexTyp.get, treeorder, searchData))
         }
         val tmp7 = psa2.filter { x => predicateFunc(STObject(x.stob, Interval(x.start, x.end)), searchData) }
         res2 = tmp7.collect()
@@ -390,7 +387,6 @@ class TestMain {
 
 
 
-    var indexData: SpatialRDDFunctions[STObject, (String, STObject)] = null
 
 
 
@@ -401,15 +397,15 @@ class TestMain {
        case _ => println(" wrong Index: " + index)
      }*/
 
-    index match {
-      case 0 => indexData = rdd // do nothing
-      case 1 => indexData = rdd.liveIntervalIndex()
-      case 2 => indexData = rdd.liveIndex(order)
-      case _ => println(" wrong Index: " + index)
+    var indexData: SpatialRDDFunctions[STObject, (String, STObject)] = index match {
+      case 0 => rdd // do nothing
+      case 1 => rdd.liveIndex(IntervalTreeConfig())
+      case 2 => rdd.liveIndex(order)
+      case 3 => rdd.liveIndex(QuadTreeConfig(maxDepth = 10, minNum = 1))
+      case _ => throw new IllegalArgumentException(" wrong Index: " + index)
     }
 
     println("using " + indexData.getClass.getSimpleName + " for indexing (order if spatialindex: " + order + " )")
-    println("skipping filter on spatial/interval index: " + LiveIntervalIndexedSpatialRDDFunctions.skipFilter)
 
 
     var res: Array[(STObject, (String, STObject))] = null
@@ -469,11 +465,12 @@ class TestMain {
           case _ => println(" wrong Partitioner: " + part)
         }
 
-        index match {
-          case 0 => indexData = rdd // do nothing
-          case 1 => indexData = rdd.liveIntervalIndex()
-          case 2 => indexData = rdd.liveIndex(order)
-          case _ => println(" wrong Index: " + index)
+        indexData = index match {
+          case 0 => rdd // do nothing
+          case 1 => rdd.liveIndex(IntervalTreeConfig())
+          case 2 => rdd.liveIndex(order)
+          case 3 => rdd.liveIndex(QuadTreeConfig(maxDepth = 10,minNum = 1))
+          case _ => throw new IllegalArgumentException(" wrong Index: " + index)
         }
         println("used result")
       }

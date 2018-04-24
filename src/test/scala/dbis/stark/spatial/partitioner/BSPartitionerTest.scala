@@ -1,11 +1,10 @@
 package dbis.stark.spatial.partitioner
 
-import java.nio.file.Paths
-
 import org.locationtech.jts.io.WKTReader
 import dbis.stark.{STObject, TestUtils}
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial._
+import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.{SparkConf, SparkContext}
@@ -396,7 +395,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
                         if t.extent.intersects(b.extent)) yield (t,b)
 
       matches.length shouldBe >(0)
-      val res = new LiveIndexedSpatialRDDFunctions(rdd, 5).join(rddtaxi, JoinPredicate.CONTAINS, None)
+      val res = new LiveIndexedSpatialRDDFunctions(rdd, RTreeConfig(5)).join(rddtaxi, JoinPredicate.CONTAINS, None)
   }
 
   it  should "correctly partiton random points" in {
@@ -608,7 +607,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
 
-    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, treeOrder = 5).join(rddTaxi, JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, RTreeConfig(5)).join(rddTaxi, JoinPredicate.CONTAINS, None).sortByKey().collect()
 
 
     val taxiPartiNoSample = new BSPartitioner(rddTaxi, sideLength = 0.3, maxCostPerPartition = 100, pointsOnly = true)
@@ -616,7 +615,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100, pointsOnly = false)
 
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), treeOrder = 5).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), RTreeConfig(5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
     joinResPlain.length shouldBe > (0)
 
     withClue("join part no sample does not have same results as no partitioning") { joinResPlain should contain theSameElementsAs joinResNoPart }

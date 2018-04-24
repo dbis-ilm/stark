@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed
 
-import org.locationtech.jts.index.intervalrtree.SortedPackedIntervalRTree
 import dbis.stark.STObject
+import org.locationtech.jts.index.intervalrtree.SortedPackedIntervalRTree
 import utils.InvertavlTreeVisitor
 
 import scala.collection.JavaConversions.asScalaBuffer
@@ -13,12 +13,7 @@ import scala.reflect.ClassTag
  *
  *
  */
-class IntervalTree1[G <: STObject : ClassTag, V: ClassTag ] {
-
-
-
-
-  val tree = new SortedPackedIntervalRTree()
+class IntervalTree1[G <: STObject : ClassTag, D: ClassTag ]() extends SortedPackedIntervalRTree with Index[G,D] {
 
   /**
    * Insert data into the tree
@@ -26,8 +21,8 @@ class IntervalTree1[G <: STObject : ClassTag, V: ClassTag ] {
    * @param geom The geometry (key) to index
    * @param data The associated value
    */
-  def insert(geom: G, data: (G,V)) : Unit ={
-   tree.insert(geom.time.get.start.value,geom.time.get.end.get.value,new Data(data, geom))
+  def insert(geom: G, data: D) : Unit ={
+   super.insert(geom.time.get.start.value,geom.time.get.end.get.value,new Data(data, geom))
   }
 
   /**
@@ -36,16 +31,18 @@ class IntervalTree1[G <: STObject : ClassTag, V: ClassTag ] {
    *
    * @param geom The geometry to compute intersection for
    **/
-    def query(geom: G) : Iterator[(G,V)]= {
+    def query(geom: STObject) : Iterator[D]= {
 
     val visitor: InvertavlTreeVisitor = new InvertavlTreeVisitor()
-    tree.query(geom.time.get.start.value, geom.time.get.end.get.value, visitor)
+    super.query(geom.time.get.start.value, geom.time.get.end.get.value, visitor)
 
-    visitor.getVisitedItems.map(_.asInstanceOf[Data[G, (G,V)]].data).iterator
+    visitor.getVisitedItems.map(_.asInstanceOf[Data[G, D]].data).iterator
 
   }
 
+  override def build(): Unit = {}
 
+  override private[indexed] def root() = ???
 }
 
 

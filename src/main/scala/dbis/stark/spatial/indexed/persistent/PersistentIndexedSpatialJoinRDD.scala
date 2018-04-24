@@ -2,17 +2,17 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed.Index
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
-import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
-class PersistantIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
-    var left: RDD[RTree[G, (G,V)]], //IndexedSpatialRDD[G,V] 
+class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
+    var left: RDD[Index[G, (G,V)]],
     var right: RDD[(G,V2)],
     pred: JoinPredicate.JoinPredicate
     )  extends RDD[(V,V2)](left.context, Nil) {

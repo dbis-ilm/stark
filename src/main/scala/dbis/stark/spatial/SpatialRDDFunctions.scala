@@ -41,7 +41,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
 
     val env = new MBR(range._1, range._2, range._3, range._4)
 
-    vis.visualize(jsc, rdd, imageWidth, imageHeight, env, flipImageVert, path, fileExt, pointSize = pointSize)
+    vis.visualize(jsc, rdd, imageWidth, imageHeight, env, flipImageVert, path, fileExt, pointSize)
   }
 
   /**

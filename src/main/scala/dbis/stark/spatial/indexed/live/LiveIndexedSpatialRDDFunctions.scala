@@ -1,51 +1,52 @@
 package dbis.stark.spatial.indexed.live
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.partitioner.SpatialPartitioner
-import dbis.stark.spatial.{IndexTyp, SpatialFilterRDD, _}
+import dbis.stark.spatial.{SpatialFilterRDD, _}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
-object LiveIndexedSpatialRDDFunctions {
-  var skipFilter = false
-}
-
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
-                                                                             rdd: RDD[(G, V)],
-                                                                             treeOrder: Int
-                                                                           ) extends SpatialRDDFunctions[G, V](rdd) with Serializable {
+         rdd: RDD[(G, V)],
+         indexConfig: IndexConfig
+       ) extends SpatialRDDFunctions[G, V](rdd) with Serializable {
 
-  def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, IndexTyp.SPATIAL, treeOrder)
+  def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
 
-  def contains(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINS, IndexTyp.SPATIAL, treeOrder)
+  def contains(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINS, Some(indexConfig))
 
-  def containedby(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINEDBY, IndexTyp.SPATIAL, treeOrder)
+  def containedby(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
 
   def withinDistance(
 		  qry: G,
 		  maxDist: Distance,
 		  distFunc: (STObject,STObject) => Distance
-	  ): RDD[(G, V)] = rdd.mapPartitions({ iter =>
-      // we don't know how the distance function looks like and thus have to scan all partitions
+	  ): RDD[(G, V)] = rdd.mapPartitions { iter =>
+          // we don't know how the distance function looks like and thus have to scan all partitions
 
-	    val indexTree = new RTree[G,(G,V)](treeOrder)
+          val tree = IndexFactory.get[G,(G,V)](indexConfig)
 
-      // Build our index live on-the-fly
-      iter.foreach{ case (geom, data) =>
-        /* we insert a pair of (geom, data) because we want the tupled
-         * structure as a result so that subsequent RDDs build from this
-         * result can also be used as SpatialRDD
-         */
-        indexTree.insert(geom, (geom,data))
-      }
-      indexTree.build()
+          require(tree.isInstanceOf[WithinDistanceIndex[_]], s"index must support withinDistance, but is: ${tree.getClass}")
 
-      indexTree.withinDistance(qry, distFunc, maxDist)
+          val idxTree = tree.asInstanceOf[Index[G,(G,V)] with WithinDistanceIndex[(G,V)]]
 
-    })
+
+          // Build our index live on-the-fly
+          iter.foreach{ case (geom, data) =>
+            /* we insert a pair of (geom, data) because we want the tupled
+             * structure as a result so that subsequent RDDs build from this
+             * result can also be used as SpatialRDD
+             */
+            idxTree.insert(geom, (geom,data))
+          }
+          idxTree.build()
+
+          idxTree.withinDistance(qry, distFunc, maxDist)
+
+        }
 
 
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
@@ -58,14 +59,18 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
               }
 
               if(partitionCheck) {
-                val tree = new RTree[G,(G,V)](treeOrder)
+
+                val tree = IndexFactory.get[G,(G,V)](indexConfig)
+
+                require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
+
+                val idxTree = tree.asInstanceOf[Index[G,(G,V)] with KnnIndex[(G,V)]]
 
                 iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
 
-                tree.build()
+                idxTree.build()
 
-                val result = tree.kNN(qry, k, distFunc)
-                result
+                idxTree.kNN(qry, k, distFunc)
               }
               else
                 Iterator.empty
@@ -114,7 +119,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
           pred,
-          treeOrder)
+        Some(indexConfig))
   }
   
   def cluster[KeyType](

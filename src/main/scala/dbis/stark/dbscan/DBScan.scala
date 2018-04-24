@@ -20,7 +20,7 @@ import scala.collection.mutable.Set
   *               to form a dense region
   */
 class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) extends java.io.Serializable {
-  var ppd: Int = 0
+  var ppd: Int = 5
   var maxPartitionSize: Int = 100
 
   /**

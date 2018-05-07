@@ -4,7 +4,7 @@ package dbis.stark.raster
  * Tile represents a data type for 2D raster data.
  *
  */
-class Tile(val ulx: Double, val uly: Double, val width: Int, val height: Int, val data: Array[Byte]) extends Serializable {
+case class Tile(ulx: Double, uly: Double, width: Int, height: Int, data: Array[Byte]) extends Serializable {
 
   /**
    * Contructor for tile with given data.
@@ -29,7 +29,7 @@ class Tile(val ulx: Double, val uly: Double, val width: Int, val height: Int, va
   /**
    * Apply a function to each raster point and return the new resulting tile.
    */
-  def map(f: Byte => Byte): Tile = new Tile(ulx, uly, width, height, data.map(f))
+  def map(f: Byte => Byte): Tile = Tile(ulx, uly, width, height, data.map(f))
 
   /**
    * Count the number of points with the given value.
@@ -42,7 +42,7 @@ class Tile(val ulx: Double, val uly: Double, val width: Int, val height: Int, va
   override def toString: String = s"tile($ulx, $uly, $width, $height)"
 }
 
-object Tile {
-  def apply(w: Int, h: Int, data: Array[Byte]) : Tile = new Tile(w, h, data)
-  def apply(x: Double, y: Double, w: Int, h: Int, data: Array[Byte]) : Tile = new Tile(x, y, w, h, data)
-}
+//object Tile {
+//  def apply(w: Int, h: Int, data: Array[Byte]) : Tile = new Tile(w, h, data)
+//  def apply(x: Double, y: Double, w: Int, h: Int, data: Array[Byte]) : Tile = new Tile(x, y, w, h, data)
+//}

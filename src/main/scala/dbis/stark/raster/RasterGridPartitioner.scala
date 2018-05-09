@@ -8,6 +8,8 @@ import org.locationtech.jts.geom.GeometryFactory
 
 import scala.collection.mutable.ListBuffer
 
+case class RasterPartition(index: Int, cell: Int) extends Partition
+
 class RasterGridPartitioner(partitionsX: Int, partitionsY: Int,
                             minX: Double, maxX: Double, minY: Double, maxY: Double
                            ) extends Partitioner {
@@ -23,8 +25,6 @@ class RasterGridPartitioner(partitionsX: Int, partitionsY: Int,
     SpatialPartitioner.getCellId(tile.ulx, tile.uly, minX, minY, maxX, maxY, partitionWidth, partitionsHeight, partitionsX)
 
   }
-
-  case class RasterPartition(index: Int) extends Partition
 
   protected[raster] def getPartitionsFor(g: STObject): Array[Partition] = {
 
@@ -42,12 +42,12 @@ class RasterGridPartitioner(partitionsX: Int, partitionsY: Int,
       val a = xPos * partitionWidth
       val b = yPos * partitionsHeight
 
-      val cellMBR = new MBR(a, a + partitionWidth, b,  b + partitionsHeight)
+      val cellMBR = new MBR(a, a + partitionWidth, b,  b - partitionsHeight)
 
       val cellGeom = factory.toGeometry(cellMBR)
 
       if(g.getGeo.intersects(cellGeom)) {
-        result += RasterPartition(currId)
+        result += RasterPartition(currId, i)
         currId += 1
       }
 

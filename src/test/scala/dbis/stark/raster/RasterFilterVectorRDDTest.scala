@@ -13,6 +13,8 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
     sc = new SparkContext(conf)
   }
 
+  override protected def afterAll(): Unit = sc.stop()
+
   "A RasterFilterRDD" should " filter an unpartitioned RasterRDD" in {
 
     val width = 10

@@ -9,6 +9,6 @@ package object raster {
     org.apache.spark.sql.raster.registerUDTs()
   }
 
-  implicit def toRasterRDD(rdd: RDD[Tile]) = new RasterRDD(rdd)
+  implicit def toRasterRDD[U](rdd: RDD[Tile[U]]) = new RasterRDD[U](rdd)
 
 }

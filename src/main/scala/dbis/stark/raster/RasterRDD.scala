@@ -9,15 +9,15 @@ import org.apache.spark.rdd.RDD
   * @param _parent The parent (input) RDD
   * @param _partitioner The optional partitioner that _was_ used
   */
-class RasterRDD(@transient private val _parent: RDD[Tile],
-                private val _partitioner: Option[Partitioner]) extends RDD[Tile](_parent) {
+class RasterRDD[U](@transient private val _parent: RDD[Tile[U]],
+                private val _partitioner: Option[Partitioner]) extends RDD[Tile[U]](_parent) {
 
   /**
     * Create new Raster RDD from a parent (without partitioner)
     * @param _parent The parent
     * @return Returns a new instance of RasterRDD
     */
-  def this(_parent: RDD[Tile]) = this(_parent, None)
+  def this(_parent: RDD[Tile[U]]) = this(_parent, None)
 
   /**
     * The partitioner that was used on this RDD
@@ -34,7 +34,7 @@ class RasterRDD(@transient private val _parent: RDD[Tile],
     * @param partitioner The partitioner to use
     * @return Returns a partitioned RasterRDD
     */
-  def partitionBy(partitioner: RasterGridPartitioner): RasterRDD = {
+  def partitionBy(partitioner: RasterGridPartitioner): RasterRDD[U] = {
     val zero: Byte = 0.toByte // the zero byte
     // transform to key-value form where Tile is key and the zero byte our aux-value
     val res = this.map(t => (t, zero))
@@ -47,13 +47,13 @@ class RasterRDD(@transient private val _parent: RDD[Tile],
 
 
   // methods needed to implement - otherwise RasterRDD must be abstract
-  override def compute(split: Partition, context: TaskContext) = firstParent[Tile].compute(split, context)
+  override def compute(split: Partition, context: TaskContext) = firstParent[Tile[U]].compute(split, context)
   override protected def getPartitions = firstParent.partitions
 
   /**
     * Filter the RasterRDD so that it contains only Tiles intersecting with the given region
     * @param qry The query region
-    * @return Returns 
+    * @return Returns
     */
   def filter(qry: STObject) = new RasterFilterVectorRDD(qry, this)
 }

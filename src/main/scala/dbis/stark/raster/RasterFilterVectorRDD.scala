@@ -5,8 +5,8 @@ import dbis.stark.STObject.MBR
 import org.apache.spark.{Partition, TaskContext}
 import org.locationtech.jts.geom.GeometryFactory
 
-class RasterFilterVectorRDD(qry: STObject,
-                            @transient private val _parent: RasterRDD
+class RasterFilterVectorRDD[U](qry: STObject,
+                            @transient private val _parent: RasterRDD[U]
                            ) extends RasterRDD(_parent) {
 
   /**
@@ -21,14 +21,14 @@ class RasterFilterVectorRDD(qry: STObject,
 
     val split = inputSplit match {
       case RasterPartition(_, parent) =>
-        firstParent[Tile].partitions(parent)
+        firstParent[Tile[U]].partitions(parent)
       case _ => inputSplit
     }
 
 
     val qryGeo = qry.getGeo
 
-    firstParent[Tile].iterator(split, context).filter { t =>
+    firstParent[Tile[U]].iterator(split, context).filter { t =>
       val tileMBR = new MBR(t.ulx, t.ulx + t.width, t.uly - t.height, t.uly)
       val tileGeom = factory.toGeometry(tileMBR)
 

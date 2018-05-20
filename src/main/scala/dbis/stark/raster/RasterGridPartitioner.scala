@@ -20,7 +20,7 @@ class RasterGridPartitioner(partitionsX: Int, partitionsY: Int,
   override def numPartitions = partitionsX * partitionsY
 
   override def getPartition(key: Any) = {
-    val tile = key.asInstanceOf[Tile]
+    val tile = key.asInstanceOf[Tile[_]]
 
     SpatialPartitioner.getCellId(tile.ulx, tile.uly, minX, minY, maxX, maxY, partitionWidth, partitionsHeight, partitionsX)
 

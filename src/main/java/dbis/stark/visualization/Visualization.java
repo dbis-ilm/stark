@@ -1,5 +1,6 @@
 package dbis.stark.visualization;
 
+import dbis.stark.raster.Tile;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
@@ -7,6 +8,7 @@ import dbis.stark.STObject;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.broadcast.Broadcast;
+import scala.Int;
 import scala.Tuple2;
 
 import javax.imageio.ImageIO;
@@ -51,6 +53,20 @@ public class Visualization implements Serializable {
         return draw(rdd, env, outputPath, outputType, pointSize);
     }
 
+    public boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tile<Integer>> rdd, int imageWidth, int imageHeight, Envelope envelope, String outputPath) {
+        this.imageWidth = imageWidth;
+        this.imageHeight = imageHeight;
+
+        Broadcast<Envelope> env = sparkContext.broadcast(envelope);
+
+        this.flipImageVert = false;
+
+        this.scaleX = this.imageWidth / envelope.getWidth();
+        this.scaleY = this.imageHeight / envelope.getHeight();
+
+        return drawRaster(rdd, env, outputPath);
+    }
+
     private <G extends STObject,T> boolean draw(JavaRDD<Tuple2<G, T>> rdd, Broadcast<Envelope> env, String outputPath, String outputType, int pointSize) {
 
         BufferedImage finalImage = rdd.mapPartitions(iter -> {
@@ -80,6 +96,53 @@ public class Visualization implements Serializable {
         .getImage(); // return that image
 
         return saveImageAsLocalFile(finalImage, outputPath, outputType);
+    }
+
+    private boolean drawRaster(JavaRDD<Tile<Integer>> rdd, Broadcast<Envelope> envelope, String outputPath) {
+
+        BufferedImage theImage = rdd.mapPartitions( iter -> {
+            BufferedImage img = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = img.createGraphics();
+            Iterable<Tile<Integer>> iterable = () -> iter;
+
+            StreamSupport.stream(iterable.spliterator(), false)
+                .forEach(tile -> {
+
+                    for (int x = 0; x < tile.width(); x++) {
+                        for (int y = 0; y < tile.height(); y++) {
+
+                            g.setColor(new Color(tile.value(x,y)));
+
+//                            Coordinate c = new Coordinate(tile.ulx() + x, tile.uly() + y);
+
+//                            Tuple2<Integer, Integer> pos = getImageCoordinates(c, envelope.getValue());
+
+                            Integer imgX = (int)(tile.ulx() + x);
+                            Integer imgY = (int)(tile.uly() - (tile.height() - y));
+                            Tuple2<Integer, Integer> pos = new Tuple2<>(imgX, imgY);
+
+
+//                            System.out.printf("%d , %d  has img coords: %s\n", x,y, pos.toString());
+
+                            if(pos != null)
+                                drawPoint(g, pos, 5);
+
+                        }
+                    }
+
+                });
+
+            return Collections.singletonList(new ImageSerializableWrapper(img)).iterator();
+        }).reduce((img1, img2) -> {
+            BufferedImage combinedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics graphics = combinedImage.getGraphics();
+            graphics.drawImage(img1.image, 0, 0, null);
+            graphics.drawImage(img2.image, 0, 0, null);
+            return new ImageSerializableWrapper(combinedImage);
+        })
+        .image;
+
+        return saveImageAsLocalFile(theImage, outputPath, "png");
     }
 
     private boolean saveImageAsLocalFile(BufferedImage finalImage, String outputPath, String outputType) {

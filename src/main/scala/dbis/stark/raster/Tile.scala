@@ -13,10 +13,13 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
    */
   def this(width: Int, height: Int, data: Array[U]) = this(0, 0, width, height, data)
 
+  def this(ulx: Double, uly: Double, width: Int, height: Int) = this(ulx, uly, width, height, Array.fill[U](width * height)(null.asInstanceOf[U]))
+
   /**
-   * Constructor for an empty tile of given size. 
-   */
-  def this(width: Int, height: Int) = this(0, 0, width, height, Array.fill[U](width * height)(null.asInstanceOf[U]))
+    * Constructor for an empty tile of given size.
+    */
+  def this(width: Int, height: Int) = this(0, 0, width, height)
+
 
   /**
    * Set a raster point at a given position to a value.
@@ -27,6 +30,8 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
    * Return the value at the given position of the raster.
    */
   def value(x: Int, y: Int): U = data((y - uly).toInt * width + (x - ulx).toInt)
+
+  def value(i: Int): U = value(i % width, i / width)
 
   /**
    * Apply a function to each raster point and return the new resulting tile.
@@ -42,6 +47,25 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
    * Return a string representation of the tile.
    */
   override def toString: String = s"tile($ulx, $uly, $width, $height)"
+
+  def matrix = {
+
+    val b = new StringBuilder
+
+    for(y <- 0 until height) {
+      for(x <- 0 until width) {
+        b.append(value(x,y))
+
+        if(x == width - 1) {
+          if(y < height - 1)
+            b.append("\n")
+        } else
+          b.append(", ")
+      }
+    }
+
+    b.toString()
+  }
 }
 
 //object Tile {

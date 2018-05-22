@@ -13,17 +13,28 @@ class TileTest extends FlatSpec with Matchers {
     tile.height shouldEqual 5
   }
 
-  "A tile" should "be updatable" in {
+  it should "be updatable" in {
     val tile = new Tile(10, 5, Array.fill(50)(0))
     tile.set(2, 2, 4)
     tile.value(2, 2) shouldEqual 4
   }
 
-  "A tile" should "be created from another tile using map" in {
+  it should "be created from another tile using map" in {
     val tile = new Tile(10, 5, Array.fill(50)(0))
     val other = tile.map(_ => 10)
     other.value(0, 0) shouldEqual 10
     other.value(4, 4) shouldEqual 10
+  }
+
+  it should "print a matrix" in {
+    val tile = new Tile(3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0))
+    val s = tile.matrix
+
+//    println(s)
+
+    val ref = "0, 0, 1\n2, 1, 0\n2, 1, 0"
+
+    s shouldBe ref
   }
 
   "Count" should "return the number of points with the given value" in {

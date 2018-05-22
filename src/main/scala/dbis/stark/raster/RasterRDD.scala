@@ -1,6 +1,10 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
+import dbis.stark.STObject.MBR
+import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.visualization.Visualization
+import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.{Partition, Partitioner, TaskContext}
 import org.apache.spark.rdd.RDD
 
@@ -10,7 +14,7 @@ import org.apache.spark.rdd.RDD
   * @param _partitioner The optional partitioner that _was_ used
   */
 class RasterRDD[U](@transient private val _parent: RDD[Tile[U]],
-                private val _partitioner: Option[Partitioner]) extends RDD[Tile[U]](_parent) {
+                                private val _partitioner: Option[Partitioner]) extends RDD[Tile[U]](_parent) {
 
   /**
     * Create new Raster RDD from a parent (without partitioner)
@@ -56,4 +60,11 @@ class RasterRDD[U](@transient private val _parent: RDD[Tile[U]],
     * @return Returns
     */
   def filter(qry: STObject) = new RasterFilterVectorRDD(qry, this)
+
+
+}
+
+
+object  RasterRDD {
+  implicit def toDrawable(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctions(rdd)
 }

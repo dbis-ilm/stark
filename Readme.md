@@ -140,7 +140,7 @@ If data is already a 2-tuple, where the second (in this case the `Long`) element
 ```Scala
 val raw = RDD[(String, Long)] = ...
 val spatialRDD = raw.map{case (g,v) => (STObject(g), v)} // results in (STObject, Long)
-val clusters = spatialRDD.cluster(epsilon = 0.5, minPts = 20, {case (g,v) => v }) // where v is id
+val clusters = spatialRDD.cluster(20, 0.5, {case (g,v) => v }) // where v is id
 ```
 
 #### k Nearest Neighbors

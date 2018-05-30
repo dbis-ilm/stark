@@ -5,8 +5,10 @@ import dbis.stark.STObject.MBR
 import org.apache.spark.{Partition, TaskContext}
 import org.locationtech.jts.geom.GeometryFactory
 
-class RasterFilterVectorRDD[U](qry: STObject,
-                            @transient private val _parent: RasterRDD[U]
+import scala.reflect.ClassTag
+
+class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
+                                          @transient private val _parent: RasterRDD[U]
                            ) extends RasterRDD(_parent) {
 
   /**

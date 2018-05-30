@@ -1,5 +1,6 @@
 package dbis.stark.spatial.indexed
 
+import dbis.stark.STObject.GeoType
 import dbis.stark.{Distance, STObject}
 
 import scala.reflect.ClassTag
@@ -8,10 +9,9 @@ import scala.reflect.ClassTag
   * This trait defines basic operations that we expect from an index.
   * These operations are insert and (range) query along with a explicit
   * build and root for internal use.
-  * @tparam G Spatial type on which we operate
   * @tparam V Payload data type
   */
-trait Index[G <: STObject,V] {
+trait Index[V] {
 
   /**
     * Explicitly build the index
@@ -23,7 +23,9 @@ trait Index[G <: STObject,V] {
     * @param k The key
     * @param v The payload value
     */
-  def insert(k: G, v: V): Unit
+  def insert(k: STObject, v: V): Unit
+
+  def insert(mbr: GeoType, data: V): Unit
 
   /**
     * Query the tree
@@ -88,10 +90,10 @@ object IndexFactory {
     * @tparam V Payload data type
     * @return Returns the index that corresponds to the given configuration
     */
-  def get[G <: STObject : ClassTag,V : ClassTag](conf: IndexConfig): Index[G,V] = conf match {
-    case rConf: RTreeConfig => new RTree[G,V](capacity = rConf.order)
+  def get[G : ClassTag,V : ClassTag](conf: IndexConfig): Index[V] = conf match {
+    case rConf: RTreeConfig => new RTree[V](capacity = rConf.order)
     case qConf: QuadTreeConfig => new QuadTree(maxDepth = qConf.maxDepth, minNum = qConf.minNum)
-    case _: IntervalTreeConfig => new IntervalTree1[G,V]()
+    case _: IntervalTreeConfig => new IntervalTree1[V]()
   }
 
 }

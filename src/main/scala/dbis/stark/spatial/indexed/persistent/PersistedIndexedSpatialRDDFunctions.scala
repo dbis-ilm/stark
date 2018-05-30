@@ -9,7 +9,7 @@ import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
 
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
-    rdd: RDD[Index[G, (G,V)]]) extends Serializable {
+    rdd: RDD[Index[(G,V)]]) extends Serializable {
 
   def contains(qry: G) = rdd.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } }
 

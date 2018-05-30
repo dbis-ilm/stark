@@ -31,7 +31,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
           require(tree.isInstanceOf[WithinDistanceIndex[_]], s"index must support withinDistance, but is: ${tree.getClass}")
 
-          val idxTree = tree.asInstanceOf[Index[G,(G,V)] with WithinDistanceIndex[(G,V)]]
+          val idxTree = tree.asInstanceOf[Index[(G,V)] with WithinDistanceIndex[(G,V)]]
 
 
           // Build our index live on-the-fly
@@ -64,7 +64,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
                 require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
 
-                val idxTree = tree.asInstanceOf[Index[G,(G,V)] with KnnIndex[(G,V)]]
+                val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
 
                 iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
 

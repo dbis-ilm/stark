@@ -12,7 +12,7 @@ import scala.reflect.ClassTag
 
 
 class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
-    var left: RDD[Index[G, (G,V)]],
+    var left: RDD[Index[(G,V)]],
     var right: RDD[(G,V2)],
     pred: JoinPredicate.JoinPredicate
     )  extends RDD[(V,V2)](left.context, Nil) {

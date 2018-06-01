@@ -1,8 +1,9 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
+import dbis.stark.STObject.{GeoType, MBR}
 import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark._
@@ -12,15 +13,13 @@ import org.locationtech.jts.geom.GeometryFactory
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
-class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] private (var left: RasterRDD[U],
-                                                    var right: RDD[(STObject, P)],
-                                                    predicateFunc: (STObject,STObject) => Boolean,
-                                                    indexConfig: Option[IndexConfig]) extends RDD[(Tile[U],P)](left.context, Nil) {
+class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (var left: RasterRDD[U],
+                                                             var right: RDD[(STObject, P)],
+                                                             predicate: JoinPredicate,
+                                                             indexConfig: Option[IndexConfig]) extends RDD[(Tile[U],P)](left.context, Nil) {
 
-
-  def this(left: RasterRDD[U], right: RDD[(STObject, P)],
-           predicate: JoinPredicate.JoinPredicate, indexConfig: Option[IndexConfig] = None) =
-    this(left,right, JoinPredicate.predicateFunction(predicate), indexConfig)
+  private val isIntersects = predicate == JoinPredicate.INTERSECTS
+  private val predicateFunc = JoinPredicate.predicateFunction(predicate)
 
 
   private val numPartitionsInRight = right.getNumPartitions
@@ -59,34 +58,21 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] private (var left: RasterRDD
   override def compute(s: Partition, context: TaskContext): Iterator[(Tile[U], P)] = {
     val split = s.asInstanceOf[JoinPartition]
 
-
-
     if(indexConfig.isDefined) {
       val index = IndexFactory.get[MBR, Tile[U]](indexConfig.get)
 
-      val geoFactory = new GeometryFactory()
-
       left.iterator(split.leftPartition, context).foreach{ t =>
-        val tileMBR = new MBR(t.ulx, t.ulx + t.width, t.uly - t.height, t.uly)
-        val tileMBRGeo = geoFactory.toGeometry(tileMBR)
+        val tileMBRGeo = RasterUtils.tileToGeo(t)
         index.insert(tileMBRGeo, t)
       }
 
       index.build()
 
-      // geometry factory used to create a Geometry from a MBR
-      // will be instantiated below while building the index
-      var factory: GeometryFactory = null
-
       val resultIter = right.iterator(split.rightPartition,context).flatMap{ case (rg, rv) =>
-
-        // create factory object only once
-        if(factory == null) {
-          factory = new GeometryFactory(rg.getGeo.getPrecisionModel, rg.getGeo.getSRID)
-        }
-
         // put all tiles into the tree
-        index.query(rg).map(t => (t, rv))
+        index.query(rg).map{t =>
+          val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects)
+          (matchingTilePart, rv)}
       }
 
       new InterruptibleIterator[(Tile[U], P)](context, resultIter)
@@ -94,20 +80,21 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] private (var left: RasterRDD
     } else {
 
       val rightList = right.iterator(split.rightPartition, context).toList
-      val head = rightList.head._1
-      val factory = new GeometryFactory(head.getGeo.getPrecisionModel, head.getGeo.getSRID)
 
       // loop over the left partition and check join condition on every element in the right partition's array
       val resultIter = left.iterator(split.leftPartition, context).flatMap { t =>
 
-        val tileMBR = new MBR(t.ulx, t.ulx + t.width, t.uly - t.height, t.uly)
-        val tileGeom = factory.toGeometry(tileMBR)
+        val tileGeom = RasterUtils.tileToGeo(t)
 
         // TODO: get the pixels of the tile that actually intersect with the geometry
         // this would create a new Tile
         rightList.iterator.filter { case (rg, _) =>
           predicateFunc(tileGeom, rg)
-        }.map { case (_, rv) => (t, rv) }
+        }.map { case (rg, rv) =>
+          // get only covered/intersected pixels
+          val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects)
+          (matchingTilePart, rv)
+        }
       }
 
       new InterruptibleIterator(context, resultIter)

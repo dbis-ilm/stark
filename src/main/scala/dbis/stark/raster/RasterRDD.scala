@@ -1,6 +1,7 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
+import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.IndexConfig
 import org.apache.spark.rdd.RDD
@@ -59,7 +60,7 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
     * @param qry The query region
     * @return Returns
     */
-  def filter(qry: STObject) = new RasterFilterVectorRDD(qry, this)
+  def filter(qry: STObject, predicate: JoinPredicate = JoinPredicate.INTERSECTS) = new RasterFilterVectorRDD(qry, this, predicate)
 
 //  def join(other: RDD[STObject], predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RasterRDD[U] =
 //    new RasterJoinVectorRDD(this, other, predicate, indexConf)

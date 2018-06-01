@@ -1,15 +1,19 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
+import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import org.apache.spark.{Partition, TaskContext}
-import org.locationtech.jts.geom.GeometryFactory
 
 import scala.reflect.ClassTag
 
 class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
-                                          @transient private val _parent: RasterRDD[U]
+                                          @transient private val _parent: RasterRDD[U],
+                                          predicate: JoinPredicate
                            ) extends RasterRDD(_parent) {
+
+  private val predicateFunc = JoinPredicate.predicateFunction(predicate)
+  private val isIntersects = predicate == JoinPredicate.INTERSECTS
 
   /**
     * Compute the filter
@@ -19,7 +23,6 @@ class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
     * @return Returns an iterator over the result elements
     */
   override def compute(inputSplit: Partition, context: TaskContext) = {
-    val factory = new GeometryFactory(qry.getGeo.getPrecisionModel, qry.getGeo.getSRID)
 
     val split = inputSplit match {
       case RasterPartition(_, parent) =>
@@ -27,16 +30,15 @@ class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
       case _ => inputSplit
     }
 
-
-    val qryGeo = qry.getGeo
-
     firstParent[Tile[U]].iterator(split, context).filter { t =>
-      val tileMBR = new MBR(t.ulx, t.ulx + t.width, t.uly - t.height, t.uly)
-      val tileGeom = factory.toGeometry(tileMBR)
+      val tileGeom = RasterUtils.tileToGeo(t)
 
 //      logInfo(s"tileMBR: $tileMBR  tile: $t  qryGeo: $qryGeo")
 
-      qryGeo.intersects(tileGeom) || qryGeo.contains(tileGeom)
+//      qryGeo.intersects(tileGeom) || qryGeo.contains(tileGeom)
+      predicateFunc(tileGeom, qry)
+    }.map{t =>
+      RasterUtils.getPixels(t, qry.getGeo, isIntersects)
     }
   }
 

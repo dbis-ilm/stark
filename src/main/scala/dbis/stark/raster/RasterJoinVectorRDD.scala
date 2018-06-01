@@ -2,7 +2,8 @@ package dbis.stark.raster
 
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory, RTreeConfig}
+import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
@@ -11,9 +12,16 @@ import org.locationtech.jts.geom.GeometryFactory
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
-class RasterJoinVectorRDD[U: ClassTag, P: ClassTag](var left: RasterRDD[U],
+class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] private (var left: RasterRDD[U],
                                                     var right: RDD[(STObject, P)],
-                                                    indexConfig: Option[IndexConfig] = None) extends RDD[(Tile[U],P)](left.context, Nil) {
+                                                    predicateFunc: (STObject,STObject) => Boolean,
+                                                    indexConfig: Option[IndexConfig]) extends RDD[(Tile[U],P)](left.context, Nil) {
+
+
+  def this(left: RasterRDD[U], right: RDD[(STObject, P)],
+           predicate: JoinPredicate.JoinPredicate, indexConfig: Option[IndexConfig] = None) =
+    this(left,right, JoinPredicate.predicateFunction(predicate), indexConfig)
+
 
   private val numPartitionsInRight = right.getNumPartitions
 
@@ -98,7 +106,7 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag](var left: RasterRDD[U],
         // TODO: get the pixels of the tile that actually intersect with the geometry
         // this would create a new Tile
         rightList.iterator.filter { case (rg, _) =>
-          tileGeom.intersects(rg) // TODO: predicateFunction as a parameter
+          predicateFunc(tileGeom, rg)
         }.map { case (_, rv) => (t, rv) }
       }
 

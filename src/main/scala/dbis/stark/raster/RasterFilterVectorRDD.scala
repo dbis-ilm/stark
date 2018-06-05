@@ -9,7 +9,8 @@ import scala.reflect.ClassTag
 
 class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
                                           @transient private val _parent: RasterRDD[U],
-                                          predicate: JoinPredicate
+                                          predicate: JoinPredicate,
+                                          pixelDefault: U
                            ) extends RasterRDD(_parent) {
 
   private val predicateFunc = JoinPredicate.predicateFunction(predicate)
@@ -32,13 +33,9 @@ class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
 
     firstParent[Tile[U]].iterator(split, context).filter { t =>
       val tileGeom = RasterUtils.tileToGeo(t)
-
-//      logInfo(s"tileMBR: $tileMBR  tile: $t  qryGeo: $qryGeo")
-
-//      qryGeo.intersects(tileGeom) || qryGeo.contains(tileGeom)
       predicateFunc(tileGeom, qry)
     }.map{t =>
-      RasterUtils.getPixels(t, qry.getGeo, isIntersects)
+      RasterUtils.getPixels(t, qry.getGeo, isIntersects, pixelDefault )
     }
   }
 

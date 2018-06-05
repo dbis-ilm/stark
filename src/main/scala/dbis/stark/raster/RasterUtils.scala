@@ -9,20 +9,26 @@ object RasterUtils {
   private val geoFactory = new GeometryFactory()
 
 
-  def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean): Tile[U] = {
+  def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U): Tile[U] = {
 
     val tileGeo = tileToGeo(tile)
     val matchingTileMBR = tileGeo.intersection(geo).getEnvelopeInternal
 
     println(matchingTileMBR)
 
-    val intersectionTile = mbrToTile[U](matchingTileMBR, tile.pixelWidth)
+    val intersectionTile = mbrToTile[U](matchingTileMBR, default, tile.pixelWidth)
 
     println(tile)
     println(tile.matrix)
 
     println(intersectionTile)
-//    println(intersectionTile.matrix)
+
+
+    def matches(pixelGeo: GeoType): Boolean = if(isIntersects) {
+      geo.intersects(pixelGeo)
+    } else {
+      geo.contains(pixelGeo)
+    }
 
     for(j <- 0 until intersectionTile.height) {
       for(i <- 0 until intersectionTile.width) {
@@ -30,28 +36,39 @@ object RasterUtils {
         val origX = intersectionTile.ulx + tile.pixelWidth * i
         val origY = intersectionTile.uly - tile.pixelWidth * j
 
-        
-        val orig = tile.value(origX, origY)
+
+        val pixelGeo = mbrToGeo(new MBR(origX, origX + tile.pixelWidth, origY - tile.pixelWidth, origY))
+        val origValue = if(matches(pixelGeo)) {
+          tile.value(origX, origY)
+        } else {
+          default
+        }
+
 
         // TODO set only if pixel intersects/contained with original geometry
         // and not only its MBR
-        intersectionTile.setArray(i, j, orig)
+        intersectionTile.setArray(i, j, origValue)
 
         // TODO: use array copy to copy rowise?
       }
     }
 
+    println(intersectionTile.matrix)
     intersectionTile
   }
+
+  def mbrToGeo(mbr: MBR): GeoType = geoFactory.toGeometry(mbr)
 
   def tileToGeo(tile: Tile[_]): GeoType = {
     val mbr = new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly)
     geoFactory.toGeometry(mbr)
   }
 
-  def mbrToTile[U : ClassTag](mbr: MBR, pixelWidth: Short = 1): Tile[U] =
+  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Short = 1): Tile[U] =
     new Tile[U](mbr.getMinX,mbr.getMaxY,
       math.ceil(mbr.getWidth).toInt, math.ceil(mbr.getHeight).toInt,
-      pixelWidth)
+      pixelWidth,
+      default
+    )
 
 }

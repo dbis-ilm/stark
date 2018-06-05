@@ -60,13 +60,14 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
     * @param qry The query region
     * @return Returns
     */
-  def filter(qry: STObject, predicate: JoinPredicate = JoinPredicate.INTERSECTS) = new RasterFilterVectorRDD(qry, this, predicate)
+  def filter(qry: STObject, pixelDefault: U, predicate: JoinPredicate = JoinPredicate.INTERSECTS) =
+    new RasterFilterVectorRDD(qry, this, predicate, pixelDefault)
 
 //  def join(other: RDD[STObject], predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RasterRDD[U] =
 //    new RasterJoinVectorRDD(this, other, predicate, indexConf)
 
-  def join[P: ClassTag](other: RDD[(STObject, P)], predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RDD[(Tile[U],P)] =
-    new RasterJoinVectorRDD(this, other, predicate, indexConf)
+  def join[P: ClassTag](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RDD[(Tile[U],P)] =
+    new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf)
 }
 
 

@@ -16,8 +16,8 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   def this(ulx: Double, uly: Double, width: Int, height: Int) =
     this(ulx, uly, width, height, Array.fill[U](width * height)(null.asInstanceOf[U]))
 
-  def this(ulx: Double, uly: Double, width: Int, height: Int, pixelWidth: Short) =
-    this(ulx, uly, width, height, Array.fill[U](width * height)(null.asInstanceOf[U]), pixelWidth)
+  def this(ulx: Double, uly: Double, width: Int, height: Int, pixelWidth: Short, default: U) =
+    this(ulx, uly, width, height, Array.fill[U](width * height)(default), pixelWidth)
 
   /**
     * Constructor for an empty tile of given size.

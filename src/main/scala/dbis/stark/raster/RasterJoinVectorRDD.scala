@@ -1,22 +1,22 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
-import dbis.stark.STObject.{GeoType, MBR}
+import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
-import org.locationtech.jts.geom.GeometryFactory
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (var left: RasterRDD[U],
-                                                             var right: RDD[(STObject, P)],
-                                                             predicate: JoinPredicate,
-                                                             indexConfig: Option[IndexConfig]) extends RDD[(Tile[U],P)](left.context, Nil) {
+                                                     var right: RDD[(STObject, P)],
+                                                     predicate: JoinPredicate,
+                                                     pixelDefault: U,
+                                                     indexConfig: Option[IndexConfig]) extends RDD[(Tile[U],P)](left.context, Nil) {
 
   private val isIntersects = predicate == JoinPredicate.INTERSECTS
   private val predicateFunc = JoinPredicate.predicateFunction(predicate)
@@ -71,7 +71,7 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (var left: RasterRDD[U],
       val resultIter = right.iterator(split.rightPartition,context).flatMap{ case (rg, rv) =>
         // put all tiles into the tree
         index.query(rg).map{t =>
-          val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects)
+          val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects, pixelDefault)
           (matchingTilePart, rv)}
       }
 
@@ -92,7 +92,7 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (var left: RasterRDD[U],
           predicateFunc(tileGeom, rg)
         }.map { case (rg, rv) =>
           // get only covered/intersected pixels
-          val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects)
+          val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects, pixelDefault)
           (matchingTilePart, rv)
         }
       }

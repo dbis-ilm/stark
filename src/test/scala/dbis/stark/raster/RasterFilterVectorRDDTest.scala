@@ -30,7 +30,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val tileRDD = sc.parallelize(tiles)
 
-    val num = tileRDD.filter(STObject("POLYGON((11 11, 89 11, 89 89, 11 89, 11 11))"), JoinPredicate.INTERSECTS).count()
+    val num = tileRDD.filter(STObject("POLYGON((11 11, 89 11, 89 89, 11 89, 11 11))"), Byte.MinValue, JoinPredicate.INTERSECTS).count()
 
     num shouldBe 100-36
 
@@ -51,7 +51,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val gridPartitioner = new RasterGridPartitioner(9,9, 0, 100, 0, 100)
 
-    val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POLYGON((11 11, 89 11, 89 89, 11 89, 11 11))")).cache()
+    val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POLYGON((11 11, 89 11, 89 89, 11 89, 11 11))"), Byte.MinValue).cache()
 
     val num = filterRes.count()
 
@@ -72,14 +72,14 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val gridPartitioner = new RasterGridPartitioner(9,9, 0, 100, 0, 100)
 
-    val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POINT(51 51)"))
+    val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POINT(51 51)"), Byte.MinValue)
 
     val num = filterRes.count()
 
     num shouldBe 1
   }
 
-  ignore should "return only matching pixels for intersecting poly" in {
+  it should "return only matching pixels for intersecting poly" in {
     val width = 11
     val height = 7
 
@@ -91,7 +91,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val rdd = sc.parallelize(Seq(tile))
 
-    val result = rdd.filter(qry, JoinPredicate.INTERSECTS)
+    val result = rdd.filter(qry, Integer.MIN_VALUE, JoinPredicate.INTERSECTS)
 
     val matchedTile = result.collect().head
 
@@ -121,7 +121,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val rdd = sc.parallelize(Seq(tile))
 
-    val result = rdd.filter(qry, JoinPredicate.INTERSECTS)
+    val result = rdd.filter(qry, Integer.MIN_VALUE, JoinPredicate.INTERSECTS)
 
     val matchedTile = result.collect().head
 
@@ -150,7 +150,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val rdd = sc.parallelize(Seq(tile))
 
-    val result = rdd.filter(qry, JoinPredicate.INTERSECTS)
+    val result = rdd.filter(qry, Integer.MIN_VALUE, JoinPredicate.INTERSECTS)
 
     val matchedTile = result.collect().head
 

@@ -65,6 +65,23 @@ class TileTest extends FlatSpec with Matchers {
     s shouldBe ref
   }
 
+  it should "compute correct position" in {
+    val tile = Tile(ulx = 0, uly = 3,  3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0), pixelWidth = 1)
+
+    tile.pos(0.5, 0.5) shouldBe 6
+    tile.pos(0, 3) shouldBe 0
+
+  }
+
+  it should "compute correct position for bigger" in {
+
+    val tile = new Tile(ulx = 0, uly = 11,  16, 11)
+
+    tile.pos(4.5, 6.5) shouldBe 68
+    tile.pos(14.5, 0.5) shouldBe 174
+
+  }
+
 
 
   "Count" should "return the number of points with the given value" in {

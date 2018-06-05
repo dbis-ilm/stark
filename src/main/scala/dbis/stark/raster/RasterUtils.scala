@@ -22,32 +22,23 @@ object RasterUtils {
     println(tile.matrix)
 
     println(intersectionTile)
-    println(intersectionTile.matrix)
+//    println(intersectionTile.matrix)
 
-    var y = intersectionTile.height
-    while(y >= 0) {
-      for(x <- 0 until intersectionTile.width) {
+    for(j <- 0 until intersectionTile.height) {
+      for(i <- 0 until intersectionTile.width) {
 
-//        val origX = math.ceil(intersectionTile.ulx - x).toInt
-//        val origY = math.ceil(intersectionTile.uly - y).toInt
+        val origX = intersectionTile.ulx + tile.pixelWidth * i
+        val origY = intersectionTile.uly - tile.pixelWidth * j
 
-//        println(intersectionTile.ulx + x - tile.ulx)
+        
+        val orig = tile.value(origX, origY)
 
-        val origX = intersectionTile.ulx.toInt + tile.pixelWidth * x
-        val origY = intersectionTile.uly.toInt + tile.pixelWidth * y
+        // TODO set only if pixel intersects/contained with original geometry
+        // and not only its MBR
+        intersectionTile.setArray(i, j, orig)
 
-        print(s"$x,$y ==> $origX, $origY : ")
-
-        try {
-          val orig = tile.value(origX, origY)
-
-          println(orig)
-          intersectionTile.setArray(x, y, orig)
-        } catch {
-          case e: ArrayIndexOutOfBoundsException => println(s"error : ${e.getMessage}")
-        }
+        // TODO: use array copy to copy rowise?
       }
-      y -= 1
     }
 
     intersectionTile

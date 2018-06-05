@@ -79,7 +79,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
     num shouldBe 1
   }
 
-  it should "return only matching pixels" in {
+  ignore should "return only matching pixels for intersecting poly" in {
     val width = 11
     val height = 7
 
@@ -87,13 +87,81 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val tile = Tile(ulx = 0, uly = height, width,height, arr)
 
-    val rdd = sc.parallelize(Seq(tile))
-
     val qry = STObject("POLYGON((5 -1,  7.5 3.5, 13 5.5, 13 -1, 5 -1))")
+
+    val rdd = sc.parallelize(Seq(tile))
 
     val result = rdd.filter(qry, JoinPredicate.INTERSECTS)
 
-    result.collect().foreach(t => println(t.matrix))
+    val matchedTile = result.collect().head
 
+    withClue("height does not match") { matchedTile.height shouldBe 5 }
+    withClue("width does not match") { matchedTile.width shouldBe 6 }
+
+    val refValues = Array(
+      27 to 32,
+      38 to 43,
+      49 to 54,
+      60 to 65,
+      71 to 76
+    ).flatten
+
+    matchedTile.data should contain theSameElementsAs refValues
+  }
+
+  ignore should "return only matching pixels for bigger polygon" in {
+    val width = 11
+    val height = 7
+
+    val arr = Array.tabulate(width * height)(identity)
+
+    val tile = Tile(ulx = 0, uly = height, width,height, arr)
+
+    val qry = STObject("POLYGON((-1 -1,  100 -1, 100 100, -1 100, -1 -1))")
+
+    val rdd = sc.parallelize(Seq(tile))
+
+    val result = rdd.filter(qry, JoinPredicate.INTERSECTS)
+
+    val matchedTile = result.collect().head
+
+    withClue("height does not match") { matchedTile.height shouldBe tile.height }
+    withClue("width does not match") { matchedTile.width shouldBe tile.width }
+
+    matchedTile.data should contain theSameElementsAs tile.data
+
+    matchedTile.ulx shouldBe tile.ulx
+    matchedTile.uly shouldBe tile.uly
+    matchedTile.width shouldBe tile.width
+    matchedTile.height shouldBe tile.height
+
+    matchedTile.data should contain theSameElementsAs tile.data
+  }
+
+  it should "return only matching pixels for completely contained polygon" in {
+    val width = 11
+    val height = 7
+
+    val arr = Array.tabulate(width * height)(identity)
+
+    val tile = Tile(ulx = 0, uly = height, width,height, arr)
+
+    val qry = STObject("POLYGON((7.5 5.5, 8.5 5.5, 8.5 6.5, 7.5 6.5, 7.5 5.5))")
+
+    val rdd = sc.parallelize(Seq(tile))
+
+    val result = rdd.filter(qry, JoinPredicate.INTERSECTS)
+
+    val matchedTile = result.collect().head
+
+    withClue("height does not match") { matchedTile.height shouldBe 1 }
+    withClue("width does not match") { matchedTile.width shouldBe 1 }
+
+    val refValues = Array(
+      7 to 8,
+      18 to 19
+    ).flatten
+
+    matchedTile.data should contain theSameElementsAs refValues
   }
 }

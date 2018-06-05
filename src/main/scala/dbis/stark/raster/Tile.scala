@@ -29,7 +29,7 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
    * Set a raster point at a given position to a value.
    */
   def set(x: Double, y: Double, v: U): Unit =
-    data((uly - y).toInt * width + x.toInt) = v
+    data(pos(x,y)) = v
 
   def set(i: Int, v: U) = data(i) = v
 
@@ -38,10 +38,10 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   /**
    * Return the value at the given position of the raster.
    */
-  def value(x: Double, y: Double): U = {
-    val pos = (uly - y).toInt * width + x.toInt
-    data(pos)
-  }
+  def value(x: Double, y: Double): U = data(pos(x,y))
+
+  private[raster] def pos(x: Double, y: Double): Int =
+    (uly - y).toInt * width + x.toInt
 
   def value(i: Int): U = data(i)
 

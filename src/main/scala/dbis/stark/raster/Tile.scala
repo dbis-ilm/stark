@@ -1,6 +1,7 @@
 package dbis.stark.raster
 
 import scala.reflect.ClassTag
+import scala.reflect._
 
 /**
  * Tile represents a data type for 2D raster data.
@@ -40,8 +41,15 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
    */
   def value(x: Double, y: Double): U = data(pos(x,y))
 
+  @inline
+  private[raster] def column(x: Double): Int = math.abs(x - ulx).toInt
+  @inline
+  private[raster] def row(y: Double): Int = (uly - y).toInt
+
+  @inline
   private[raster] def pos(x: Double, y: Double): Int =
-    (uly - y).toInt * width + x.toInt
+    row(y) * width + column(x)
+
 
   def value(i: Int): U = data(i)
 
@@ -60,7 +68,7 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   /**
    * Return a string representation of the tile.
    */
-  override def toString: String = s"tile(ulx = $ulx, uly = $uly, w = $width, h = $height, pixelWidth = $pixelWidth)"
+  override def toString: String = s"tile(ulx = $ulx, uly = $uly, w = $width, h = $height, pixelWidth = $pixelWidth, data = array of ${classTag[U].runtimeClass} with length ${data.length})"
 
   def matrix = {
 

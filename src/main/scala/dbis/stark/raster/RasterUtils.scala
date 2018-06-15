@@ -14,16 +14,9 @@ object RasterUtils {
     val tileGeo = tileToGeo(tile)
     val matchingTileMBR = tileGeo.intersection(geo).getEnvelopeInternal
 
-    println(matchingTileMBR)
-
     val intersectionTile = mbrToTile[U](matchingTileMBR, default, tile.pixelWidth)
 
-    println(tile)
-    println(tile.matrix)
-
-    println(intersectionTile)
-
-
+    @inline
     def matches(pixelGeo: GeoType): Boolean = if(isIntersects) {
       geo.intersects(pixelGeo)
     } else {
@@ -39,21 +32,26 @@ object RasterUtils {
 
         val pixelGeo = mbrToGeo(new MBR(origX, origX + tile.pixelWidth, origY - tile.pixelWidth, origY))
         val origValue = if(matches(pixelGeo)) {
-          tile.value(origX, origY)
+
+          try {
+            tile.value(origX, origY)
+          } catch {
+            case e: ArrayIndexOutOfBoundsException =>
+              println(s"tile: $tile")
+              println(s"i=$i j=$j  ==> x=$origX y=$origY ==> pos=${tile.pos(origX, origY)}")
+              sys.error(e.getMessage)
+          }
         } else {
           default
         }
 
-
-        // TODO set only if pixel intersects/contained with original geometry
-        // and not only its MBR
+        // TODO: use array copy to copy rowise?
         intersectionTile.setArray(i, j, origValue)
 
-        // TODO: use array copy to copy rowise?
       }
     }
 
-    println(intersectionTile.matrix)
+//    println(intersectionTile.matrix)
     intersectionTile
   }
 

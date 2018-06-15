@@ -17,7 +17,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
   override protected def afterAll(): Unit = sc.stop()
 
 //  "A RasterFilterRDD"
-  ignore should " filter an unpartitioned RasterRDD" in {
+  it should " filter an unpartitioned RasterRDD" in {
 
     val width = 10
     val height = 10
@@ -36,7 +36,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
   }
 
-  ignore should "filter a partitioned RasterRDD for a large query polygon" in {
+  it should "filter a partitioned RasterRDD for a large query polygon" in {
 
     val width = 10
     val height = 10
@@ -49,7 +49,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val tileRDD = sc.parallelize(tiles)
 
-    val gridPartitioner = new RasterGridPartitioner(9,9, 0, 100, 0, 100)
+    val gridPartitioner = new RasterGridPartitioner(9,9, 0, 101, 0, 101)
 
     val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POLYGON((11 11, 89 11, 89 89, 11 89, 11 11))"), Byte.MinValue).cache()
 
@@ -58,7 +58,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
     num shouldBe 100-36
   }
 
-  ignore should "filter a partitioned RasterRDD with a query point" in {
+  it should "filter a partitioned RasterRDD with a query point" in {
     val width = 10
     val height = 10
 
@@ -99,8 +99,10 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
     withClue("width does not match") { matchedTile.width shouldBe 6 }
 
     val refValues = Array(
-      27 to 32,
-      38 to 43,
+      Seq(Integer.MIN_VALUE, Integer.MIN_VALUE),
+      29 to 32,
+      Seq(Integer.MIN_VALUE),
+      39 to 43,
       49 to 54,
       60 to 65,
       71 to 76
@@ -109,7 +111,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
     matchedTile.data should contain theSameElementsAs refValues
   }
 
-  ignore should "return only matching pixels for bigger polygon" in {
+  it should "return only matching pixels for bigger polygon" in {
     val width = 11
     val height = 7
 

@@ -77,8 +77,42 @@ class TileTest extends FlatSpec with Matchers {
 
     val tile = new Tile(ulx = 0, uly = 11,  16, 11)
 
+    tile.pos(0.5, 10.5) shouldBe 0
     tile.pos(4.5, 6.5) shouldBe 68
     tile.pos(14.5, 0.5) shouldBe 174
+
+  }
+
+  it should "compute correct row if tile doesn't start at 0" in {
+    val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
+
+    withClue("for tile uly"){tile.row(tile.uly) shouldBe 0}
+    tile.row(9.5) shouldBe 0
+    tile.row(8.5) shouldBe 1
+    tile.row(7.5) shouldBe 2
+    tile.row(6.4) shouldBe 3
+    tile.row(5.5) shouldBe 4
+//    withClue("for uly - height") { tile.row(tile.uly - tile.height) shouldBe 4 }
+  }
+
+  it should "copute the correct column if tile doesn't start at 0" in {
+    val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
+
+    withClue("for tile ulx"){tile.row(tile.ulx) shouldBe 0}
+    tile.column(9.5) shouldBe 0
+    tile.column(8.5) shouldBe 1
+    tile.column(7.5) shouldBe 2
+    tile.column(6.4) shouldBe 3
+    tile.column(5.5) shouldBe 4
+  }
+
+  it should "compute correct position if tile doesn't start at 0" in {
+
+    val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
+
+    tile.pos(12.5, 7.5) shouldBe 16
+    tile.pos(16.5, 5.5) shouldBe 34
+    tile.pos(10.5, 9.5) shouldBe 0
 
   }
 

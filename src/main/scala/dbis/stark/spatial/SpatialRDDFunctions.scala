@@ -1,11 +1,15 @@
 package dbis.stark.spatial
 
+import java.awt.image.BufferedImage
+import java.io.File
+
 import dbis.stark.STObject.MBR
 
 import scala.reflect.ClassTag
 import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
 import dbis.stark.visualization.Visualization
+import javax.imageio.ImageIO
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 
@@ -40,14 +44,26 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
                 fileExt: String = "png",
                 range: (Double,Double,Double,Double) = SpatialPartitioner.getMinMax(rdd),
                 flipImageVert: Boolean = false,
-                pointSize: Int = 1) = {
+                bgImagePath: String = null,
+                pointSize: Int = 1,
+                fillPolygon: Boolean = false,
+                worldProj: Boolean = false) = {
 
     val vis = new Visualization()
     val jsc = new JavaSparkContext(rdd.context)
 
     val env = new MBR(range._1, range._2, range._3, range._4)
 
-    vis.visualize(jsc, rdd, imageWidth, imageHeight, env, flipImageVert, path, fileExt, pointSize)
+    var width = imageWidth
+    var height = imageHeight
+
+    if(bgImagePath != null) {
+      val bg = ImageIO.read(new File(bgImagePath))
+      width = bg.getWidth()
+      height = bg.getHeight()
+    }
+
+    vis.visualize(jsc, rdd, width, height, env, flipImageVert, path, fileExt, bgImagePath, pointSize, fillPolygon, worldProj)
   }
 
   /**

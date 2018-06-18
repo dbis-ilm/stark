@@ -3,10 +3,12 @@ package dbis.stark.visualization
 import java.awt.Color
 import java.nio.file.{Files, Paths}
 
-import dbis.stark.TestUtils
+import dbis.stark.TestUtils.makeTimeStamp
+import dbis.stark.{STObject, TestUtils}
 import dbis.stark.raster.Tile
 import dbis.stark.spatial.SpatialRDD._
 import org.apache.spark.SparkContext
+import org.locationtech.jts.geom.Envelope
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 
@@ -36,6 +38,19 @@ class VisualizationTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
+  it should "create a PNG file on a world map" in {
+    val rdd = TestUtils.createPolyRDD(sc)
+    //val rdd = TestUtils.createPointRDD(sc)
+
+    val path = "/tmp/testimg"
+
+    rdd.visualize(4096,2048, path = path, fileExt = "png", range = (-90, 90, -180, 180),
+      flipImageVert = true, worldProj = true, fillPolygon = true, bgImagePath = "src/test/resources/mercator.jpg")
+
+    Files.exists(Paths.get(s"$path.png")) shouldBe true
+
+  }
+
   ignore should "create a jpg file" in {
     val rdd = TestUtils.createRDD(sc)
 
@@ -44,10 +59,9 @@ class VisualizationTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     rdd.visualize(800,600,path, fileExt = "jpg")
 
     Files.exists(Paths.get(s"$path.jpg")) shouldBe true
-
   }
 
-  it should "create a raster png file" in {
+  ignore should "create a raster png file" in {
 
     case class MyData(x: Int, y: Int, c: Int)
 

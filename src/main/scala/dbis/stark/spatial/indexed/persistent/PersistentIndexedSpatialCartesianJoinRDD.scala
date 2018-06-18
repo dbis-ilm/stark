@@ -14,7 +14,7 @@ import scala.reflect.ClassTag
 
 private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : ClassTag, G2 <: STObject: ClassTag, V: ClassTag, V2: ClassTag](
     sc: SparkContext,
-    var rdd1 : RDD[Index[G,(G,V)]],
+    var rdd1 : RDD[Index[(G,V)]],
     var rdd2 : RDD[(G2,V2)],
     predicate: (G,G2) => Boolean)
   extends RDD[(V, V2)](sc, Nil)
@@ -63,9 +63,9 @@ private[stark] class PersistentIndexedSpatialCartesianJoinRDD[G <: STObject : Cl
   		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
 
-      require(tree.isInstanceOf[RTree[G,(G,V)]], s"persistent join only supported for R-Trees currently, but is: ${tree.getClass}")
+      require(tree.isInstanceOf[RTree[(G,V)]], s"persistent join only supported for R-Trees currently, but is: ${tree.getClass}")
 
-      val indexBounds = tree.asInstanceOf[RTree[G,(G,V)]].root().getBounds.asInstanceOf[MBR]
+      val indexBounds = tree.asInstanceOf[RTree[(G,V)]].root().getBounds.asInstanceOf[MBR]
       
       val partitionCheck = rightParti.forall { p =>
         indexBounds.intersects(Utils.toEnvelope(p.partitionExtent(currSplit.rightPartition.index)))

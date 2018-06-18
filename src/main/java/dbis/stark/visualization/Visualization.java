@@ -8,7 +8,6 @@ import dbis.stark.STObject;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.broadcast.Broadcast;
-import scala.Int;
 import scala.Tuple2;
 
 import javax.imageio.ImageIO;

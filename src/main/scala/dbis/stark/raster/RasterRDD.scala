@@ -1,20 +1,21 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
-import dbis.stark.spatial.partitioner.SpatialPartitioner
-import dbis.stark.visualization.Visualization
-import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.{Partition, Partitioner, TaskContext}
+import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial.indexed.IndexConfig
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{Partition, Partitioner, TaskContext}
+
+import scala.reflect.ClassTag
 
 /**
   * A base class for representing raster data as RDD
   * @param _parent The parent (input) RDD
   * @param _partitioner The optional partitioner that _was_ used
   */
-class RasterRDD[U](@transient private val _parent: RDD[Tile[U]],
-                                private val _partitioner: Option[Partitioner]) extends RDD[Tile[U]](_parent) {
+class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
+                              private val _partitioner: Option[Partitioner]) extends RDD[Tile[U]](_parent) {
 
   /**
     * Create new Raster RDD from a parent (without partitioner)
@@ -59,9 +60,14 @@ class RasterRDD[U](@transient private val _parent: RDD[Tile[U]],
     * @param qry The query region
     * @return Returns
     */
-  def filter(qry: STObject) = new RasterFilterVectorRDD(qry, this)
+  def filter(qry: STObject, pixelDefault: U, predicate: JoinPredicate = JoinPredicate.INTERSECTS) =
+    new RasterFilterVectorRDD(qry, this, predicate, pixelDefault)
 
+//  def join(other: RDD[STObject], predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RasterRDD[U] =
+//    new RasterJoinVectorRDD(this, other, predicate, indexConf)
 
+  def join[P: ClassTag](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RDD[(Tile[U],P)] =
+    new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf)
 }
 
 

@@ -210,7 +210,7 @@ class BSPTest extends FlatSpec with Matchers {
     
   }
   
-  it should "create correct extent information" in {
+  ignore should "create correct extent information" in {
     val cell1 = Cell(0,
       range = NRectRange(NPoint(-4,-4), NPoint(0,0)),
       extent = NRectRange(NPoint(-7,-5), NPoint(0,1)))
@@ -267,7 +267,7 @@ class BSPTest extends FlatSpec with Matchers {
     withClue("p2 extent") { p2.get.extent shouldBe expP2.extent }
   }
   
-  it should "process a large number of cells"taggedAs Slow  in {
+  ignore should "process a large number of cells"taggedAs Slow  in {
     val sideLength = 0.1
     val maxCost = 10
     val numXCells = 500
@@ -277,8 +277,36 @@ class BSPTest extends FlatSpec with Matchers {
     
     val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
     
-    val bsp = new BSP(whole,histo,sideLength,100,false)
-    
+    val bsp = new BSP(whole,histo,sideLength,100,true)
+
+    val start = System.currentTimeMillis()
     bsp.partitions.length should be > 0
+    val end = System.currentTimeMillis()
+
+    println(s"linear bsp: ${end - start}ms")
+  }
+
+
+  "Async Binary Split" should "work in principle" in {
+    val sideLength = 0.1
+    val maxCost = 10
+    val numXCells = 500
+    val numYCells = 500
+    val llStartX = -180
+    val llStartY = -90
+
+    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+
+    val bsp = new BSPBinaryAsync(whole,histo,sideLength,100,true)
+
+    val start = System.currentTimeMillis()
+    bsp.partitions.length should be > 0
+    val end = System.currentTimeMillis()
+
+
+
+    println(s"binary async: ${end - start}ms  (${bsp.partitions.length} partitions)")
+
+    bsp.partitions.foreach(p => println(p.wkt))
   }
 }

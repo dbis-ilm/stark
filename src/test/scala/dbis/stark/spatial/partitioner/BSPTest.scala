@@ -267,7 +267,7 @@ class BSPTest extends FlatSpec with Matchers {
     withClue("p2 extent") { p2.get.extent shouldBe expP2.extent }
   }
   
-  ignore should "process a large number of cells"taggedAs Slow  in {
+  ignore should "process a large number of cells" taggedAs Slow  in {
     val sideLength = 0.1
     val maxCost = 10
     val numXCells = 500
@@ -283,11 +283,11 @@ class BSPTest extends FlatSpec with Matchers {
     bsp.partitions.length should be > 0
     val end = System.currentTimeMillis()
 
-    println(s"linear bsp: ${end - start}ms")
+    println(s"linear bsp: ${end - start}ms  (${bsp.partitions.length} partitions)")
   }
 
 
-  "Async Binary Split" should "work in principle" in {
+  ignore should "work in principle with async" taggedAs Slow in {
     val sideLength = 0.1
     val maxCost = 10
     val numXCells = 500
@@ -307,6 +307,37 @@ class BSPTest extends FlatSpec with Matchers {
 
     println(s"binary async: ${end - start}ms  (${bsp.partitions.length} partitions)")
 
-    bsp.partitions.foreach(p => println(p.wkt))
+//    bsp.partitions.foreach(p => println(p.wkt))
+//    println
+//    histo.map(_._1.range.wkt).foreach(println)
+  }
+
+  it should "be faster than sequential" taggedAs Slow in {
+    val sideLength = 0.1
+    val maxCost = 10
+    val numXCells = 500
+    val numYCells = 500
+    val llStartX = -180
+    val llStartY = -90
+
+    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+
+    val bspAsync = new BSPBinaryAsync(whole,histo,sideLength,100,true)
+
+
+    val start = System.currentTimeMillis()
+    bspAsync.partitions.length should be > 0
+    val end = System.currentTimeMillis()
+
+    println(s"binary async: ${end - start}ms  (${bspAsync.partitions.length} partitions)")
+
+    val bsp = new BSP(whole,histo,sideLength,100,true)
+    val startS = System.currentTimeMillis()
+    bsp.partitions.length should be > 0
+    val endS = System.currentTimeMillis()
+
+    println(s"sequential: ${endS - startS}ms  (${bsp.partitions.length} partitions)")
+
+    (endS - startS) shouldBe > (end - start)
   }
 }

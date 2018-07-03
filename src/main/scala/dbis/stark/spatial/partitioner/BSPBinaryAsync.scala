@@ -5,6 +5,7 @@ import java.util.concurrent.{ForkJoinPool, RecursiveTask}
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 
 import scala.collection.immutable.IndexedSeq
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 
 /**
@@ -74,10 +75,48 @@ class BSPBinaryAsync(private val _start: NRectRange,
    *
    * This is a lazy value
    */
-  lazy val partitions = {
-    val baseTask = new SplitTask(_start, cellHistogram, sideLength, maxCostPerPartition)
-    val pool = new ForkJoinPool()
-    pool.invoke(baseTask)
+  lazy val partitions: Array[Cell] = {
+    var i = 0
+
+    val nonempty = ListBuffer.empty[Cell]
+    while(i < cellHistogram.length && nonempty.length <= numCellThreshold) {
+      val cell = cellHistogram(i)._1
+
+      if(cellHistogram(i)._2 > 0)
+        nonempty += cell
+
+      i += 1
+    }
+
+
+    val resultPartitions = if(i <= cellHistogram.length) {
+      nonempty.toArray
+    } else {
+
+      val baseTask = new SplitTask(_start, cellHistogram, sideLength, maxCostPerPartition)
+      val pool = new ForkJoinPool()
+      val partitionRanges = pool.invoke(baseTask)
+
+      val resultCells = new Array[Cell](partitionRanges.length)
+
+        var j = 0
+        val iter = partitionRanges.iterator
+        while(iter.hasNext) {
+          val range = iter.next()
+          resultCells(j) = if(pointsOnly) {
+            Cell(range)
+          } else {
+            val extent = range //extentForRange(range)
+            Cell(range, extent)
+          }
+          j += 1
+        }
+
+
+      Array.empty[Cell]
+    }
+
+    resultPartitions
   }
 }
 
@@ -93,6 +132,7 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
   }
 
   protected[spatial] def cellId(p: NPoint): Int = {
+    //TODO make multidimensional
     val x = math.floor(math.abs(p(0) - range.ll(0)) / sideLength).toInt
     val y = math.floor(math.abs(p(1) - range.ll(1)) / sideLength).toInt
     y * numXCells + x
@@ -124,8 +164,8 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     */
   def costEstimation(part: NRectRange): Int = {
     val cellIds = getCellsIn(part)
-    var i = 0
 
+    var i = 0
     var sum = 0
     while (i < cellIds.size) {
       val id = cellIds(i)
@@ -146,20 +186,30 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
       return (None, None, costEstimation(part))
     }
 
-    Iterator.range(1, numCells, 1).map{ i =>
-      val splitVec = part.ur.withValue(dim, part.ll(dim) + i*sideLength)
+    var r1,r2: NRectRange = null
+    var minDiff = Int.MaxValue
 
-      val r1 = NRectRange(part.ll, splitVec)
-      val r2 = NRectRange(splitVec, part.ur)
+    var i = 1
+    while(i < numCells && (minDiff > 0.1 * maxCostPerPartition)) {
+      val splitPos = part.ll(dim) + i*sideLength
 
-      val cost1 = costEstimation(r1)
-      val cost2 = costEstimation(r2)
+      val rect1 = NRectRange(part.ll, part.ur.withValue(dim, splitPos))
+      val rect2 = NRectRange(part.ll.withValue(dim, splitPos), part.ur)
+
+      val cost1 = costEstimation(rect1)
+      val cost2 = costEstimation(rect2)
       val costDiff = math.abs(cost1 - cost2)
 
-      (Some(r1),Some(r2), costDiff)
-    }
-    .minBy(_._3)
+      if(costDiff < minDiff) {
+        r1 = rect1
+        r2 = rect2
+        minDiff = costDiff
+      }
 
+      i += 1
+    }
+
+    (Some(r1), Some(r2), minDiff)
 
 //    val start = range.ll(dim)
 //
@@ -200,7 +250,7 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     val splitWithMinDiff = (0 until range.dim).map(dim => bestSplitInDimension(dim, range)).minBy(_._3)
     val a = (splitWithMinDiff._1, splitWithMinDiff._2)
 
-    println(s"divide ${range.wkt} into \n\t ${a._1.map(_.wkt)}  and \n\t ${a._2.map(_.wkt)}")
+//    println(s"divide ${range.wkt} into \n\t ${a._1.map(_.wkt)}  and \n\t ${a._2.map(_.wkt)}")
 
     a
   }

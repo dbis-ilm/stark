@@ -5,7 +5,7 @@ import java.util.concurrent.{ForkJoinPool, RecursiveTask}
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 
 import scala.collection.immutable.IndexedSeq
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ListBuffer
 
 
 /**
@@ -40,34 +40,7 @@ class BSPBinaryAsync(private val _start: NRectRange,
 
 
 
-//  /**
-//    * Determine the extent of the given range. The extent is computed by combining the extents
-//    * of all cotnained elements
-//    * @param range The range to determine the extent fr
-//    * @return Returns the extent
-//    */
-//  protected[spatial] def extentForRange(range: NRectRange): NRectRange = {
-////    getCellsIn(range)
-////      .filter { id => id >= 0 && id < _cellHistogram.length } // FIXME: we should actually make sure cellInRange produces always valid cells
-////      .map { id => _cellHistogram(id)._1.extent } // get the extent for the cells
-////      .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent
-//
-//    val cellIds = getCellsIn(range)
-//
-//    var i = 0
-//    var extent = range
-//
-//    while(i < cellIds.length) {
-//      val id = cellIds(i)
-//      if(id >= 0 && id < cellHistogram.length) {
-//        extent = extent.extend(cellHistogram(id)._1.extent)
-//      }
-//      i += 1
-//    }
-//
-//    extent
-//
-//  }
+
 
 
   /**
@@ -88,32 +61,15 @@ class BSPBinaryAsync(private val _start: NRectRange,
       i += 1
     }
 
-
-    val resultPartitions = if(i <= cellHistogram.length) {
+    val resultPartitions = if(i == cellHistogram.length) {
       nonempty.toArray
     } else {
 
-      val baseTask = new SplitTask(_start, cellHistogram, sideLength, maxCostPerPartition)
+      val baseTask = new SplitTask(_start, cellHistogram, sideLength, maxCostPerPartition, pointsOnly)
       val pool = new ForkJoinPool()
-      val partitionRanges = pool.invoke(baseTask)
 
-      val resultCells = new Array[Cell](partitionRanges.length)
-
-        var j = 0
-        val iter = partitionRanges.iterator
-        while(iter.hasNext) {
-          val range = iter.next()
-          resultCells(j) = if(pointsOnly) {
-            Cell(range)
-          } else {
-            val extent = range //extentForRange(range)
-            Cell(range, extent)
-          }
-          j += 1
-        }
-
-
-      Array.empty[Cell]
+      val partitions = pool.invoke(baseTask)
+      partitions.toArray
     }
 
     resultPartitions
@@ -123,7 +79,8 @@ class BSPBinaryAsync(private val _start: NRectRange,
 
 class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Cell, Int)],
                 private val sideLength: Double,
-                private val maxCostPerPartition: Double) extends RecursiveTask[List[NRectRange]] {
+                private val maxCostPerPartition: Double,
+                private val pointsOnly: Boolean) extends RecursiveTask[List[Cell]] {
 
   private val numXCells = cellsPerDimension(range)(0)
 
@@ -211,73 +168,62 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
     (Some(r1), Some(r2), minDiff)
 
-//    val start = range.ll(dim)
-//
-//    var p1, p2: Option[NRectRange] = None
-//
-//    val cellsInDim = cellsPerDimension(part)(dim)
-//    var splitPos = start + (cellsInDim / 2) * sideLength
-//
-//
-//    val splitVec = part.ur.withValue(dim, splitPos)
-//    var r1 = NRectRange(part.ll, splitVec)
-//    var r2 = NRectRange(splitVec, part.ur)
-//
-//
-//    var cost1 = costEstimation(r1)
-//    var cost2 = costEstimation(r2)
-//
-//    var costDiff = math.abs(cost1 - cost2)
-//
-////    var iter = 0
-////    while(costDiff > 0.1 * maxCostPerPartition) {
-////
-////      splitPos = if(cost1 > cost2) {
-////        start + (cellsInDim / (2 << iter)) * sideLength
-////      } else {
-////
-////        ???
-////
-////      }
-////
-////
-////    }
-//
-//    (Some(r1), Some(r2), costDiff)
   }
 
   def findBestSplit(range: NRectRange): (Option[NRectRange], Option[NRectRange]) = {
-    val splitWithMinDiff = (0 until range.dim).map(dim => bestSplitInDimension(dim, range)).minBy(_._3)
-    val a = (splitWithMinDiff._1, splitWithMinDiff._2)
+    val splitWithMinDiff = (0 until range.dim).par // parallel processing of each dimension
+                                  .map(dim => bestSplitInDimension(dim, range)) // find best split for that dimension
+                                                                                // results in one candidate split per dimension
+                                  .minBy(_._3) // take best of all candidate split
 
-//    println(s"divide ${range.wkt} into \n\t ${a._1.map(_.wkt)}  and \n\t ${a._2.map(_.wkt)}")
-
-    a
+    (splitWithMinDiff._1, splitWithMinDiff._2) // return only the generated two partitions
   }
 
+  /**
+    * Determine the extent of the given range. The extent is computed by combining the extents
+    * of all cotnained elements
+    * @param range The range to determine the extent fr
+    * @return Returns the extent
+    */
+  protected[spatial] def extentForRange(range: NRectRange): NRectRange = {
 
-  override def compute(): List[NRectRange] = {
+    val cellIds = getCellsIn(range)
+
+    var i = 0
+    var extent = range
+
+    while(i < cellIds.length) {
+      val id = cellIds(i)
+      if(id >= 0 && id < cellHistogram.length) {
+        extent = extent.extend(cellHistogram(id)._1.extent)
+      }
+      i += 1
+    }
+
+    extent
+
+  }
+
+  override def compute(): List[Cell] = {
 
     if(costEstimation(range) <= maxCostPerPartition || !cellsPerDimension(range).exists(_ > 1)) {
-      List(range)
+      if(pointsOnly)
+        List(Cell(range))
+      else
+        List(Cell(range, extentForRange(range)))
+
     } else {
 
-
       val (s1, s2) = findBestSplit(range)
+      val task1 = s1.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
+      val task2 = s2.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
 
-      if(s1.isEmpty && s2.isDefined) {
-        List(range)
-      } else {
+      task1.foreach(_.fork())
+      val second = task2.map(_.compute())
+      val first = task1.map(_.join())
 
-        val task1 = s1.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition))
-        val task2 = s2.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition))
+      first.getOrElse(List.empty) ++ second.getOrElse(List.empty)
 
-        task1.foreach(_.fork())
-        val second = task2.map(_.compute())
-        val first = task1.map(_.join())
-
-        first.getOrElse(List.empty) ++ second.getOrElse(List.empty)
-      }
     }
 
   }

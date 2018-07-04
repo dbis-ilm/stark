@@ -34,15 +34,6 @@ class BSPBinaryAsync(private val _start: NRectRange,
 
 
 
-//  private lazy val numXCells = cellsPerDimension(start.range)(0) //math.ceil(math.abs(ur.head - ll.head) / sideLength).toInt
-
-
-
-
-
-
-
-
   /**
    * Compute the partitioning using the cost based BSP algorithm
    *
@@ -51,6 +42,15 @@ class BSPBinaryAsync(private val _start: NRectRange,
   lazy val partitions: Array[Cell] = {
     var i = 0
 
+
+    /*
+     * It may happen, that data is so dense that it relies only in very few cells
+     * So it may save time to return only those cells instead of computing the
+     * actual partitioning
+     *
+     * To do so, we check the histogram and find the non-empty cells. If these
+     * are fewer than a given threshold, return them as a partitioning.
+     */
     val nonempty = ListBuffer.empty[Cell]
     while(i < cellHistogram.length && nonempty.length <= numCellThreshold) {
       val cell = cellHistogram(i)._1
@@ -61,14 +61,25 @@ class BSPBinaryAsync(private val _start: NRectRange,
       i += 1
     }
 
+    //return the non-empty cells or compute the actual partitioning
     val resultPartitions = if(i == cellHistogram.length) {
       nonempty.toArray
     } else {
 
+      /* The actual partitioning is done using a recursive split of a candidate partition
+       * The SplitTask performs the recurive binary split of the given range  (if necessary)
+       */
+
+      // the start task covering the complete data space
       val baseTask = new SplitTask(_start, cellHistogram, sideLength, maxCostPerPartition, pointsOnly)
+
+      // parallel execution is handled by Java's ForkJoinPool
       val pool = new ForkJoinPool()
 
+      // invoke the initial task - which will spawn new subtasks
       val partitions = pool.invoke(baseTask)
+
+      // return the final result
       partitions.toArray
     }
 
@@ -76,7 +87,15 @@ class BSPBinaryAsync(private val _start: NRectRange,
   }
 }
 
-
+/**
+  * A SplitTask represents the splitting of a partition into two partitions.
+  * The generated two partitions are further processed by new SplitTasks in parallel
+  * @param range The range to split
+  * @param cellHistogram The histogram to use for cost estimation
+  * @param sideLength The side length of a cell
+  * @param maxCostPerPartition Cost threshold allowed per partition
+  * @param pointsOnly True if the dataset contains only points
+  */
 class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Cell, Int)],
                 private val sideLength: Double,
                 private val maxCostPerPartition: Double,
@@ -84,10 +103,12 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
   private val numXCells = cellsPerDimension(range)(0)
 
+  // compute how many cells fit in each dimension
   protected[spatial] def cellsPerDimension(part: NRectRange): IndexedSeq[Int] = (0 until part.dim).map { dim =>
     math.ceil(part.lengths(dim) / sideLength).toInt
   }
 
+  // compute the ID of the cell containing a given point
   protected[spatial] def cellId(p: NPoint): Int = {
     //TODO make multidimensional
     val x = math.floor(math.abs(p(0) - range.ll(0)) / sideLength).toInt
@@ -135,28 +156,41 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
   }
 
+  /*
+   * Find the best split for in a given dimension
+   * @param dim The dimension
+   * @param part the partition (candidate) to process
+   */
   private def bestSplitInDimension(dim: Int, part: NRectRange): (Option[NRectRange], Option[NRectRange], Int) = {
 
     val numCells = cellsPerDimension(part)(dim)
 
+    // there are fewer than 2 cells in the requested dimension (i.e. 0 or 1) -- we cannot further split this!
     if(numCells < 2) {
       return (None, None, costEstimation(part))
     }
 
+    // will store the two partitions with the minimal costDiff
     var r1,r2: NRectRange = null
     var minDiff = Int.MaxValue
 
+    // Iterate through all possible partitionings in this dimension and calculated the cost diff
     var i = 1
     while(i < numCells && (minDiff > 0.1 * maxCostPerPartition)) {
+
+      // the value in the dimension at which to split
       val splitPos = part.ll(dim) + i*sideLength
 
+      // create the two resulting partitions
       val rect1 = NRectRange(part.ll, part.ur.withValue(dim, splitPos))
       val rect2 = NRectRange(part.ll.withValue(dim, splitPos), part.ur)
 
+      // compute costs for each partitions
       val cost1 = costEstimation(rect1)
       val cost2 = costEstimation(rect2)
       val costDiff = math.abs(cost1 - cost2)
 
+      // set as new minimal cost diff --> could be our final result here
       if(costDiff < minDiff) {
         r1 = rect1
         r2 = rect2
@@ -170,7 +204,16 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
   }
 
+  /**
+    * Find the best split for a partition
+    *
+    * Will check partitioning in each dimension and take the one with minimal cost difference,
+    * i.e. try to create two balanced partitions
+    * @param range The partition to split
+    * @return Returns the two resulting partitions with the optimal split
+    */
   def findBestSplit(range: NRectRange): (Option[NRectRange], Option[NRectRange]) = {
+
     val splitWithMinDiff = (0 until range.dim).par // parallel processing of each dimension
                                   .map(dim => bestSplitInDimension(dim, range)) // find best split for that dimension
                                                                                 // results in one candidate split per dimension
@@ -204,24 +247,37 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
   }
 
+  /**
+    * Compute the partitioning or start new recursive sub tasks
+    * @return Returns the list of generated partitions
+    */
   override def compute(): List[Cell] = {
 
+    // if the partition to split does not exceed the maximum cost or is a single cell,
+    // return this as result partition
     if(costEstimation(range) <= maxCostPerPartition || !cellsPerDimension(range).exists(_ > 1)) {
       if(pointsOnly)
         List(Cell(range))
       else
         List(Cell(range, extentForRange(range)))
 
-    } else {
+    } else { // need to compute the split
 
+      // find the best split and ...
       val (s1, s2) = findBestSplit(range)
+
+      // ... create new sub tasks
       val task1 = s1.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
       val task2 = s2.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
 
+      // start the first task
       task1.foreach(_.fork())
+      // compute second task in current thread
       val second = task2.map(_.compute())
+      // wait for first task to complete
       val first = task1.map(_.join())
 
+      // combine results of both sub tasks
       first.getOrElse(List.empty) ++ second.getOrElse(List.empty)
 
     }

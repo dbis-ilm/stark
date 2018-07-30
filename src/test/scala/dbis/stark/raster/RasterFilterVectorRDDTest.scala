@@ -140,7 +140,7 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
     matchedTile.data should contain theSameElementsAs tile.data
   }
 
-  it should "return only matching pixels for completely contained polygon" in {
+  ignore should "return only matching pixels for completely contained polygon" in {
     val width = 11
     val height = 7
 

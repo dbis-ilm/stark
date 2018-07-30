@@ -43,7 +43,7 @@ class RTreeTest extends FlatSpec with Matchers {
     
     val entries = loadFile().map{case (_,i,_,stobject) => (stobject,i) }.toList
           
-    val tree = new RTree[STObject, (STObject, Int)](3)
+    val tree = new RTree[(STObject, Int)](3)
     
     entries.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
     
@@ -58,7 +58,7 @@ class RTreeTest extends FlatSpec with Matchers {
           
     val q: STObject = new WKTReader().read("POINT (53.483437 -2.2040706)")
 	  
-    val tree = new RTree[STObject, (STObject, Int)](3)
+    val tree = new RTree[(STObject, Int)](3)
     
     entries.foreach{ case (_,i,_,stobject) => tree.insert(stobject, (stobject,i)) }
     
@@ -93,7 +93,7 @@ class RTreeTest extends FlatSpec with Matchers {
       STObject("POINT(5 10)")
     )
     
-    val tree = new RTree[STObject, (STObject, Int)](3)
+    val tree = new RTree[(STObject, Int)](3)
     
     entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
     
@@ -122,7 +122,7 @@ class RTreeTest extends FlatSpec with Matchers {
       STObject("POINT(20 20)")
     )
 
-    val tree = new RTree[STObject, (STObject, Int)](2)
+    val tree = new RTree[(STObject, Int)](2)
     entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
 
     val q = STObject("POLYGON((0.5 0.5, 1.5 0.5, 1.5 1.5, 0.5 1.5, 0.5 0.5))")
@@ -145,7 +145,7 @@ class RTreeTest extends FlatSpec with Matchers {
       STObject("POINT(20 20)")
     )
 
-    val tree = new RTree[STObject, (STObject, Int)](2)
+    val tree = new RTree[(STObject, Int)](2)
     entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
 
     val q = STObject("POLYGON((15 15, 25 15, 25 25, 15 25, 15 15))")
@@ -168,7 +168,7 @@ class RTreeTest extends FlatSpec with Matchers {
       STObject("POINT(20 20)")
     )
 
-    val tree = new RTree[STObject, (STObject, Int)](2)
+    val tree = new RTree[(STObject, Int)](2)
     entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
 
     val q = STObject("POLYGON((30 30, 40 30, 35 35, 30 30))")
@@ -191,7 +191,7 @@ class RTreeTest extends FlatSpec with Matchers {
       STObject("POINT(20 20)")
     )
 
-    val tree = new RTree[STObject, (STObject, Int)](2)
+    val tree = new RTree[(STObject, Int)](2)
     entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
 
     val q = STObject("POLYGON((0 0, 50 0, 50 50, 0 50, 0 0))")

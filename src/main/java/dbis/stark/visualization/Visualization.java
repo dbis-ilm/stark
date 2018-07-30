@@ -1,5 +1,6 @@
 package dbis.stark.visualization;
 
+import dbis.stark.raster.Tile;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
@@ -26,33 +27,49 @@ public class Visualization implements Serializable {
     private int pixelColor = new Color(255, 0, 0).getRGB();
     private boolean fillPolygon;
     private boolean flipImageVert;
+    private boolean worldProj;
 
     public <G extends STObject, T> boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tuple2<G, T>> rdd,
                                                      int imageWidth, int imageHeight, Envelope envelope,
                                                      boolean flipImageVert, String outputPath, String outputType) {
 
-        return visualize(sparkContext, rdd, imageWidth, imageHeight, envelope, flipImageVert, outputPath, outputType, 1);
+        return visualize(sparkContext, rdd, imageWidth, imageHeight, envelope, flipImageVert, outputPath, outputType, null, 1, false, false);
     }
 
     public <G extends STObject, T> boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tuple2<G, T>> rdd,
                                                      int imageWidth, int imageHeight, Envelope envelope,
                                                      boolean flipImageVert, String outputPath, String outputType,
-                                                     int pointSize) {
+                                                     String bgImagePath, int pointSize, boolean fillPolygon, boolean worldProj) {
 
         this.imageHeight = imageHeight;
         this.imageWidth = imageWidth;
         this.flipImageVert = flipImageVert;
+        this.fillPolygon = fillPolygon;
+        this.worldProj = worldProj;
 
         scaleX = (double) imageWidth / envelope.getWidth();
         scaleY = (double) imageHeight / envelope.getHeight();
 
         Broadcast<Envelope> env = sparkContext.broadcast(envelope);
 
-        return draw(rdd, env, outputPath, outputType, pointSize);
+        return draw(rdd, env, outputPath, outputType, bgImagePath, pointSize);
     }
 
-    private <G extends STObject,T> boolean draw(JavaRDD<Tuple2<G, T>> rdd, Broadcast<Envelope> env, String outputPath, String outputType, int pointSize) {
+    public boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tile<Integer>> rdd, int imageWidth, int imageHeight, Envelope envelope, String outputPath) {
+        this.imageWidth = imageWidth;
+        this.imageHeight = imageHeight;
 
+        Broadcast<Envelope> env = sparkContext.broadcast(envelope);
+
+        this.flipImageVert = false;
+
+        this.scaleX = this.imageWidth / envelope.getWidth();
+        this.scaleY = this.imageHeight / envelope.getHeight();
+
+        return drawRaster(rdd, env, outputPath);
+    }
+
+    private <G extends STObject,T> boolean draw(JavaRDD<Tuple2<G, T>> rdd, Broadcast<Envelope> env, String outputPath, String outputType, String bgImagePath, int pointSize) {
         BufferedImage finalImage = rdd.mapPartitions(iter -> {
             BufferedImage imagePartition = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
             Graphics2D imageGraphic = imagePartition.createGraphics();
@@ -79,7 +96,67 @@ public class Visualization implements Serializable {
         })
         .getImage(); // return that image
 
+        if(bgImagePath != null) { // add background image if specified
+            BufferedImage bg = null;
+            try {
+                bg = ImageIO.read(new File(bgImagePath));
+
+                BufferedImage combinedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+                Graphics graphics = combinedImage.getGraphics();
+                graphics.drawImage(bg, 0, 0, null);
+                graphics.drawImage(finalImage, 0, 0, null);
+                finalImage = combinedImage;
+            } catch (IOException e) {}
+        }
+
         return saveImageAsLocalFile(finalImage, outputPath, outputType);
+    }
+
+    private boolean drawRaster(JavaRDD<Tile<Integer>> rdd, Broadcast<Envelope> envelope, String outputPath) {
+
+        BufferedImage theImage = rdd.mapPartitions( iter -> {
+            BufferedImage img = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = img.createGraphics();
+            Iterable<Tile<Integer>> iterable = () -> iter;
+
+            StreamSupport.stream(iterable.spliterator(), false)
+                .forEach(tile -> {
+
+                    for (int x = 0; x < tile.width(); x++) {
+                        for (int y = 0; y < tile.height(); y++) {
+
+                            g.setColor(new Color(tile.value(x,y)));
+
+//                            Coordinate c = new Coordinate(tile.ulx() + x, tile.uly() + y);
+
+//                            Tuple2<Integer, Integer> pos = getImageCoordinates(c, envelope.getValue());
+
+                            Integer imgX = (int)(tile.ulx() + x);
+                            Integer imgY = (int)(tile.uly() - (tile.height() - y));
+                            Tuple2<Integer, Integer> pos = new Tuple2<>(imgX, imgY);
+
+
+//                            System.out.printf("%d , %d  has img coords: %s\n", x,y, pos.toString());
+
+                            if(pos != null)
+                                drawPoint(g, pos, 5);
+
+                        }
+                    }
+
+                });
+
+            return Collections.singletonList(new ImageSerializableWrapper(img)).iterator();
+        }).reduce((img1, img2) -> {
+            BufferedImage combinedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics graphics = combinedImage.getGraphics();
+            graphics.drawImage(img1.image, 0, 0, null);
+            graphics.drawImage(img2.image, 0, 0, null);
+            return new ImageSerializableWrapper(combinedImage);
+        })
+        .image;
+
+        return saveImageAsLocalFile(theImage, outputPath, "png");
     }
 
     private boolean saveImageAsLocalFile(BufferedImage finalImage, String outputPath, String outputType) {
@@ -98,13 +175,17 @@ public class Visualization implements Serializable {
         Geometry geo = obj.getGeo();
 
         if(geo instanceof Point) {
-            Tuple2<Integer, Integer> p = getImageCoordinates(geo.getCoordinate(), env);
+            Tuple2<Integer, Integer> p = null;
+            if(worldProj) p = getMercatorProjection(geo.getCoordinate(), env);
+            else p = getImageCoordinates(geo.getCoordinate(), env);
             if(p != null) drawPoint(g, p, pointSize);
         } else if(geo instanceof Polygon) {
             Coordinate[] coordinates = geo.getCoordinates();
             java.awt.Polygon poly = new java.awt.Polygon();
             for(Coordinate c : coordinates) {
-                Tuple2<Integer, Integer> p = getImageCoordinates(c, env);
+                Tuple2<Integer, Integer> p = null;
+                if(worldProj) p = getMercatorProjection(c, env);
+                else p = getImageCoordinates(c, env);
                 if(p != null) poly.addPoint(p._1, p._2);
             }
 
@@ -117,6 +198,28 @@ public class Visualization implements Serializable {
 
     private void drawPoint(Graphics2D g, Tuple2<Integer, Integer> p, int pointSize) {
         g.fillRect(p._1, p._2, pointSize, pointSize);
+    }
+
+    private Tuple2<Integer, Integer> getMercatorProjection(Coordinate p, Envelope envelope) {
+        double lat = p.y;
+        double lng = p.x;
+
+        //values for mercator map
+        double mapLatBottom = -82.05;
+        double mapLngRight = 180;
+        double mapLngLeft = -180.85;
+
+        double mapLatBottomRad = mapLatBottom * Math.PI / 180;
+        double latitudeRad = lat * Math.PI / 180;
+        double mapLngDelta = (mapLngRight - mapLngLeft);
+
+        double worldMapWidth = ((imageWidth / mapLngDelta) * 360) / (2 * Math.PI);
+        double mapOffsetY = (worldMapWidth / 2 * Math.log((1 + Math.sin(mapLatBottomRad)) / (1 - Math.sin(mapLatBottomRad))));
+
+        double x = (lng - mapLngLeft) * (imageWidth / mapLngDelta);
+        double y = imageHeight - ((worldMapWidth / 2 * Math.log((1 + Math.sin(latitudeRad)) / (1 - Math.sin(latitudeRad)))) - mapOffsetY);
+
+        return new Tuple2<Integer, Integer>((int) x, (int) y);
     }
 
     private Tuple2<Integer, Integer> getImageCoordinates(Coordinate p, Envelope envelope) {

@@ -142,7 +142,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
 	  val foundGeoms = rdd.kNN(q, k, Distance.seuclid).collect()
 	  
-	  val tree = new RTree[STObject, (String, Long, String, STObject)](5)
+	  val tree = new RTree[(String, Long, String, STObject)](5)
     rddRaw.collect().foreach{ case (so, v) => tree.insert(so, v) }
 	  tree.build()
 	  

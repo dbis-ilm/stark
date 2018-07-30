@@ -288,7 +288,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     new LiveIndexedSpatialRDDFunctions(reparted, indexConfig)
   }
 
-  def index(partitioner: SpatialPartitioner, order: Int): RDD[Index[G,(G,V)]] = index(Some(partitioner), RTreeConfig(order))
+  def index(partitioner: SpatialPartitioner, order: Int): RDD[Index[(G,V)]] = index(Some(partitioner), RTreeConfig(order))
 
   /**
     * Create an index for each partition.
@@ -297,7 +297,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     * and thus changes the type of the RDD from {{{ RDD[(STObject, V)]  }}} to
     * {{{ RDD[Index[STObject, (STObject, V)]] }}}
     */
-  def index(partitioner: Option[SpatialPartitioner] = None, indexConfig: IndexConfig): RDD[Index[G,(G,V)]] = {
+  def index(partitioner: Option[SpatialPartitioner] = None, indexConfig: IndexConfig): RDD[Index[(G,V)]] = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
 
     reparted.mapPartitions(iter => {

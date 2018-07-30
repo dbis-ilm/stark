@@ -77,6 +77,32 @@ object TestUtils {
     else
       rdd
   }
+
+  def createPointRDD(
+                 sc: SparkContext,
+                 file: String = "src/test/resources/points.csv",
+                 sep: Char = ';') = {
+
+    val rdd = sc.textFile(file) // let's start with only one partition and repartition later
+      .map { line => line.split(sep) }
+      .map { arr =>
+        (STObject(arr(0).toDouble, arr(1).toDouble, 0), arr(0).toDouble) }
+
+      rdd
+  }
+
+  def createPolyRDD(
+                     sc: SparkContext,
+                     file: String = "src/test/resources/poly.csv",
+                     sep: Char = ';') = {
+
+    val rdd = sc.textFile(file) // let's start with only one partition and repartition later
+      .map { line => line.split(sep) }
+      .map { arr =>
+        (STObject(arr(0), 0), 0) }
+
+    rdd
+  }
   
   def makeTimeStamp(year: Int, month: Int, day: Int) = LocalDate.of(year, month, day).toEpochDay
   

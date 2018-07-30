@@ -1,5 +1,6 @@
 package dbis.stark.spatial.indexed
 
+import dbis.stark.STObject.{GeoType, MBR}
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
 import org.locationtech.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
@@ -8,16 +9,17 @@ import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
-protected[indexed] class Data[G <: STObject,T](/*var ts: Int, */val data: T, val so: G) extends Serializable
+/*var ts: Int, */
+protected[indexed] class Data[D](val data: D, val so: STObject) extends Serializable
 
 /**
  * A R-Tree abstraction based on VividSolution's ST R-Tree implementation
  * 
  * @param capacity The number of elements in a node
  */
-class RTree[G <: STObject : ClassTag, D: ClassTag ](
+class RTree[D: ClassTag ](
     @transient private val capacity: Int
-  ) extends STRtreePlus[Data[G,D]](capacity) with Index[G,D] with KnnIndex[D] with WithinDistanceIndex[D] { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
+  ) extends STRtreePlus[Data[D]](capacity) with Index[D] with KnnIndex[D] with WithinDistanceIndex[D] { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
 //  private var timestamp = 0
 //  protected[indexed] def ts: Int = timestamp
@@ -28,8 +30,11 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param geom The geometry (key) to index
    * @param data The associated value
    */
-  def insert(geom: G, data: D): Unit =
-    super.insert(geom.getEnvelopeInternal, new Data(/*-1,*/data, geom))
+  def insert(geom: STObject, data: D): Unit =
+    super.insert(geom.getGeo.getEnvelopeInternal, new Data(data, geom))
+
+  def insert(mbr: GeoType, data: D) =
+    super.insert(mbr.getEnvelopeInternal, new Data(data, mbr))
   
   /**
    * Query the tree and find all elements in the tree that intersect
@@ -39,10 +44,10 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @return Returns all elements of the tree that intersect with the query geometry
    */
   def oldQuery(box: STObject): Iterator[D] =
-    super.query(box.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[G,D]].data)
+    super.query(box.getGeo.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[D]].data)
 
   def query(box: STObject): Iterator[D] =
-    super.iteratorQuery(box.getEnvelopeInternal).asScala.map(_.data)
+    super.iteratorQuery(box.getGeo.getEnvelopeInternal).asScala.map(_.data)
 
   /**
    * A read only query variant of the tree.
@@ -69,7 +74,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
         new Coordinate(env.getMinX - maxDist.maxValue - 1, env.getMinY - maxDist.maxValue - 1),
         new Coordinate(env.getMaxX + maxDist.maxValue + 1, env.getMaxY + maxDist.maxValue + 1))
     
-    super.query(env2).iterator().map(_.asInstanceOf[Data[G,D]]).filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
+    super.query(env2).iterator().map(_.asInstanceOf[Data[D]]).filter { p => distFunc(qry, p.so) <= maxDist }.map(_.data)
   }
   
 //  private def doQueryRO(qry: STObject, env: Envelope, pred: (STObject, STObject) => Boolean) = {
@@ -93,9 +98,9 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
    * @param l The list that contains plain elements and other lists
    * @return Returns a flat list Data
    */
-  private def unnest[T](l: java.lang.Iterable[_]): Iterator[Data[G,D]] =
+  private def unnest[T](l: java.lang.Iterable[_]): Iterator[Data[D]] =
     l.flatMap {
-      case d: Data[G, D] => Iterator.single(d)
+      case d: Data[D] => Iterator.single(d)
       case a: java.util.ArrayList[_] => unnest(a)
     }.toIterator
   
@@ -107,7 +112,7 @@ class RTree[G <: STObject : ClassTag, D: ClassTag ](
   protected[indexed] def items = super.itemsTree()
       .iterator()
       .flatMap{ l => (l: @unchecked) match {
-        case d: Data[G,D] => Iterator.single(d)
+        case d: Data[D] => Iterator.single(d)
         case a: java.util.ArrayList[_] => unnest(a)
         } 
       }
@@ -143,7 +148,7 @@ protected[stark] object DataDistance {
 
   def getGeo(o: AnyRef): STObject = o match {
       case so: STObject => so //.getGeo
-      case d: Data[_,_] => d.so //.getGeo
+      case d: Data[_] => d.so //.getGeo
       case _ => throw new IllegalArgumentException(s"unsupported type: ${o.getClass}")
     } 
 }

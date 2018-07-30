@@ -48,8 +48,14 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
     SpatialPartitioner.getCellId(tile.ulx, tile.uly, minX, minY, maxX, maxY, partitionWidth, partitionsHeight, partitionsX)
   }
 
+  /**
+    * Return the partitions that intersect with the spatial component of the provided object
+    * @param g The object to apply as a filter
+    * @return Returns all partitions that intersect with the given object
+    */
   protected[raster] def getPartitionsFor(g: STObject): Array[Partition] = {
 
+    // get the factory to instantiate vector geometry objects
     val factory = new GeometryFactory(g.getGeo.getPrecisionModel, g.getGeo.getSRID)
 
     var i = 0
@@ -58,10 +64,16 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
     val result = ListBuffer.empty[RasterPartition]
 
     while( i < numPartitions) {
+      // get the MBR of partition
       val cellMBR = idToMBR(i)
 
+      // convert the MBR to a geometry
       val cellGeom = factory.toGeometry(cellMBR)
 
+      /* if the partition intersects with the geo
+       * create a special RasterPartition, with the ID
+       * of the actual partition (i) and a sequence number (currID)
+       */
       if(g.getGeo.intersects(cellGeom)) {
         result += RasterPartition(currId, i)
         currId += 1
@@ -75,6 +87,12 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
 }
 
 object RasterGridPartitioner {
+
+  /**
+    * Determine min and max value for the raster RDD
+    * @param rdd The RDD
+    * @return A tuple of (minX, maxX, minY, maxY)
+    */
   def getMinMax(rdd: RasterRDD[_]) = rdd.map { t =>
     (t.ulx, t.ulx + t.width, t.uly - t.height, t.uly)
   }.reduce{(t1,t2) =>

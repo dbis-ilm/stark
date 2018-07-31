@@ -2,7 +2,7 @@ package dbis.stark.spatial
 
 import dbis.stark.spatial.indexed.Index
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory}
+import dbis.stark.spatial.partitioner.PartitionerConfig
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
@@ -87,7 +87,7 @@ object SpatialRDD {
     type ValuePair = (V,V2)
     type Combiner = ListBuffer[ValuePair]
     
-    val createCombiner: ( ValuePair => Combiner) = pair => ListBuffer(pair)
+    val createCombiner: ValuePair => Combiner = pair => ListBuffer(pair)
     
     val mergeValue: (Combiner, ValuePair) => Combiner = (list, value) => list += value
     
@@ -113,7 +113,7 @@ object SpatialRDD {
 	 * @param rdd The RDD to convert
 	 * @return Returns a IndexedSpatialRDDFunctions object that contains spatial methods that use indexing
 	 */
-	implicit def convertSpatialPersistedIndexing[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[Index[G,(G,V)]]): PersistedIndexedSpatialRDDFunctions[G, V]
+	implicit def convertSpatialPersistedIndexing[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[Index[(G,V)]]): PersistedIndexedSpatialRDDFunctions[G, V]
     = new PersistedIndexedSpatialRDDFunctions(rdd)
 
 }

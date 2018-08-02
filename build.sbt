@@ -7,9 +7,9 @@ lazy val stark = (project in file("."))
 libraryDependencies ++= Seq(
    //"com.vividsolutions" % "jts" % "1.13" withSources() withJavadoc(),
    "org.locationtech.jts" % "jts-core" % "1.15.0",
-   "org.apache.spark" %% "spark-core" % "2.1.0" % "provided" withSources() withJavadoc(),
-   "org.apache.spark"  %% "spark-mllib" % "2.1.0" % "provided",
-   "org.apache.spark" %% "spark-sql" % "2.1.0" % "provided",
+   "org.apache.spark" %% "spark-core" % "2.3.1" % "provided" withSources() withJavadoc(),
+   "org.apache.spark"  %% "spark-mllib" % "2.3.1" % "provided",
+   "org.apache.spark" %% "spark-sql" % "2.3.1" % "provided",
    //"fm.void.jetm" % "jetm" % "1.2.3",
    "org.scalatest" %% "scalatest" % "3.0.1" % "test" withSources(),
    "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",

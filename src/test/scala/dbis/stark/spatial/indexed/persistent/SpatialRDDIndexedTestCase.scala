@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.STObject.{getInternal, makeSTObject, stringToGeom}
+import dbis.stark.STObject.{getInternal, makeSTObject, fromWKT}
 import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}

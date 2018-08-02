@@ -107,8 +107,8 @@ case class STObject(
   }
   
   override def hashCode() = (g,time).hashCode()
-  
-  
+
+
   def getGeo = g
   def getTemp = time
   
@@ -146,6 +146,8 @@ object STObject {
 	 * @param s The WKT string
 	 * @return The geometry parsed from the given textual representation
 	 */
-	implicit def stringToGeom(s: String): STObject = STObject(s)
+	implicit def fromWKT(s: String): STObject = STObject(s)
+
+  implicit def asString(s: STObject): String = s.toString
   
 }

@@ -2,9 +2,8 @@ package org.apache.spark.sql.spatial
 
 
 import dbis.stark.STObject
-import dbis.stark.STObject.GeoType
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.types._
 import org.locationtech.jts.geom.Geometry
 
@@ -27,7 +26,8 @@ private[sql] class STObjectUDT extends UserDefinedType[STObject] {
         require(row.numFields == 1,
           s"STObject.deserialize given row with length ${row.numFields} but requires length == 1")
         val geo = row.get(0, BinaryType).asInstanceOf[Geometry]
-        new STObject(geo, null)
+        val res = new STObject(geo, None) // TODO (de-)serialize time too
+        res
     }
   }
 
@@ -44,6 +44,5 @@ private[sql] class STObjectUDT extends UserDefinedType[STObject] {
 }
 
 case object STObjectUDT extends STObjectUDT {
-  println("register STObjectUDT")
   UDTRegistration.register(classOf[STObject].getName, classOf[STObjectUDT].getName)
 }

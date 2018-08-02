@@ -72,5 +72,6 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
 
 
 object  RasterRDD {
+  implicit def toRasterRDD[U : ClassTag](rdd: RDD[Tile[U]]) = new RasterRDD[U](rdd)
   implicit def toDrawable(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctions(rdd)
 }

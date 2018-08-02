@@ -2,6 +2,8 @@ package dbis.stark.raster
 
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate
+import dbis.stark.raster.RasterRDD._
+
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 

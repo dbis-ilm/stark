@@ -1,5 +1,6 @@
 package dbis.stark.sql.spatial
 
+import dbis.stark.STObject
 import dbis.stark.sql.Functions.fromWKT
 import dbis.stark.sql.STARKSession
 import org.apache.spark.sql.SparkSession
@@ -19,11 +20,13 @@ class SqlFilterTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   "A SQL spatial filter" should "be correct for contains" in {
 
+    val sparkSession: SparkSession = spark
+    import sparkSession.implicits._
+
     val s = Seq("""{ "column1": "POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))", "column2": 42 }""",
       """{ "column1": "POINT (25 20)", "column2": 69 }""")
 
-    val rdd = spark.sparkContext.parallelize(s)
-    val df = spark.read.json(rdd)
+    val df = spark.read.json(s.toDS())
 
     val df2 = df.withColumn("location", fromWKT(df("column1")))
 
@@ -31,13 +34,14 @@ class SqlFilterTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     df2.createOrReplaceTempView("myData")
 
     // run query
-    val sqlDF = spark.sql("SELECT asString(location), column2 FROM myData WHERE containedBy(location, fromWKT('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))'))")
+    val sqlDF = spark.sql("SELECT location, column2 FROM myData WHERE containedBy(location, fromWKT('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))'))")
+
 
     val result = sqlDF.collect()
     result.length shouldBe 1
 
     val row = result(0)
-    row.getString(0) shouldBe "STObject(POINT (25 20),None)"
+    row.getAs[STObject](0) shouldBe STObject("POINT (25 20)")
     row.getLong(1) shouldBe 69
   }
 

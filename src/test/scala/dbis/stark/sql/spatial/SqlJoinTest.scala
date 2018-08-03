@@ -1,10 +1,10 @@
 package dbis.stark.sql.spatial
 
+import dbis.stark.STObject
 import dbis.stark.sql.Functions.fromWKT
 import dbis.stark.sql.STARKSession
-import org.apache.spark.sql.SparkSession
-
-
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.{Row, SparkSession}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
@@ -90,7 +90,7 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     result(1).getLong(3) shouldBe 69
   }
 
-  ignore should "compute join with programmatic API" in {
+  it should "compute join with programmatic API" in {
     val s = Seq("""{ "column1": "POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))", "column2": 42 }""",
       """{ "column1": "POINT (25 20)", "column2": 69 }""")
 
@@ -101,10 +101,26 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val l = spark.read.json(s.toDS())
     val r = spark.read.json(s.toDS())
 
-    val left =  l.withColumn("location", fromWKT(l("column1")))
-    val right = r.withColumn("location", fromWKT(r("column1")))
+    val left =  l.withColumn("location1", fromWKT(l("column1"))).withColumnRenamed("column2","leftCol2")
+    val right = r.withColumn("location2", fromWKT(r("column1"))).withColumnRenamed("column2","rightCol2")
 
-    left.join(right, $"location" === $"location")
+    val resultDF = left.join(right, $"location1" === $"location2").select("location1", "leftCol2", "location2", "rightCol2")
+
+//    resultDF.show(truncate = false)
+
+    val result = resultDF.collect()
+
+    result.length shouldBe 2
+
+    result(1).getAs[STObject]("location1") shouldBe STObject("POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))")
+    result(1).getLong(1) shouldBe 42
+    result(1).getAs[STObject]("location2") shouldBe STObject("POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))")
+    result(1).getLong(3) shouldBe 42
+
+    result(0).getAs[STObject]("location1") shouldBe STObject("POINT (25 20)")
+    result(0).getLong(1) shouldBe 69
+    result(0).getAs[STObject]("location2") shouldBe STObject("POINT (25 20)")
+    result(0).getLong(3) shouldBe 69
   }
 
 }

@@ -34,7 +34,7 @@ class SqlFilterTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     df2.createOrReplaceTempView("myData")
 
     // run query
-    val sqlDF = spark.sql("SELECT location, column2 FROM myData WHERE containedBy(location, fromWKT('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))'))")
+    val sqlDF = spark.sql("SELECT location, column2 FROM myData WHERE st_containedby(location, st_geomfromwkt('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))'))")
 
 
     val result = sqlDF.collect()

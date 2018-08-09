@@ -128,9 +128,14 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       val resultIter = left.iterator(split.leftPartition, context).flatMap { case (lg, lv) =>
         rightList.iterator.filter { case (rg, _) =>
           val res = predicateFunc(lg, rg)
-//        println(s"check ($predicateFunc) $lg -- $rg --> $res")
+//          println(s"check ($predicateFunc) $lg -- $rg --> $res")
           res
-        }.map { case (_, rv) => (lv, rv) }
+        }.map { case (_, rv) =>
+//          val r = (lg, lv, rg, rv)
+//          println(s"$lg   ---   $rg")
+//          r
+          (lv,rv)
+        }
       }
       new InterruptibleIterator(context, resultIter)
 

@@ -22,8 +22,10 @@ import org.locationtech.jts.io.WKTReader
  * @param time The optional time component 
  */
 case class STObject(
-   private val g: GeoType,
+   g: GeoType,
    time: Option[TemporalExpression]) extends BaseExpression[STObject] {
+
+  private def this() = this(null, None)
 
   def area = g.getArea
   def length = time.map(_.length)

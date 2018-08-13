@@ -76,6 +76,10 @@ public class ResultIterator<T> implements Iterator<T> {
     private void findNextObject() {
 
         T found = null;
+        if(stack.empty()) {
+            return;
+        }
+
         do {
             // get the next element to process ...
             Pair pair = stack.pop();

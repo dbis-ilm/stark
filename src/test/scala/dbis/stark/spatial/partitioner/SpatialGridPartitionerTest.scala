@@ -60,7 +60,7 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
 
 //    val parted = rdd.partitionBy(parti)
 
-    val gridConfig = GridStategy(5, pointsOnly = false)
+    val gridConfig = GridStrategy(5, pointsOnly = false)
 
     val parted = rdd.partitionBy(gridConfig)
     val parti = parted.partitioner match {

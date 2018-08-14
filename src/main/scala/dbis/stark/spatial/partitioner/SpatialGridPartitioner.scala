@@ -48,25 +48,23 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,
   protected[this] val yLength: Double = math.abs(maxY - minY) / partitionsPerDimension
 
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
-  private val partitions: Array[Cell] = {
-    (if(pointsOnly) {
+  private val partitions: Array[(Cell,Int)] = {
+    if(pointsOnly) {
       SpatialPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
     } else {
       SpatialPartitioner.buildHistogram(rdd,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
 
-    }).map(_._1)
-
+    }
   }
 
   override def printPartitions(fName: Path): Unit = {
-    val list2 = partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList
+    val list2 = partitions.map { case (cell, _) => s"${cell.id};${cell.range.wkt}" }.toList
     super.writeToFile(list2, fName)
-
   }
 
-  override def partitionBounds(idx: Int): Cell = partitions(idx) //getCellBounds(idx)
+  override def partitionBounds(idx: Int): Cell = partitions(idx)._1 //getCellBounds(idx)
 
-  override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
+  override def partitionExtent(idx: Int): NRectRange = partitions(idx)._1.extent
 
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 

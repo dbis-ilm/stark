@@ -122,11 +122,11 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     // if treeOrder is <= 0 we do not use indexing
     if(indexConfig.isEmpty) {
       // collect the right partition into an array
-      val rightList = right.iterator(split.rightPartition, context).toList
+//      val rightList = right.iterator(split.rightPartition, context).toList
 
       // loop over the left partition and check join condition on every element in the right partition's array
       val resultIter = left.iterator(split.leftPartition, context).flatMap { case (lg, lv) =>
-        rightList.iterator.filter { case (rg, _) =>
+        right.iterator(split.rightPartition, context).filter { case (rg, _) =>
           val res = predicateFunc(lg, rg)
 //        println(s"check ($predicateFunc) $lg -- $rg --> $res")
           res

@@ -362,9 +362,6 @@ class BSP(private val _start: NRectRange,
       }
     }
 
-    // FIXME: this is a dirty workaround for a bug that does not add all non-empty cells to partitions
-    // somehow there are non-empty cells that also exceed max cost but which are not added to the result partitions
-
     // index is the ID of the partition
     resultPartitions.iterator.zipWithIndex.foreach { case (p, i) =>
       p.id = i

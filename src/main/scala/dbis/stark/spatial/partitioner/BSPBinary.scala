@@ -46,7 +46,7 @@ class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
   def maxCostPerPartition = _maxCostPerPartition
   
   
-  private lazy val numXCells = math.ceil(( math.abs(_ur.head - _ll.head) ) / _sideLength).toInt
+  private lazy val numXCells = math.ceil(math.abs(_ur.head - _ll.head) / _sideLength).toInt
   
   protected[spatial] def cellId(p: NPoint) = {
       
@@ -76,7 +76,7 @@ class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
     val llCellId = cellId(r.ll)
     
     (0 until numCells(1)).flatMap { i =>
-      (llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells )
+      llCellId + i*numXCells until llCellId+numCells(0)+ i*numXCells
     }
   }
   
@@ -89,7 +89,7 @@ class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
    * @param part The partition 
    */
   def costEstimation(part: Cell): Double = getCellsIn(part.range)
-    .filter{id => id >= 0 && id < histogram.size && histogram(id)._2 > 0}
+    .filter{id => id >= 0 && id < histogram.length && histogram(id)._2 > 0}
     .map{id => histogram(id)._2}
     .sum
 //    histogram
@@ -104,7 +104,7 @@ class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
       
   protected[spatial] def extentForRange(range: NRectRange) = {
     getCellsIn(range)
-      .filter { id => id >= 0 && id < histogram.size } // FIXME: we should actually make sure cellInRange produces always valid cells
+      .filter { id => id >= 0 && id < histogram.length } // FIXME: we should actually make sure cellInRange produces always valid cells
       .map { id => histogram(id)._1.extent } // get the extent for the cells
       .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent 
   }

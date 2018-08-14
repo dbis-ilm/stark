@@ -4,9 +4,11 @@ import org.locationtech.jts.geom.{Envelope, GeometryFactory, Point}
 import dbis.stark.STObject.{GeoType, MBR}
 
 object Utils {
-  
+
+  @inline
   def toEnvelope(r: NRectRange): MBR = new Envelope(r.ll(0), r.ur(0), r.ll(1), r.ur(1))
 
+  @inline
   def fromEnvelope(g: GeoType): NRectRange = {
     val env = g.getEnvelopeInternal
     NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))

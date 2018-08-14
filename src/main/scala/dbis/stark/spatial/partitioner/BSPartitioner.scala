@@ -44,15 +44,14 @@ object BSPartitioner {
   * @tparam G Geometry type
   * @tparam V Payload data type
   */
-class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
-                                                            rdd: RDD[(G,V)],
-                                                            val sideLength: Double,
-                                                            maxCostPerPartition: Double,
-                                                            pointsOnly: Boolean,
-                                                            _minX: Double,
-                                                            _maxX: Double,
-                                                            _minY: Double,
-                                                            _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
+                                                           val sideLength: Double,
+                                                           maxCostPerPartition: Double,
+                                                           pointsOnly: Boolean,
+                                                           _minX: Double,
+                                                           _maxX: Double,
+                                                           _minY: Double,
+                                                           _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   def this(rdd: RDD[(G,V)],
            sideLength: Double,

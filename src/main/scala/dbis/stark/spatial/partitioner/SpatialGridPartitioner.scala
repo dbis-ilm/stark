@@ -19,15 +19,14 @@ import scala.reflect.ClassTag
  * @param rdd The [[org.apache.spark.rdd.RDD]] to partition
  * @param dimensions The dimensionality of the input data
  */
-class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
-                                                                     rdd: RDD[(G,V)],
-                                                                     partitionsPerDimension: Int,
-                                                                     pointsOnly: Boolean,
-                                                                     _minX: Double,
-                                                                     _maxX: Double,
-                                                                     _minY: Double,
-                                                                     _maxY: Double,
-                                                                     dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
+                                                                    partitionsPerDimension: Int,
+                                                                    pointsOnly: Boolean,
+                                                                    _minX: Double,
+                                                                    _maxX: Double,
+                                                                    _minY: Double,
+                                                                    _maxY: Double,
+                                                                    dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   require(dimensions == 2, "Only 2 dimensions supported currently")
 

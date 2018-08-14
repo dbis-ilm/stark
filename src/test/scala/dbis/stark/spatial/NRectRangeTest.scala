@@ -107,6 +107,124 @@ class NRectRangeTest extends FlatSpec with Matchers {
     
     ex shouldBe rect
   }
+
+  it should "correctly extend for a point in +x" in {
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(11, 5)
+
+    val expExt = NRectRange(NPoint(3,3), NPoint(11,10))
+
+    val ext = rect.extend(p)
+
+    ext shouldBe expExt
+  }
+
+  it should "correctly extend for a point in -x" in {
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(2, 5)
+
+    val expExt = NRectRange(NPoint(2,3), NPoint(10,10))
+
+    val ext = rect.extend(p)
+
+    ext shouldBe expExt
+  }
+
+  it should "correctly extend for a point in +y" in {
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(5, 12)
+
+    val expExt = NRectRange(NPoint(3,3), NPoint(10,12))
+
+    val ext = rect.extend(p)
+
+    ext shouldBe expExt
+  }
+
+  it should "correctly extend for a point in -y" in {
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(5, 1)
+
+    val expExt = NRectRange(NPoint(3,1), NPoint(10,10))
+
+    val ext = rect.extend(p)
+
+    ext shouldBe expExt
+  }
+
+  //////////
+
+  it should "correctly extend for a point in +x with eps" in {
+    val eps = 1/1000.0
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(11, 5)
+
+    val expExt = NRectRange(NPoint(3,3), NPoint(11+eps,10))
+
+    val ext = rect.extend(p,eps)
+
+    ext shouldBe expExt
+  }
+
+  it should "correctly extend for a point in -x with eps" in {
+    val eps = 1/1000.0
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(2, 5)
+
+    val expExt = NRectRange(NPoint(2,3), NPoint(10,10))
+
+    val ext = rect.extend(p)
+
+    ext shouldBe expExt
+  }
+
+  it should "correctly extend for a point in +y with eps" in {
+    val eps = 1/1000.0
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(5, 12)
+
+    val expExt = NRectRange(NPoint(3,3), NPoint(10,12+eps))
+
+    val ext = rect.extend(p,eps)
+
+    ext shouldBe expExt
+  }
+
+  it should "correctly extend for a point in -y with eps" in {
+    val eps = 1/1000.0
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(5, 1)
+
+    val expExt = NRectRange(NPoint(3,1), NPoint(10, 10))
+
+    val ext = rect.extend(p,eps)
+
+    ext shouldBe expExt
+  }
+
+  ////
+
+
+
+  it should "contain the extended point when eps given" in {
+
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(11, 5)
+
+    val ext = rect.extend(p, 1/100.0)
+
+    ext.contains(p) shouldBe true
+  }
+
+  it should "not contain the extended point when no eps given" in {
+
+    val rect = NRectRange(NPoint(3, 3), NPoint(10, 10))
+    val p = NPoint(11, 5)
+
+    val ext = rect.extend(p)
+
+    ext.contains(p) shouldBe false
+  }
   
   it should "have the correct length" in {
     

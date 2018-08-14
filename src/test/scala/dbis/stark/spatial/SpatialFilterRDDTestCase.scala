@@ -33,7 +33,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
 
     val raw = TestUtils.createRDD(sc)
 
-    val grid = new SpatialGridPartitioner(raw, 10, false)
+    val grid = new SpatialGridPartitioner(raw, 10, true)
 
     val gridRdd = raw.partitionBy(grid)
     val q: STObject = "POINT (53.483437 -2.2040706)"
@@ -55,7 +55,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
 
     val raw = TestUtils.createRDD(sc)
 
-    val bsp = new BSPartitioner(raw, 1, 50, false)
+    val bsp = new BSPartitioner(raw, 1, 50, true)
 
     val bspRdd = raw.partitionBy(bsp)
     val q: STObject = "POINT (53.483437 -2.2040706)"

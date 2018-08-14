@@ -84,7 +84,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
 
         val spatialParts = ListBuffer.empty[Partition]
 
-        val qryEnv = qry.getGeo.getEnvelopeInternal
+//        val qryEnv = qry.getGeo.getEnvelopeInternal
         var i = 0
         var cnt = 0
         val numParentParts = parent.getNumPartitions

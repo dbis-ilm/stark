@@ -41,8 +41,6 @@ class BSPBinaryAsync(private val _start: NRectRange,
    */
   lazy val partitions: Array[Cell] = {
     var i = 0
-
-
     /*
      * It may happen, that data is so dense that it relies only in very few cells
      * So it may save time to return only those cells instead of computing the
@@ -63,7 +61,7 @@ class BSPBinaryAsync(private val _start: NRectRange,
 
     //return the non-empty cells or compute the actual partitioning
     val resultPartitions = if(i == cellHistogram.length) {
-      nonempty.toArray
+      nonempty
     } else {
 
       /* The actual partitioning is done using a recursive split of a candidate partition
@@ -80,10 +78,14 @@ class BSPBinaryAsync(private val _start: NRectRange,
       val partitions = pool.invoke(baseTask)
 
       // return the final result
-      partitions.toArray
+      partitions
     }
 
-    resultPartitions
+
+    resultPartitions.iterator.zipWithIndex.map{ case (cell, idx) =>
+      cell.id = idx
+      cell
+    }.toArray
   }
 }
 
@@ -263,12 +265,16 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
     } else { // need to compute the split
 
+//      print(s"split $range into .... ")
+
       // find the best split and ...
       val (s1, s2) = findBestSplit(range)
 
+//      println(s"$s1  and $s2")
+
       // ... create new sub tasks
-      val task1 = s1.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
-      val task2 = s2.map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
+      val task1 = s1.filter(r => !r.equals(range)).map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
+      val task2 = s2.filter(r => !r.equals(range)).map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
 
       // start the first task
       task1.foreach(_.fork())

@@ -20,7 +20,8 @@ abstract class PartitionerConfig(val strategy: PartitionStrategy,
 case class BSPStrategy(cellSize: Double,
                        maxCost: Double,
                        pointsOnly: Boolean = false,
-                       minmax: Option[(Double, Double, Double, Double)] = None
+                       minmax: Option[(Double, Double, Double, Double)] = None,
+                       sampleFactor: Int = 0
                       ) extends PartitionerConfig(PartitionStrategy.BSP, pointsOnly, minmax)
 
 case class GridStategy(partitionsPerDimensions: Int,
@@ -31,9 +32,9 @@ case class GridStategy(partitionsPerDimensions: Int,
 
 object PartitionerFactory {
   def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]) = strategy match {
-    case BSPStrategy(cellSize, maxCost, pointsOnly, minmax) => minmax match {
+    case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor) => minmax match {
       case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly)
-      case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm)
+      case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor)
     }
 
     case GridStategy(partitionsPerDimensions, pointsOnly, minmax) => minmax match {

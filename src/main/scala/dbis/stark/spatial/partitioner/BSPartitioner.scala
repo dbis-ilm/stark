@@ -104,14 +104,13 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
-  protected[spatial] var bsp = new BSP(
+  protected[spatial] var bsp = new BSPBinaryAsync(
     start,
     cells, // for BSP we only need calculated cell sizes and their respective counts
     sideLength,
     maxCostPerPartition,
     pointsOnly,
-    BSPartitioner.numCellThreshold
-    )
+    BSPartitioner.numCellThreshold)
 
 
 //  printPartitions(Paths.get(System.getProperty("user.home"), "partis.wkt"))

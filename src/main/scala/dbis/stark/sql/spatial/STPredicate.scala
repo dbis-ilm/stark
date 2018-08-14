@@ -4,7 +4,7 @@ import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, Predicate}
+import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, BindReferences, Expression, Predicate}
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.spatial.{STObjectUDT, StarkSerializer}
 
@@ -23,8 +23,9 @@ trait STPredicate
   override def children = Seq(left, right)
 
   def doEval(input: InternalRow, predicate: JoinPredicate): Boolean = {
-    val leftBytes = left.eval(input).asInstanceOf[ArrayData]
-    val rightBytes = right.eval(input).asInstanceOf[ArrayData]
+
+    val leftBytes = left.eval(input) //.asInstanceOf[ArrayData]
+    val rightBytes = right.eval(input) //.asInstanceOf[ArrayData]
 
     val leftObj = StarkSerializer.deserialize(leftBytes)
     val rightObj = StarkSerializer.deserialize(rightBytes)

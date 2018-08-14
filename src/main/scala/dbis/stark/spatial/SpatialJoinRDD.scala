@@ -104,12 +104,16 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     parts.toArray
   }
 
-  private[stark] lazy val leftParti = left.partitioner.map{
-    case sp: SpatialPartitioner => sp
-  }
+  private[stark] lazy val leftParti = getSpatialPartitioner(left.partitioner)
 
-  private[stark] lazy val rightParti = right.partitioner.map{
-    case sp: SpatialPartitioner => sp
+  private[stark] lazy val rightParti = getSpatialPartitioner(right.partitioner)
+
+  private def getSpatialPartitioner(partitioner: Option[Partitioner]) = partitioner match {
+    case Some(p) => p match {
+      case sp: SpatialPartitioner => Some(sp)
+      case _ => None
+    }
+    case None => None
   }
 
   override def compute(s: Partition, context: TaskContext): Iterator[(V, V2)] = {
@@ -119,7 +123,6 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     val split = s.asInstanceOf[JoinPartition]
 //    println(s"left = ${split.leftPartition.index} -- right: ${split.rightPartition.index}")
 
-    // if treeOrder is <= 0 we do not use indexing
     if(indexConfig.isEmpty) {
       // collect the right partition into an array
       val rightList = right.iterator(split.rightPartition, context).toList
@@ -128,14 +131,9 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       val resultIter = left.iterator(split.leftPartition, context).flatMap { case (lg, lv) =>
         rightList.iterator.filter { case (rg, _) =>
           val res = predicateFunc(lg, rg)
-//          println(s"check ($predicateFunc) $lg -- $rg --> $res")
+//        println(s"check ($predicateFunc) $lg -- $rg --> $res")
           res
-        }.map { case (_, rv) =>
-//          val r = (lg, lv, rg, rv)
-//          println(s"$lg   ---   $rg")
-//          r
-          (lv,rv)
-        }
+        }.map { case (_, rv) => (lv, rv) }
       }
       new InterruptibleIterator(context, resultIter)
 

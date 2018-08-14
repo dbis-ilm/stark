@@ -1,6 +1,6 @@
 package org.apache.spark.sql.spatial
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+import java.io._
 
 import dbis.stark.STObject
 import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
@@ -12,7 +12,22 @@ import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 object StarkSerializer {
 
   def serialize(obj: STObject): GenericArrayData =  {
+
     val baos = new ByteArrayOutputStream()
+//    var out: ObjectOutput = null
+//    var bytes: Array[Byte] = Array.emptyByteArray
+//    try {
+//      out = new ObjectOutputStream(baos)
+//      out.writeObject(obj)
+//      out.flush()
+//      bytes = baos.toByteArray
+//      println(s"out: ${bytes.length}")
+//    } finally {
+//        baos.close()
+////        out.close()
+//    }
+
+    try {
     val oos = new ObjectOutputStream(baos)
     oos.writeObject(obj)
     oos.flush()
@@ -20,15 +35,32 @@ object StarkSerializer {
     val arr = new GenericArrayData(baos.toByteArray)
     oos.close()
     arr
+    } catch {
+      case e: Throwable =>
+        println(s"could NOT serialize: ${e.getMessage}")
+        ???
+    }
   }
 
   def deserialize(datum: Any): STObject = datum match {
     case a: ArrayData =>
-      val byis = new ByteArrayInputStream(a.toByteArray())
-      val in = new ObjectInputStream(byis)
+      val bytes = a.toByteArray()
+//      println(s"in: ${bytes.length}")
+      val byis = new ByteArrayInputStream(bytes)
+      var in: ObjectInput = null
+      var so: STObject = null
+      try {
+        in = new ObjectInputStream(byis)
+        so = in.readObject.asInstanceOf[STObject]
+      } catch {
+        case e: Throwable =>
+          println(s"could NOT deserialize: ${e.getMessage}")
+          e.printStackTrace()
+      } finally{
+        if(in != null)
+          in.close()
+      }
 
-      val so = in.readObject.asInstanceOf[STObject]
-      in.close()
       so
   }
 

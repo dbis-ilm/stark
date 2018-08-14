@@ -11,7 +11,10 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   var spark: SparkSession = _
 
   override def beforeAll(): Unit = {
-    spark = STARKSession.builder().master("local").appName("sqltest filter").getOrCreate()
+    spark = STARKSession.builder()
+      .master("local")
+      .appName("sqltest filter")
+      .getOrCreate()
 
   }
 
@@ -20,13 +23,13 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       spark.close()
   }
 
-  private def prepare(qry: String) = {
+  private def prepareFromMemory(qry: String) = {
     val s = Seq(
       """{ "column1": "POINT (1 1)", "column2": 23}""",
       """{ "column1": "POINT (25 20)", "column2": 69 }""",
       """{ "column1": "POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))", "column2": 42 }"""
-      )
-//
+    )
+    //
 
     val s2 = Seq(
       """{ "column1": "POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))", "column2": 42 }""",
@@ -45,6 +48,24 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val left =  l.withColumn("locationL", fromWKT(l("column1")))
     val right = r.withColumn("locationR", fromWKT(r("column1")))
 
+    left.createOrReplaceTempView("left")
+    right.createOrReplaceTempView("right")
+
+    // run query
+    val sqlDF = spark.sql(qry)
+
+    sqlDF
+
+  }
+
+  private def prepareFromFiles(qry: String) = {
+
+    val l = spark.read.json("src/test/resources/spatialdata.json")
+    val r = spark.read.json("src/test/resources/spatialdata2.json")
+
+    val left =  l.withColumn("locationL", fromWKT(l("column1")))
+    val right = r.withColumn("locationR", fromWKT(r("column1")))
+
 
     // Register the DataFrame as a SQL temporary view
     left.createOrReplaceTempView("left")
@@ -53,37 +74,77 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     // run query
     val sqlDF = spark.sql(qry)
 
-    sqlDF.collect()
+    sqlDF
   }
 
-  "A SQL spatial join" should "be correct for intersects self join" in {
+  "A SQL spatial join" should "be correct for intersects join" in {
 
+//    locationL as left_loc
+//    left.column1, left.column2, right.column1, right.column2, locationL, locationR
     val qry =
-      """SELECT left.locationL as left_loc, left.column2, right.locationR as right_loc, right.column2
-        | FROM left , right
+
+      """SELECT right.column1, right.column2, left.column1, left.column2
+        | FROM right, left
         | WHERE st_intersects(left.locationL, right.locationR)""".stripMargin
 
-    val result = prepare(qry)
-    result.length shouldBe 3
+    val result = prepareFromFiles(qry)
+//    result.collect().length shouldBe 3
 
-    result.foreach(println)
+//    result.show(truncate = false)
 
-    val stringRes = result.map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
+    val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
 
     stringRes should contain allElementsOf Seq(
-      "STObject(POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5)),None)|42|STObject(POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5)),None)|42",
-      "STObject(POINT (25 20),None)|69|STObject(POINT (25 20),None)|69",
-      "STObject(POINT (1 1),None)|23|STObject(POINT (1 1),None)|23")
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))|42",
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POINT (-72.5 40.75)|55")
+
   }
 
-  it should "be correct for intersects self join with contructor udf used" in {
+  it should "self join from file" in {
+    val qry =
+
+      """SELECT r.column1, r.column2, l.column1, l.column2
+        | FROM left l, left r
+        | WHERE st_intersects(l.locationL, r.locationL)""".stripMargin
+
+    val result = prepareFromFiles(qry)
+    //    result.collect().length shouldBe 3
+
+    val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
+
+    stringRes should contain allElementsOf Seq(
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))|42",
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POINT (-72.5 40.75)|55")
+  }
+
+  it should "self join in memory" in {
+    val qry =
+
+      """SELECT left.column1, left.column2, right.column1, right.column2
+        | FROM right, left
+        | WHERE st_intersects(left.locationL, right.locationR)""".stripMargin
+
+    val result = prepareFromMemory(qry)
+    //    result.collect().length shouldBe 3
+
+//    result.show(truncate = false)
+
+        val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
+
+        stringRes should contain allElementsOf Seq(
+          "POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))|42|POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))|42",
+          "POINT (25 20)|69|POINT (25 20)|69",
+          "POINT (1 1)|23|POINT (1 1)|23")
+  }
+
+  ignore should "be correct for intersects self join with contructor udf used" in {
 
     val qry =
       """SELECT left.locationL as left_loc, left.column2, right.locationR as right_loc, right.column2
         | FROM left , right
         | WHERE st_intersects(st_geomfromwkt(left.column1), st_geomfromwkt(right.column1))""".stripMargin
 
-    val result = prepare(qry)
+    val result = prepareFromFiles(qry).collect()
     result.length shouldBe 3
 
     result.foreach(println)
@@ -103,7 +164,7 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       """SELECT asString(left.location) as left_loc, left.column2, asString(right.location) as right_loc, right.column2
         | FROM left SPATIAL_JOIN right ON intersects(left.location, right.location)""".stripMargin
 
-    val result = prepare(qry)
+    val result = prepareFromFiles(qry).collect()
     result.length shouldBe 2
 
 

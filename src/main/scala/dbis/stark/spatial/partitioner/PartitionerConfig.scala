@@ -21,7 +21,7 @@ case class BSPStrategy(cellSize: Double,
                        maxCost: Double,
                        pointsOnly: Boolean = false,
                        minmax: Option[(Double, Double, Double, Double)] = None,
-                       sampleFactor: Int = 0
+                       sampleFactor: Double = 0
                       ) extends PartitionerConfig(PartitionStrategy.BSP, pointsOnly, minmax)
 
 case class GridStrategy(partitionsPerDimensions: Int,

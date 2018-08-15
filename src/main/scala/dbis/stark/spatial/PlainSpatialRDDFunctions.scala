@@ -6,7 +6,7 @@ import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.{SpatialGridPartitioner, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialGridPartitioner, SpatialPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
@@ -300,15 +300,26 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   def index(partitioner: Option[SpatialPartitioner] = None, indexConfig: IndexConfig): RDD[Index[(G,V)]] = {
     val reparted = if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd
 
-    reparted.mapPartitions(iter => {
+    reparted.mapPartitionsWithIndex({ case (index,iter) =>
       val tree = IndexFactory.get[G,(G,V)](indexConfig)
-      for ((g, v) <- iter) {
-        tree.insert(g, (g, v))
-      }
+
+      println(s"$index: ${iter.length}")
+
+//      iter.take(10).foreach{ case (g,v) => tree.insert(g, (g,v))}
+
+
+
+      //      for ((g, v) <- iter) {
+      //        tree.insert(g, (g, v))
+      //      }
 
       Iterator.single(tree)
     },
     preservesPartitioning = true) // preserve partitioning
   }
+
+  def index(partitionerConfig: PartitionerConfig, indexConfig: IndexConfig): RDD[Index[(G,V)]] =
+    index(Some(PartitionerFactory.get(partitionerConfig, rdd)), indexConfig)
+
 
 }

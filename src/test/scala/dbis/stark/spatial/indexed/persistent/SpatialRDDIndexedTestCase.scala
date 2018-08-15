@@ -1,11 +1,11 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.STObject.{getInternal, makeSTObject, fromWKT}
+import dbis.stark.STObject.{fromWKT, getInternal, makeSTObject}
 import dbis.stark._
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
+import dbis.stark.spatial.indexed.{RTree, RTreeConfig}
+import dbis.stark.spatial.partitioner.{BSPartitioner, GridStrategy, SpatialGridPartitioner}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -82,7 +82,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   "An INDEXED SpatialRDD" should "find the correct intersection result for points" in {
     
     val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-    
+
     val start = System.currentTimeMillis()
     val foundPoints = rdd.intersects(qry).collect()
     val end = System.currentTimeMillis()

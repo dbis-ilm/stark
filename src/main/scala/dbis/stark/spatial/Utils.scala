@@ -14,6 +14,11 @@ object Utils {
     NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
   }
 
+  def makeGeo(mbr: MBR): GeoType = {
+    val fac = new GeometryFactory()
+    fac.toGeometry(mbr)
+  }
+
 
   def getCenter(g: GeoType): Point = {
     var center = g.getCentroid

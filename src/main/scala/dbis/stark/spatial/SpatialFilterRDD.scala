@@ -6,7 +6,7 @@ import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
 import dbis.stark.{Interval, STObject}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, Partitioner, TaskContext}
+import org.apache.spark.{InterruptibleIterator, Partition, Partitioner, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -22,13 +22,12 @@ import scala.reflect.ClassTag
   * @tparam G The type representing spatio-temporal data
   * @tparam V The payload data
   */
-class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
-                                                                         private val parent: RDD[(G,V)],
-                                                                         qry: G,
-                                                                         predicate: JoinPredicate,
-                                                                         predicateFunc: (G,G) => Boolean,
-                                                                         indexConfig: Option[IndexConfig],
-                                                                         private val checkParties: Boolean) extends RDD[(G,V)](parent) {
+class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (private val parent: RDD[(G,V)],
+                                                                        qry: G,
+                                                                        predicate: JoinPredicate,
+                                                                        predicateFunc: (G,G) => Boolean,
+                                                                        indexConfig: Option[IndexConfig],
+                                                                        private val checkParties: Boolean) extends RDD[(G,V)](parent) {
 
   def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
     this(parent, qry,null, predicateFunc, None, false)
@@ -139,7 +138,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
     }
 
 
-    if (indexConfig.isDefined) {
+    val resultIter = if (indexConfig.isDefined) {
 
       val tree = IndexFactory.get[G, (G, V)](indexConfig.get)
       // insert everything into the tree
@@ -151,5 +150,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (
     } else {
       parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
     }
+
+    new InterruptibleIterator(context, resultIter)
   }
 }

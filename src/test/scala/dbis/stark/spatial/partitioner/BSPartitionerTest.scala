@@ -2,7 +2,7 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Paths
 
-import dbis.stark.{STObject, TestUtils}
+import dbis.stark.{Fix, STObject, TestUtils}
 import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTreeConfig
@@ -35,6 +35,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { case (string, id) => (new WKTReader().read(string), id) }
 
 //  "The BSP partitioner"
+
   it  should "find correct min/max values" in {
     
     val rdd = createRDD()    
@@ -136,9 +137,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
 
-  it  should "return the correct partition id" in {
+  it  should "return the correct partition id" taggedAs Fix in {
     val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 1, 1, pointsOnly = true)
+    val parti = new BSPartitioner(rdd, 0.1, 1, pointsOnly = true)
 
     parti.printPartitions("/tmp/idtest_partitions")
 
@@ -323,14 +324,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println("No cell contains this point!")
         }
 
-
-
         fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
       }
-
     }
-
-
   }
 
   it  should "create real partitions correctly for taxi" taggedAs Slow in {
@@ -498,6 +494,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val numparts = parti.numPartitions
 
+    withClue("number of partitions"){numparts should be > 0}
+
     val parted = rdd.partitionBy(parti)
 
     parted.collect().foreach { case (st, name) =>
@@ -597,7 +595,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joined.collect().length shouldBe 1
   }
 
-  it should "contain all taxi points with sampling" taggedAs Sampling in {
+  it should "contain all taxi points with sampling" taggedAs (Sampling, Slow) in {
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -614,7 +612,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     }
   }
 
-  ignore should "contain all blocks with sampling" taggedAs Sampling in {
+  it should "contain all blocks with sampling" taggedAs (Sampling,Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}

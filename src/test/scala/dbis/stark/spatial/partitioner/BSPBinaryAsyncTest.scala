@@ -110,7 +110,7 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
 
     val theRange = NRectRange(NPoint(2, 1),NPoint(4,3))
 
-    val extent = bspTask.extentForRange(theRange)
+    val extent = bspTask.extentForPart(theRange)
 
     extent shouldBe theRange
 

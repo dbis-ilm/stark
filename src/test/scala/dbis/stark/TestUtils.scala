@@ -7,7 +7,9 @@ import dbis.stark.spatial.SpatialRDD._
 import dbis.stark.spatial.partitioner.BSPartitioner
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
+import org.scalatest.Tag
 
+object Fix extends Tag("dbis.stark.Fix")
 
 object TestUtils {
   def createIntervalRDD(

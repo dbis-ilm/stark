@@ -128,6 +128,7 @@ object SpatialPartitioner {
         histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
       }
     }
+
     histo
 
   }

@@ -176,14 +176,16 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       var minPartitionId: Int = -1
       var first = true
 
+//      println(s"num partitions: ${bsp.partitions.length}")
+
       for(partition <- bsp.partitions) {
         val dist = partition.range.dist(pc)
         if(first || dist < minDist) {
           minDist = dist
+//          println(s"setting min partition id from $minPartitionId to ${partition.id}")
           minPartitionId = partition.id
           first = false
         }
-
       }
 
       (minPartitionId, true)

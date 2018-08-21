@@ -19,7 +19,7 @@ To be able to use the spatio-temporal operations, you have to have an Pair-RDD w
 
 ```Scala
 import dbis.stark._
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 
 val countries = sc.textFile("/data/countries") // assume Schema ID;Name;WKT String
     .map(line => line.split(';'))

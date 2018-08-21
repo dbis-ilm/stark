@@ -46,15 +46,15 @@ object BSPartitioner {
   * @tparam V Payload data type
   */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
-      rdd: RDD[(G,V)],
+      @transient private val rdd: RDD[(G,V)],
       val sideLength: Double,
-      maxCostPerPartition: Double,
-      pointsOnly: Boolean,
-      _minX: Double,
-      _maxX: Double,
-      _minY: Double,
-      _maxY: Double,
-      sampleFraction: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+      val maxCostPerPartition: Double,
+      val pointsOnly: Boolean,
+      private val _minX: Double,
+      private val _maxX: Double,
+      private val _minY: Double,
+      private val _maxY: Double,
+      val sampleFraction: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   protected[partitioner] val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
 
@@ -193,9 +193,21 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, SpatialPartitioner.EPS)
 
       if(!pointsOnly)
-        bsp.partitions(partitionId).extendBy(Utils.fromEnvelope(g.getGeo))
+        bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
     partitionId
+  }
+
+  override def equals(obj: scala.Any) = obj match {
+    case sp: BSPartitioner[G,_] =>
+      sp.rdd == rdd &&
+      sp.sideLength == sideLength &&
+      sp.maxCostPerPartition == maxCostPerPartition &&
+      sp.pointsOnly == pointsOnly &&
+      sp.sampleFraction == sampleFraction &&
+      sp.minX == minX && sp.maxX == maxX &&
+      sp.minY == minY && sp.maxY == maxY
+    case _ => false
   }
 }

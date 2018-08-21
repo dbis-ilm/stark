@@ -108,7 +108,7 @@ object SpatialPartitioner {
         val p = Utils.getCenter(g.getGeo)
 //        val env = g.getEnvelopeInternal
 //        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-        val extent = Utils.fromEnvelope(g.getGeo)
+        val extent = Utils.fromGeo(g.getGeo)
         val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
         (cellId,(1, extent))
@@ -163,7 +163,7 @@ abstract class SpatialPartitioner(
     printPartitions(Paths.get(fName))
   }
 
-  protected[stark] def writeToFile(strings: List[String], fName: Path) =
+  protected[stark] def writeToFile(strings: Seq[String], fName: Path) =
     java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
 }
 

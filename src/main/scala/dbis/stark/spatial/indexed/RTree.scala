@@ -18,7 +18,7 @@ protected[indexed] class Data[D](val data: D, val so: STObject) extends Serializ
  * @param capacity The number of elements in a node
  */
 class RTree[D: ClassTag ](
-    @transient private val capacity: Int
+    @transient private val capacity: Int = 10
   ) extends STRtreePlus[Data[D]](capacity) with Index[D] with KnnIndex[D] with WithinDistanceIndex[D] { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
 //  private var timestamp = 0

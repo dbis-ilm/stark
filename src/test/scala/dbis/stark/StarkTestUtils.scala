@@ -3,13 +3,13 @@ package dbis.stark
 import java.io.File
 import java.time.LocalDate
 
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.partitioner.BSPartitioner
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 
 
-object TestUtils {
+object StarkTestUtils {
   def createIntervalRDD(
                          sc: SparkContext,
                          file: String = "src/test/resources/intervaltest.csv",
@@ -24,7 +24,7 @@ object TestUtils {
       .keyBy( _._2)
 
     if(distinct)
-      TestUtils.distinct(rdd).repartition(numParts)
+      StarkTestUtils.distinct(rdd).repartition(numParts)
     else
       rdd
   }
@@ -73,7 +73,7 @@ object TestUtils {
       .keyBy( _._4)
       
     if(distinct)
-      TestUtils.distinct(rdd).repartition(numParts)
+      StarkTestUtils.distinct(rdd).repartition(numParts)
     else
       rdd
   }
@@ -117,7 +117,7 @@ object TestUtils {
       numParts: Int = 4,
       order: Int = 10) = {
     
-    val rdd = TestUtils.createRDD(sc, file, sep, numParts, distinct)
+    val rdd = StarkTestUtils.createRDD(sc, file, sep, numParts, distinct)
     rdd.index(new BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
   } 
   

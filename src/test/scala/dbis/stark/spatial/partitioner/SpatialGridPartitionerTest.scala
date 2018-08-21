@@ -1,7 +1,7 @@
 package dbis.stark.spatial.partitioner
 
 import dbis.stark.STObject
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.JoinPredicate
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}

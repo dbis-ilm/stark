@@ -3,7 +3,7 @@ package dbis.stark.spatial
 import java.nio.file.Paths
 
 import dbis.stark.{Instant, Interval, STObject}
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD

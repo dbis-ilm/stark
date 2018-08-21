@@ -6,7 +6,7 @@ import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
 import org.apache.spark.rdd.RDD
 import org.apache.spark._
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.reflect.ClassTag
 
 /**
@@ -59,38 +59,42 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     this(left, right, predicate, None, checkParties = false)
 
   override def getPartitions: Array[Partition] = {
-    val parts = ArrayBuffer.empty[JoinPartition]
-
-    val checkPartitions = checkParties && leftParti.isDefined && rightParti.isDefined
-    var idx = 0
 
 
-//    leftParti.foreach(_.printPartitions("/tmp/left_partitions.wkt"))
-//    rightParti.foreach(_.printPartitions("/tmp/right_partitions.wkt"))
+    val parts = ListBuffer.empty[JoinPartition]
+    if(leftParti.isDefined && leftParti == rightParti) {
 
-    // Which of the following two loop constructs are fastest? Is there a significant difference?
+      left.partitions.iterator.zip(right.partitions.iterator).foreach{ case (l,r) =>
+        parts += new JoinPartition(l.index,left,right,l.index,r.index)
+      }
 
-//    var s1Index = 0
-//    var s2Index = 0
+    } else {
+
+      val checkPartitions = checkParties && leftParti.isDefined && rightParti.isDefined
+      var idx = 0
+
+//      var s1Index = 0
+//      var s2Index = 0
 //
-//    while(s1Index < left.partitions.length) {
-//      s2Index = 0
-//      while(s2Index < right.partitions.length) {
+//      while (s1Index < left.partitions.length) {
+//        s2Index = 0
 //
-//        if(!checkPartitions || leftParti.get.partitionExtent(s1Index).intersects(rightParti.get.partitionExtent(s2Index))) {
-//          parts += new JoinPartition(idx, left, right, s1Index, s2Index)
-//          idx += 1
+//        while (s2Index < right.partitions.length) {
+//
+//          if (!checkPartitions || leftParti.get.partitionExtent(s1Index).intersects(rightParti.get.partitionExtent(s2Index))) {
+//            parts += new JoinPartition(idx, left, right, s1Index, s2Index)
+//            idx += 1
+//          }
+//
+//          s2Index += 1
 //        }
-//
-//        s2Index += 1
+//        s1Index += 1
 //      }
-//      s1Index +=1
-//    }
 
-    for (
-      s1 <- left.partitions;
-      s2 <- right.partitions
-      if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
+      for (
+        s1 <- left.partitions;
+        s2 <- right.partitions
+        if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
 
 //        val leftContainsRight = leftParti.get.partitionExtent(s1.index).contains(rightParti.get.partitionExtent(s2.index))
 //        val rightContainsLeft = if(!leftContainsRight) rightParti.get.partitionExtent(s1.index).contains(leftParti.get.partitionExtent(s2.index)) else false
@@ -98,10 +102,11 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
           val p = new JoinPartition(idx, left, right, s1.index, s2.index)//, leftContainsRight, rightContainsLeft)
           parts += p
           idx += 1
-//        }
+        }
 
     }
     parts.toArray
+
   }
 
   private[stark] lazy val leftParti = left.partitioner.map{

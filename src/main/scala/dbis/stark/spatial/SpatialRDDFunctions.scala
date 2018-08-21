@@ -1,22 +1,36 @@
 package dbis.stark.spatial
 
-import java.awt.image.BufferedImage
 import java.io.File
 
 import dbis.stark.STObject.MBR
-
-import scala.reflect.ClassTag
-import dbis.stark.{Distance, STObject}
 import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
 import dbis.stark.visualization.Visualization
+import dbis.stark.{Distance, STObject}
 import javax.imageio.ImageIO
+import org.apache.spark.Partitioner
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
+
+import scala.reflect.ClassTag
 
 abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: RDD[(G,V)]) extends PairRDDFunctions[G,V](rdd) {
 
   def partitionBy(strategy: PartitionerConfig) = {
     val partitioner = PartitionerFactory.get(strategy, rdd)
+
+//    rdd.map{ case (g,v) =>
+//      val partId = partitioner.getPartition(g)
+//      (partId, (g,v))
+//    }
+////      .repartition(partitioner.numPartitions)
+//      .partitionBy(new Partitioner{
+//      override def numPartitions = partitioner.numPartitions
+//
+//      override def getPartition(key: Any) = key.asInstanceOf[Int]
+//    })
+//      .map(_._2)
+
+
     rdd.partitionBy(partitioner)
   }
 

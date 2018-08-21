@@ -5,7 +5,7 @@ import dbis.stark.STObject
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.{Index, RTree}
 import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
-import dbis.stark.spatial.{SpatialRDD, Utils}
+import dbis.stark.spatial.Utils
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 

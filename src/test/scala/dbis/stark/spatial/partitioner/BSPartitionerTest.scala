@@ -2,8 +2,8 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Paths
 
-import dbis.stark.{STObject, TestUtils}
-import dbis.stark.spatial.SpatialRDD._
+import dbis.stark.{STObject, StarkTestUtils}
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
@@ -49,7 +49,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   it  should "have the correct min/max in real world scenario" in {
 
-    val rdd = TestUtils.createRDD(sc)
+    val rdd = StarkTestUtils.createRDD(sc)
 
     val parti = new BSPartitioner(rdd,1, 10, pointsOnly = true)
 
@@ -62,7 +62,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it  should "have the correct number of x cells in reald world scenario with length = 1" in {
 
-    val rdd = TestUtils.createRDD(sc)
+    val rdd = StarkTestUtils.createRDD(sc)
 
     val parti = new BSPartitioner(rdd,1, 10, pointsOnly = true)
 
@@ -159,7 +159,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it  should "return all points for one partition" in {
 
-    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = StarkTestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, maxCostPerPartition = 1000, pointsOnly = false)
@@ -172,7 +172,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it  should "return all points for two partitions" in {
 
-    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = StarkTestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 2, maxCostPerPartition = 500, pointsOnly = true)
@@ -188,7 +188,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it  should "return all points for max cost 100 & sidelength = 1" in {
 
-    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = StarkTestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 100, pointsOnly = true)
@@ -204,7 +204,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it  should "return only one partition if max cost equals input size" in {
 
-    val rdd: RDD[(STObject, (String, Long, String, STObject))] = TestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
+    val rdd: RDD[(STObject, (String, Long, String, STObject))] = StarkTestUtils.createRDD(sc, numParts = Runtime.getRuntime.availableProcessors())
 
     // with maxcost = size of RDD everything will end up in one partition
     val parti = new BSPartitioner(rdd, 1, maxCostPerPartition = 1000, pointsOnly = true)

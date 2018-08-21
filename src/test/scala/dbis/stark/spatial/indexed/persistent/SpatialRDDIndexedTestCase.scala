@@ -2,7 +2,7 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.{fromWKT, getInternal, makeSTObject}
 import dbis.stark._
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import dbis.stark.spatial.indexed.{RTree, RTreeConfig}
 import dbis.stark.spatial.partitioner.{BSPartitioner, GridStrategy, SpatialGridPartitioner}
@@ -81,7 +81,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 
   "An INDEXED SpatialRDD" should "find the correct intersection result for points" in {
     
-    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+    val rdd = StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
 
     val start = System.currentTimeMillis()
     val foundPoints = rdd.intersects(qry).collect()
@@ -95,7 +95,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "find all elements contained by a query" in { 
-    val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+    val rdd = StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
     
     val start = System.currentTimeMillis()
     val foundPoints = rdd.containedby(qry).collect()
@@ -106,7 +106,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "find all elements that contain a given point" in { 
-	  val rdd = TestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+	  val rdd = StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -119,7 +119,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "find the correct nearest neighbors with Grid Partitioning" in { 
-    val rddRaw = TestUtils.createRDD(sc)
+    val rddRaw = StarkTestUtils.createRDD(sc)
     val rdd = rddRaw.index(new SpatialGridPartitioner(rddRaw, partitionsPerDimension = 5, pointsOnly = false), order= 5)
 	  
 	  // we know that there are 5 duplicates in the data for this point.
@@ -132,7 +132,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "find the correct nearest neighbors with BSP" in { 
-    val rddRaw = TestUtils.createRDD(sc)
+    val rddRaw = StarkTestUtils.createRDD(sc)
     val rdd = rddRaw.index(new BSPartitioner(rddRaw,  1, 100, pointsOnly = false), order= 5) // 0.5
 	  
     val k = 6
@@ -155,8 +155,8 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "compute the correct (quasi) self-join result for points with intersects" in {
-    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
-    val rdd2 = TestUtils.createRDD(sc, distinct = true)
+    val rdd1 = StarkTestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = StarkTestUtils.createRDD(sc, distinct = true)
     
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -169,7 +169,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd3 = TestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
+    val rdd3 = StarkTestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
     
     val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
     
@@ -185,8 +185,8 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "compute the correct (quasi) self-join result for points with contains" in {
-    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
-    val rdd2 = TestUtils.createRDD(sc, distinct = true)
+    val rdd1 = StarkTestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = StarkTestUtils.createRDD(sc, distinct = true)
     
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -199,7 +199,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd3 = TestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
+    val rdd3 = StarkTestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
     
     val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
     
@@ -216,8 +216,8 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "compute the correct (quasi) self-join result for points with containedBy" in {
     
-    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
-    val rdd2 = TestUtils.createRDD(sc, distinct = true)
+    val rdd1 = StarkTestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = StarkTestUtils.createRDD(sc, distinct = true)
     
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -230,7 +230,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd3 = TestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
+    val rdd3 = StarkTestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
     
     val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
     
@@ -247,8 +247,8 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "compute the correct (quasi) self-join result for points with withinDistance" in {
     
-    val rdd1 = TestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
-    val rdd2 = TestUtils.createRDD(sc, distinct = true)
+    val rdd1 = StarkTestUtils.createIndexedRDD(sc, distinct = true, cost = 100, cellSize = 10, order = 5)
+    val rdd2 = StarkTestUtils.createRDD(sc, distinct = true)
     
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -261,7 +261,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd3 = TestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
+    val rdd3 = StarkTestUtils.createRDD(sc, distinct = true).map{ case (st, v) => (st.toText, 1) }
     
     val plainJoinResult = rdd3.join(rdd3).map(_._1).collect() // plain join
     
@@ -294,9 +294,9 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "intersect with temporal instant" in {
     
-    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
     
-    val qryT = STObject(qry.getGeo, Interval(TestUtils.makeTimeStamp(2013, 1, 1), TestUtils.makeTimeStamp(2013, 1, 31)))
+    val qryT = STObject(qry.getGeo, Interval(StarkTestUtils.makeTimeStamp(2013, 1, 1), StarkTestUtils.makeTimeStamp(2013, 1, 31)))
     
     val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).intersects(qryT)
     
@@ -305,9 +305,9 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "contain with temporal instant" in {
     
-    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
     
-    val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", StarkTestUtils.makeTimeStamp(2013, 6, 8))
     
     val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).contains(q)
     
@@ -316,9 +316,9 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "containedby with temporal instant" in {
     
-    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
     
-    val q: STObject = STObject("POINT (53.483437 -2.2040706)", TestUtils.makeTimeStamp(2013, 6, 8))
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", StarkTestUtils.makeTimeStamp(2013, 6, 8))
     
     val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).containedby(q)
     
@@ -327,9 +327,9 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   it should "containedby with temporal interval" in {
     
-    val rdd = TestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
     
-    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Interval(TestUtils.makeTimeStamp(2013, 6, 1),TestUtils.makeTimeStamp(2013, 6, 30) ))
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Interval(StarkTestUtils.makeTimeStamp(2013, 6, 1),StarkTestUtils.makeTimeStamp(2013, 6, 30) ))
     
     val res = rdd.index(new SpatialGridPartitioner(rdd, 5, pointsOnly = false), 10).containedby(q)
     

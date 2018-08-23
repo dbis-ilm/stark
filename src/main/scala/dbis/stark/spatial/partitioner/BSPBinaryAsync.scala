@@ -216,12 +216,37 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     */
   def findBestSplit(range: NRectRange): (Option[NRectRange], Option[NRectRange]) = {
 
-    val splitWithMinDiff = (0 until range.dim).par // parallel processing of each dimension
-                                  .map(dim => bestSplitInDimension(dim, range)) // find best split for that dimension
-                                                                                // results in one candidate split per dimension
-                                  .minBy(_._3) // take best of all candidate split
 
-    (splitWithMinDiff._1, splitWithMinDiff._2) // return only the generated two partitions
+    var doContinue = true
+    var currDim = 0
+
+    var minLeft, minRight: Option[NRectRange] = None
+    var minDiff = Int.MaxValue
+
+    while(doContinue && currDim < range.dim) {
+      val (left,right, diff) = bestSplitInDimension(currDim, range)
+
+      if(diff < minDiff) {
+        minDiff = diff
+        minLeft = left
+        minRight = right
+
+        // the found partitioning is good enough
+        if(diff < 0.1 * maxCostPerPartition)
+          doContinue = false
+      }
+
+      currDim += 1
+    }
+
+    (minLeft, minRight)
+
+//    val splitWithMinDiff = (0 until range.dim).par // parallel processing of each dimension
+//                                  .map(dim => bestSplitInDimension(dim, range)) // find best split for that dimension
+//                                                                                // results in one candidate split per dimension
+//                                  .minBy(_._3) // take best of all candidate split
+//
+//    (splitWithMinDiff._1, splitWithMinDiff._2) // return only the generated two partitions
   }
 
   /**

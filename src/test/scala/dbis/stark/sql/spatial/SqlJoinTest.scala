@@ -104,17 +104,21 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val qry =
 
       """SELECT r.column1, r.column2, l.column1, l.column2
-        | FROM left l, left r
-        | WHERE st_intersects(l.locationL, r.locationL)""".stripMargin
+        | FROM left l, right r
+        | WHERE st_intersects(l.locationL, r.locationR)""".stripMargin
 
     val result = prepareFromFiles(qry)
     //    result.collect().length shouldBe 3
 
-    val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
+    val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}").mkString("\n")
 
-    stringRes should contain allElementsOf Seq(
+//    stringRes should contain allElementsOf
+
+    val ref = Seq(
       "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))|42",
-      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POINT (-72.5 40.75)|55")
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POINT (-72.5 40.75)|55").mkString("\n")
+
+    stringRes shouldBe ref
   }
 
   it should "self join in memory" in {
@@ -137,7 +141,7 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           "POINT (1 1)|23|POINT (1 1)|23")
   }
 
-  ignore should "be correct for intersects self join with contructor udf used" in {
+  it should "be correct for intersects self join with contructor udf used" in {
 
     val qry =
       """SELECT left.locationL as left_loc, left.column2, right.locationR as right_loc, right.column2
@@ -162,7 +166,7 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val qry =
       """SELECT asString(left.location) as left_loc, left.column2, asString(right.location) as right_loc, right.column2
-        | FROM left SPATIAL_JOIN right ON intersects(left.location, right.location)""".stripMargin
+        | FROM left SPATIAL_JOIN right ON st_intersects(left.location, right.location)""".stripMargin
 
     val result = prepareFromFiles(qry).collect()
     result.length shouldBe 2

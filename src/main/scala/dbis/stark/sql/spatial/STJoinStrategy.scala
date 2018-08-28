@@ -56,6 +56,8 @@ object STJoinStrategy extends Strategy {
               val rightPlan = planLater(r)
 
               STJoinExec(leftPlan, rightPlan, pred) :: Nil
+
+            case None => Nil // expressions do not match referenced plans - not our spatial join
           }
 
 

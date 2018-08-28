@@ -123,42 +123,37 @@ class SqlJoinTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it should "self join in memory" in {
     val qry =
-
       """SELECT left.column1, left.column2, right.column1, right.column2
         | FROM right, left
         | WHERE st_intersects(left.locationL, right.locationR)""".stripMargin
 
     val result = prepareFromMemory(qry)
-    //    result.collect().length shouldBe 3
 
-//    result.show(truncate = false)
+    val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
 
-        val stringRes = result.collect().map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
-
-        stringRes should contain allElementsOf Seq(
-          "POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))|42|POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))|42",
-          "POINT (25 20)|69|POINT (25 20)|69",
-          "POINT (1 1)|23|POINT (1 1)|23")
+    stringRes should contain allElementsOf Seq(
+      "POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))|42|POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5))|42",
+      "POINT (25 20)|69|POINT (25 20)|69",
+      "POINT (1 1)|23|POINT (1 1)|23")
   }
 
   it should "be correct for intersects self join with contructor udf used" in {
 
     val qry =
-      """SELECT left.locationL as left_loc, left.column2, right.locationR as right_loc, right.column2
+      """SELECT right.column1, right.column2, left.column1, left.column2
         | FROM left , right
         | WHERE st_intersects(st_geomfromwkt(left.column1), st_geomfromwkt(right.column1))""".stripMargin
 
     val result = prepareFromFiles(qry).collect()
-    result.length shouldBe 3
+    result.length shouldBe 2
 
     result.foreach(println)
 
     val stringRes = result.map(row => s"${row.get(0).toString}|${row.getLong(1)}|${row.get(2).toString}|${row.getLong(3)}")
 
     stringRes should contain allElementsOf Seq(
-      "STObject(POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5)),None)|42|STObject(POLYGON ((-73.1 40.5, -70 40.5, -72 41, -73.1 40.5)),None)|42",
-      "STObject(POINT (25 20),None)|69|STObject(POINT (25 20),None)|69",
-      "STObject(POINT (1 1),None)|23|STObject(POINT (1 1),None)|23")
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POLYGON ((-73.0 40.5, -70 40.5, -72 41, -73.0 40.5))|42",
+      "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))|43|POINT (-72.5 40.75)|55")
   }
 
   // TODO: create parser rule and inject into spark session

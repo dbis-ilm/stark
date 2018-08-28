@@ -5,7 +5,6 @@ import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{JoinPartition, OneToManyPartition, SpatialPartitioner}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
-import org.apache.spark._
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer

@@ -1,3 +1,5 @@
+package dbis.stark.spatial
+
 
 import dbis.stark.{STObject, StarkTestUtils}
 import org.apache.spark.SparkContext

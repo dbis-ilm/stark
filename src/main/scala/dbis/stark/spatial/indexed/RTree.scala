@@ -1,9 +1,9 @@
 package dbis.stark.spatial.indexed
 
-import dbis.stark.STObject.{GeoType, MBR}
+import dbis.stark.STObject.GeoType
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
-import org.locationtech.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
+import org.locationtech.jts.index.strtree.{AbstractNode, ItemBoundable, ItemDistance, STRtreePlus}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -109,14 +109,16 @@ class RTree[D: ClassTag ](
    * 
    * @return Returns a list containing all Data items in the tree
    */
-  protected[indexed] def items = super.itemsTree()
+  def items = super.itemsTree()
       .iterator()
       .flatMap{ l => (l: @unchecked) match {
         case d: Data[D] => Iterator.single(d)
         case a: java.util.ArrayList[_] => unnest(a)
         } 
       }
-  
+
+  def lastLevelNodes = boundablesAtLevel(depth()).asScala.map(_.asInstanceOf[AbstractNode])
+
   /**
    * If the tree was queried using the *RO methods you can use this method
    * to retreive the final result of the tree.

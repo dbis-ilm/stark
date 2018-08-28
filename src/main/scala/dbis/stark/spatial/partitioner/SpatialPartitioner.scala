@@ -26,7 +26,7 @@ object SpatialPartitioner {
     * @tparam V The type for payload data
     * @return Returns a 4-tuple for min/max values in the two dimensions in the form <code>(min-x, max-x, min-y, max-y)</code>
     */
-  protected[stark] def getMinMax[G <: STObject, V](rdd: RDD[(G,V)], sampleFraction: Double = 0): (Double, Double, Double, Double) = {
+  def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) = {
 
 //    val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
 
@@ -44,6 +44,25 @@ object SpatialPartitioner {
     }
     
     // do +1 for the max values to achieve right open intervals 
+    (minX, maxX + EPS, minY, maxY + EPS)
+  }
+
+  def getMinMax[G <: STObject, V](samples: Iterator[(G,V)]): (Double, Double, Double, Double) = {
+
+    val (minX, maxX, minY, maxY) = samples.map{ case (g,_) =>
+      val env = g.getEnvelopeInternal
+      (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
+
+    }.reduce { (oldMM, newMM) =>
+      val newMinX = oldMM._1 min newMM._1
+      val newMaxX = oldMM._2 max newMM._2
+      val newMinY = oldMM._3 min newMM._3
+      val newMaxY = oldMM._4 max newMM._4
+
+      (newMinX, newMaxX, newMinY, newMaxY)
+    }
+
+    // do +1 for the max values to achieve right open intervals
     (minX, maxX + EPS, minY, maxY + EPS)
   }
 

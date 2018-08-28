@@ -11,21 +11,21 @@ import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
 
 class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
-         rdd: RDD[(G, V)],
-         indexConfig: IndexConfig
-       ) extends SpatialRDDFunctions[G, V](rdd) with Serializable {
+                                                                             self: RDD[(G, V)],
+                                                                             indexConfig: IndexConfig
+       ) extends SpatialRDDFunctions[G, V](self) with Serializable {
 
-  def intersects(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
+  def intersects(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
 
-  def contains(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINS, Some(indexConfig))
+  def contains(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINS, Some(indexConfig))
 
-  def containedby(qry: G) = new SpatialFilterRDD[G, V](rdd, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
+  def containedby(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
 
   def withinDistance(
 		  qry: G,
 		  maxDist: Distance,
 		  distFunc: (STObject,STObject) => Distance
-	  ): RDD[(G, V)] = rdd.mapPartitions { iter =>
+	  ): RDD[(G, V)] = self.mapPartitions { iter =>
           // we don't know how the distance function looks like and thus have to scan all partitions
 
           val tree = IndexFactory.get[G,(G,V)](indexConfig)
@@ -51,8 +51,8 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
-    val r = rdd.mapPartitionsWithIndex({(idx,iter) =>
-              val partitionCheck = rdd.partitioner.forall { p =>
+    val r = self.mapPartitionsWithIndex({ (idx, iter) =>
+              val partitionCheck = self.partitioner.forall { p =>
                 p match {
                   case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
                   case _ => true
@@ -82,7 +82,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           .sortBy(_._2._1, ascending = true)
           .take(k)
 
-    rdd.sparkContext.parallelize(r)
+    self.sparkContext.parallelize(r)
   }
 
   /**
@@ -100,7 +100,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @return Returns an RDD containing the Join result
    */
   def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = {
-    new SpatialJoinRDD(rdd, other, pred, oneToMany = oneToManyPartitioning)
+    new SpatialJoinRDD(self, other, pred, oneToMany = oneToManyPartitioning)
   }
 
   /**
@@ -117,10 +117,14 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    */
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = {
       new SpatialJoinRDD(
-          if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd,
+          if(partitioner.isDefined) self.partitionBy(partitioner.get) else self,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
           pred,
         Some(indexConfig), oneToMany = oneToManyPartitioning)
+  }
+
+  def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {
+    new SpatialKnnJoinRDD(self, other, k, distFunc)
   }
   
   def cluster[KeyType](

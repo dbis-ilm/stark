@@ -3,6 +3,7 @@ package dbis.stark.spatial
 import java.io.File
 
 import dbis.stark.STObject.MBR
+import dbis.stark.spatial.indexed.Index
 import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
 import dbis.stark.visualization.Visualization
 import dbis.stark.{Distance, STObject}
@@ -88,6 +89,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
    */
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean): RDD[(V,V2)]
   def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner], oneToManyPartitioning: Boolean): RDD[(V,V2)]
+
+  def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)]
 
   def skyline(ref: STObject,
               distFunc: (STObject, STObject) => (Distance, Distance),

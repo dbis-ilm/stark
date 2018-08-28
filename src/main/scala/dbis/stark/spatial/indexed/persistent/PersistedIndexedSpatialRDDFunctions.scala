@@ -66,7 +66,6 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     self.sparkContext.parallelize(nn)
   }
 
-
   def withinDistance(qry: STObject, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
     self.mapPartitions({ trees =>
     trees.flatMap{ tree =>

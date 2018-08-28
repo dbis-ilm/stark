@@ -3,7 +3,6 @@ package dbis.stark.spatial.indexed.persistent
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
-import dbis.stark.spatial.partitioner.SpatialPartitioner
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 

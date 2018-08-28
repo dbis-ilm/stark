@@ -7,7 +7,6 @@ import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, Sp
 import dbis.stark.visualization.Visualization
 import dbis.stark.{Distance, STObject}
 import javax.imageio.ImageIO
-import org.apache.spark.Partitioner
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 
@@ -87,8 +86,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean): RDD[(V,V2)]
-  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner]): RDD[(V,V2)]
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean): RDD[(V,V2)]
+  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner], oneToManyPartitioning: Boolean): RDD[(V,V2)]
 
   def skyline(ref: STObject,
               distFunc: (STObject, STObject) => (Distance, Distance),

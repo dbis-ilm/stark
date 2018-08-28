@@ -2,12 +2,12 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.{fromWKT, getInternal, makeSTObject}
 import dbis.stark._
-import org.apache.spark.SpatialRDD._
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
-import dbis.stark.spatial.indexed.{RTree, RTreeConfig}
-import dbis.stark.spatial.partitioner.{BSPartitioner, GridStrategy, SpatialGridPartitioner}
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
+import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {

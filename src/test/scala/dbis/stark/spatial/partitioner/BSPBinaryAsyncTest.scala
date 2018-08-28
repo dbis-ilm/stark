@@ -1,6 +1,5 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.spatial
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.scalatest.{FlatSpec, Matchers}
 

@@ -95,19 +95,19 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) = self.withScope {
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = self.withScope {
     val cleanF = self.context.clean(pred)
-    new SpatialJoinRDD(self, other, cleanF)
+    new SpatialJoinRDD(self, other, cleanF, oneToManyPartitioning)
   }
 
 
 
 
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) = self.withScope {
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
     new SpatialJoinRDD(
       if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
       if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
-      pred)
+      pred, oneToMany = oneToManyPartitioning)
   }
 
 

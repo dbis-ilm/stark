@@ -21,6 +21,8 @@ case class Cell(var id: Int, var range: NRectRange, var extent: NRectRange) exte
   def extendBy(p: NPoint): Unit = { extent = extent.extend(p) }
   
   override def clone(): Cell = Cell(id, range.clone(), extent.clone())
+
+  def intersects(other: Cell) = range.intersects(other.range) || extent.intersects(other.extent)
 }
 
 object Cell {

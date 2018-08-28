@@ -675,7 +675,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val pPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
 
     val start = System.currentTimeMillis()
-    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 50)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None)//.collect()
+    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 5)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None)//.collect()
     val joinResSamCnt = joinResSam.count()
     val end = System.currentTimeMillis()
 
@@ -683,12 +683,16 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joinResSamCnt shouldBe > (0L)
 
     val start2 = System.currentTimeMillis()
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 50)).join(pPartedNoSample, JoinPredicate.CONTAINEDBY, None)//.collect()
+    val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 5)).join(pPartedNoSample, JoinPredicate.CONTAINEDBY, None)//.collect()
     val joinResPlainCnt = joinResPlain.count()
     val end2 = System.currentTimeMillis()
 
     joinResPlainCnt shouldBe > (0L)
     joinResSamCnt should equal(joinResPlainCnt)
+
+
+
+
 
     println(s"sampled join: ${end - start} ms")
     println(s"plain join: ${end2 - start2} ms")
@@ -789,22 +793,28 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "produce same join results with sampling as without short" taggedAs (Sampling, Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}.cache()//.sample(withReplacement = false, 0.5)
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}.cache()//.sample(withReplacement = false, 0.5)
 
 
+    val noStart = System.currentTimeMillis()
     val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, RTreeConfig(order = 5)).join(rddTaxi, JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val noEnd = System.currentTimeMillis()
+
+    println(s"no partitioning: ${noEnd - noStart} ms")
 
 
     val taxiPartiNoSample = new BSPartitioner(rddTaxi, sideLength = 0.3, maxCostPerPartition = 100, pointsOnly = true)
-
-
     val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100, pointsOnly = false)
 
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), RTreeConfig(order = 5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val withStart = System.currentTimeMillis()
+    val joinResPlain = rddBlocks.partitionBy(blockPartiNoSample).liveIndex(RTreeConfig(order = 5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val withEnd = System.currentTimeMillis()
+    println(s"with BSP partitioning: ${withEnd - withStart} ms")
+
     joinResPlain.length shouldBe > (0)
 
     withClue("join part no sample does not have same results as no partitioning") { joinResPlain should contain theSameElementsAs joinResNoPart }

@@ -29,25 +29,18 @@ class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
     case sp: SpatialPartitioner => sp
   }
 
+
   override def getPartitions: Array[Partition] = {
-//    // create the cross product split
-//    val array = new Array[Partition](left.partitions.length * right.partitions.length)
-//    for (s1 <- left.partitions; s2 <- right.partitions) {
-//      val idx = s1.index * numPartitionsInright + s2.index
-//      array(idx) = new CartesianPartition(idx, left, right, s1.index, s2.index)
-//    }
-//    array
-    
     val parts = ListBuffer.empty[JoinPartition]
-    
+
     val checkPartitions = leftParti.isDefined && rightParti.isDefined
     var idx = 0
     for (
-        s1 <- left.partitions; 
-        s2 <- right.partitions
-        if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
-      
-      parts += new JoinPartition(idx, left, right, s1.index, s2.index)
+      s1 <- left.partitions;
+      s2 <- right.partitions
+      if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
+
+      parts += JoinPartition(idx, left, right, s1.index, s2.index)
       idx += 1
     }
     parts.toArray
@@ -61,7 +54,7 @@ class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
     val currSplit = split.asInstanceOf[JoinPartition]
 
-    val rightArray = right.iterator(currSplit.rightPartition, context).toArray
+//    val rightArray = right.iterator(currSplit.rightPartition, context).toArray
 
     val resultIter = left.iterator(currSplit.leftPartition, context).flatMap{ tree =>
       
@@ -73,7 +66,7 @@ class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
 
-      rightArray.flatMap { case (rg,rv) =>
+      right.iterator(currSplit.rightPartition, context).flatMap { case (rg,rv) =>
         tree.query(rg)
           .filter { case (lg,_) => predicateFunction(lg,rg)}
           .map{ case (_,lv) => (lv,rv) }

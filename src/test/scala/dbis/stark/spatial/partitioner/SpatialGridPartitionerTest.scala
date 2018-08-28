@@ -1,7 +1,7 @@
 package dbis.stark.spatial.partitioner
 
 import dbis.stark.STObject
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.JoinPredicate
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -60,7 +60,7 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
 
 //    val parted = rdd.partitionBy(parti)
 
-    val gridConfig = GridStategy(5, pointsOnly = false)
+    val gridConfig = GridStrategy(5, pointsOnly = false)
 
     val parted = rdd.partitionBy(gridConfig)
     val parti = parted.partitioner match {

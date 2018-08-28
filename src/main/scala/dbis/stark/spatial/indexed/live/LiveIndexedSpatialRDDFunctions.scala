@@ -3,8 +3,9 @@ package dbis.stark.spatial.indexed.live
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.partitioner.SpatialPartitioner
-import dbis.stark.spatial.{SpatialFilterRDD, _}
+import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
+import org.apache.spark.SpatialFilterRDD
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -98,8 +99,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * and the parameter is the geometry of other
    * @return Returns an RDD containing the Join result
    */
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean) =
-    new SpatialJoinRDD(rdd, other, pred)
+  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = {
+    new SpatialJoinRDD(rdd, other, pred, oneToMany = oneToManyPartitioning)
+  }
 
   /**
    * Perform a spatial join using the given predicate and a partitioner.
@@ -113,13 +115,12 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param partitioner The partitioner to partition both RDDs with
    * @return Returns an RDD containing the Join result
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None) = {
-
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = {
       new SpatialJoinRDD(
           if(partitioner.isDefined) rdd.partitionBy(partitioner.get) else rdd,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
           pred,
-        Some(indexConfig))
+        Some(indexConfig), oneToMany = oneToManyPartitioning)
   }
   
   def cluster[KeyType](

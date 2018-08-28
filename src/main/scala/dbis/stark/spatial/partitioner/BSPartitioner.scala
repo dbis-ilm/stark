@@ -17,11 +17,12 @@ object BSPartitioner {
     _minX: Double,
     _maxX: Double,
     _minY: Double,
-    _maxY: Double): BSPartitioner[G, V] = {
+    _maxY: Double,
+    _sampleFraction: Int = 0): BSPartitioner[G, V] = {
     
     val _sideLength = math.min(math.abs(_maxX - _minX), math.abs(_maxY - _minY)) / _gridPPD
     
-    new BSPartitioner(rdd, _sideLength, _maxCostPerPartition, withExtent, _minX, _maxX, _minY, _maxY)
+    new BSPartitioner(rdd, _sideLength, _maxCostPerPartition, withExtent, _minX, _maxX, _minY, _maxY, _sampleFraction)
     
   }
   
@@ -45,27 +46,33 @@ object BSPartitioner {
   * @tparam V Payload data type
   */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
-                                                            rdd: RDD[(G,V)],
-                                                            val sideLength: Double,
-                                                            maxCostPerPartition: Double,
-                                                            pointsOnly: Boolean,
-                                                            _minX: Double,
-                                                            _maxX: Double,
-                                                            _minY: Double,
-                                                            _maxY: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+      @transient private val rdd: RDD[(G,V)],
+      val sideLength: Double,
+      val maxCostPerPartition: Double,
+      val pointsOnly: Boolean,
+      private val _minX: Double,
+      private val _maxX: Double,
+      private val _minY: Double,
+      private val _maxY: Double,
+      val sampleFraction: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+
+  protected[partitioner] val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
+
 
   def this(rdd: RDD[(G,V)],
            sideLength: Double,
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
-           minMax: (Double, Double, Double, Double)) =
-    this(rdd, sideLength, maxCostPerPartition, pointsOnly, minMax._1, minMax._2, minMax._3, minMax._4)
+           minMax: (Double, Double, Double, Double),
+           sampleFraction: Double) =
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction)
 
   def this(rdd: RDD[(G,V)],
            sideLength: Double,
            maxCostPerPartition: Double,
-           pointsOnly: Boolean) =
-    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd))
+           pointsOnly: Boolean,
+           sampleFraction: Double = 0) =
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd), sampleFraction)
 
 
 //  val s = Cell(0, NRectRange(NPoint(ll), NPoint(ur)))
@@ -100,18 +107,17 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     * cell it belongs and then simply aggregate by cell
     */
   protected[spatial] val cells: Array[(Cell, Int)] =
-    SpatialPartitioner.buildHistogram(rdd,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
+    SpatialPartitioner.buildHistogram(theRDD,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
-  protected[spatial] var bsp = new BSP(
+  protected[spatial] val bsp = new BSPBinaryAsync(
     start,
     cells, // for BSP we only need calculated cell sizes and their respective counts
     sideLength,
     maxCostPerPartition,
     pointsOnly,
-    BSPartitioner.numCellThreshold
-    )
+    BSPartitioner.numCellThreshold)
 
 
 //  printPartitions(Paths.get(System.getProperty("user.home"), "partis.wkt"))
@@ -147,39 +153,61 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   override def getPartition(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
-    /* XXX: This will throw an error if the geometry is outside of our partitions!
-     * However, this should not happen, because the partitioner is specially for a given RDD
-     * which by definition is immutable and the partitions should cover the complete data space 
-     * of the RDD's content
-     */
     val c = Utils.getCenter(g.getGeo)
-    val part = bsp.partitions.find{ p =>
-      p.range.contains(NPoint(c.getX, c.getY))
+
+    val pX = c.getX
+    val pY = c.getY
+    val pc = NPoint(pX, pY)
+
+
+    // find the partitionId where the point is contained in
+    val part = bsp.partitions.find(_.range.contains(pc))
+
+    /*
+     * If the given point was not within any partition, calculate the distances to all other partitions
+     * and assign the point to the closest partition.
+     * Eventually, adjust the assigned partition range and extent
+     */
+    val (partitionId, outside) = part.map(p => (p.id,false)).getOrElse {
+//      val iter = if(partitions.length > 100) partitions.par.iterator else partitions.iterator
+//      val minPartitionId12 = iter.map{ case Cell(id, range, _) => (id, range.dist(pc)) }.minBy(_._2)._1
+
+      var minDist = Double.MaxValue
+      var minPartitionId: Int = -1
+      var first = true
+
+      for(partition <- bsp.partitions) {
+        val dist = partition.range.dist(pc)
+        if(first || dist < minDist) {
+          minDist = dist
+          minPartitionId = partition.id
+          first = false
+        }
+
+      }
+
+      (minPartitionId, true)
     }
-    
-    
-    if(part.isDefined) {
-      // return the partition ID
-      part.get.id 
-      
-    } else {
-//      println("error: no partition found")
-//      println(bsp.partitions.mkString("\n"))
-      val histoFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_histogram.wkt")
-      val partitionFile = java.nio.file.Paths.get(System.getProperty("user.home"), "stark_partitions.wkt")
-      
-//      println(s"saving historgram to $histoFile")
-      printHistogram(histoFile)
-      
-//      println(s"saving partitions to $partitionFile")
-      printPartitions(partitionFile)
-      
-//      println("you can use the script/plotpoints.py script to visualize points, cells, and partitions")
-      
-      throw new IllegalStateException(s"$g is not in any partition!")
-        
+
+    if(outside) {
+      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, SpatialPartitioner.EPS)
+
+      if(!pointsOnly)
+        bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
-    
-    
+
+    partitionId
+  }
+
+  override def equals(obj: scala.Any) = obj match {
+    case sp: BSPartitioner[G,_] =>
+      sp.rdd == rdd &&
+      sp.sideLength == sideLength &&
+      sp.maxCostPerPartition == maxCostPerPartition &&
+      sp.pointsOnly == pointsOnly &&
+      sp.sampleFraction == sampleFraction &&
+      sp.minX == minX && sp.maxX == maxX &&
+      sp.minY == minY && sp.maxY == maxY
+    case _ => false
   }
 }

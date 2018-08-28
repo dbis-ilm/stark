@@ -95,7 +95,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = self.withScope {
     val cleanF = self.context.clean(pred)
     new SpatialJoinRDD(self, other, cleanF, oneToManyPartitioning)
   }
@@ -103,13 +103,16 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
     new SpatialJoinRDD(
       if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
       if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
       pred, oneToMany = oneToManyPartitioning)
   }
 
+  override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = self.withScope {
+    new SpatialKnnJoinRDD(self, other, k, distFunc)
+  }
 
   /**
    * Cluster this SpatialRDD using DBSCAN
@@ -311,15 +314,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       val tree = IndexFactory.get[G,(G,V)](indexConfig)
 
       iter.foreach{ case (g,v) => tree.insert(g, (g,v))}
-
-//      iter.take(10).foreach{ case (g,v) => tree.insert(g, (g,v))}
-
-
-
-      //      for ((g, v) <- iter) {
-      //        tree.insert(g, (g, v))
-      //      }
-
       Iterator.single(tree)
     },
     preservesPartitioning = true) // preserve partitioning

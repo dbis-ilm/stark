@@ -1,17 +1,14 @@
-package dbis.stark.spatial
 
-import dbis.stark.{STObject, TestUtils}
+import dbis.stark.{STObject, StarkTestUtils}
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
-
-import dbis.stark.spatial.SpatialRDD._
 
 class SpatialJoinRDDTestCase  extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   private var sc: SparkContext = _
 
   override def beforeAll() {
-    sc = TestUtils.createSparkContext("spatialjoinrddtestcase", 1)
+    sc = StarkTestUtils.createSparkContext("spatialjoinrddtestcase", 1)
   }
 
   override def afterAll() {

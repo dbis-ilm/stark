@@ -21,9 +21,6 @@ class RTree[D: ClassTag ](
     @transient private val capacity: Int = 10
   ) extends STRtreePlus[Data[D]](capacity) with Index[D] with KnnIndex[D] with WithinDistanceIndex[D] { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
-//  private var timestamp = 0
-//  protected[indexed] def ts: Int = timestamp
-  
   /**
    * Insert data into the tree
    * 

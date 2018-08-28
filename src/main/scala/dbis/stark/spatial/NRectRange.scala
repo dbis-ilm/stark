@@ -52,18 +52,20 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
 
     var idx = 0
     var res = true
-    while(idx < r.ll.c.length) {
+    while(idx < r.ll.c.length && res) {
       res &&= r.ll.c(idx) >= ll(idx) && r.ur.c(idx) <= ur(idx)
-      if(!res)
-        return false
+//      if(!res)
+//        return false
 
       idx += 1
     }
     res
   }
-  
-  def intersects(r: NRectRange): Boolean = this.contains(r) || points.exists { p => r.contains(p) }
-  
+
+  def intersects(r: NRectRange): Boolean = /*this.contains(r) || r.contains(this) ||*/
+    points.exists { p => r.contains(p) } || r.points.exists(p => this.contains(p))
+
+  //TODO: make n-dimensional
   def points = Array(ll, NPoint(ur(0),ll(1)),ur, NPoint(ll(0),ur(1)))
   
   override def wkt: String = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))"

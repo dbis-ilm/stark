@@ -1,6 +1,5 @@
 package dbis.stark.sql
 
-import dbis.stark.sql.spatial.STJoinStrategy
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -20,7 +19,7 @@ object STARKSession {
       enableSTARK = true
 
       withExtensions{ extensions =>
-        extensions.injectPlannerStrategy(_ => STJoinStrategy)
+        extensions.injectPlannerStrategy(_ => StarkStrategy)
       }
 
       this

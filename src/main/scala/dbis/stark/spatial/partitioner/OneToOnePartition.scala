@@ -1,5 +1,7 @@
 package dbis.stark.spatial.partitioner
 
+import java.io.{IOException, ObjectOutputStream}
+
 import org.apache.spark.Partition
 import org.apache.spark.rdd.RDD
 
@@ -12,7 +14,7 @@ import org.apache.spark.rdd.RDD
   * @param leftIndex The index of the partition in the left RDD
   * @param rightIndex The index of the partition in the right RDD
   */
-protected[stark] case class JoinPartition(
+protected[stark] case class OneToOnePartition(
                                       idx: Int,
                                       @transient private val left: RDD[_],
                                       @transient private val right: RDD[_],
@@ -23,13 +25,13 @@ protected[stark] case class JoinPartition(
   var rightPartition: Partition = right.partitions(rightIndex)
   override val index: Int = idx
 
-//  @throws(classOf[IOException])
-//  private def writeObject(oos: ObjectOutputStream): Unit = {
-//    // Update the reference to parent split at the time of task serialization
-//    leftPartition = left.partitions(leftIndex)
-//    rightPartition = right.partitions(rightIndex)
-//    oos.defaultWriteObject()
-//  }
+  @throws(classOf[IOException])
+  private def writeObject(oos: ObjectOutputStream): Unit = {
+    // Update the reference to parent split at the time of task serialization
+    leftPartition = left.partitions(leftIndex)
+    rightPartition = right.partitions(rightIndex)
+    oos.defaultWriteObject()
+  }
 
   override def toString: String = s"JoinPartition[idx=$idx, leftIdx=$leftIndex, rightIdx=$rightIndex, s1=$leftPartition, s2=$rightPartition]"
 }
@@ -44,4 +46,12 @@ protected[stark] case class OneToManyPartition(idx: Int, @transient private val 
   var leftPartition = left.partitions(leftIndex)
 
   var rightPartitions = rightIndex.map(i => right.partitions(i))
+
+  @throws(classOf[IOException])
+  private def writeObject(oos: ObjectOutputStream): Unit = {
+    // Update the reference to parent split at the time of task serialization
+    leftPartition = left.partitions(leftIndex)
+    rightPartitions = rightIndex.map(i => right.partitions(i))
+    oos.defaultWriteObject()
+  }
 }

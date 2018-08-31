@@ -19,35 +19,30 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     tree.query(qry).filter{ c => c._1.intersects(qry)}
   }
 
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean) =
-    new PersistentIndexedSpatialCartesianJoinRDD(self.sparkContext,self, other, pred)
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToMany: Boolean) =
+    new PersistentIndexedSpatialJoinRDD(self, other, pred, oneToMany)
 
 
-  def join[V2 : ClassTag](right: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+  def join[V2 : ClassTag](right: RDD[(G, V2)], pred: JoinPredicate, oneToMany: Boolean = false): RDD[(V, V2)] = {
 
-
-    val predicateFunction = JoinPredicate.predicateFunction(pred)
-
-    if(self.partitioner == right.partitioner) {
+    if(self.partitioner.isDefined && self.partitioner == right.partitioner) {
       self.zipPartitions(right) { case (leftIter, rightIter) =>
 
         if(leftIter.isEmpty || rightIter.isEmpty)
           Seq.empty[(V,V2)].iterator
         else {
-
-          // FIXME: ensure there's only one element
-          // if leftIter has more elements we would ignore them here
-          val index = leftIter.next()
-
-          rightIter.flatMap { case (rg, rv) =>
-            index.query(rg)
-                 .filter { case (lg, _) => predicateFunction(lg, rg) }
-                 .map { case (_, lv) => (lv, rv) }
+          val predicateFunction = JoinPredicate.predicateFunction(pred)
+          leftIter.flatMap { index =>
+            rightIter.flatMap { case (rg, rv) =>
+              index.query(rg)
+                .filter { case (lg, _) => predicateFunction(lg, rg) }
+                .map { case (_, lv) => (lv, rv) }
+            }
           }
         }
       }
     } else
-      new PersistentIndexedSpatialJoinRDD(self, right, pred)
+      new PersistentIndexedSpatialJoinRDD(self, right, pred, oneToMany)
   }
 
 

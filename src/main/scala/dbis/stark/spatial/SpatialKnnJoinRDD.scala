@@ -1,11 +1,12 @@
 package dbis.stark.spatial
 
 import dbis.stark.spatial.indexed.{Index, KnnIndex}
-import dbis.stark.spatial.partitioner.{JoinPartition, OneToManyPartition}
+import dbis.stark.spatial.partitioner.{OneToManyPartition, OneToOnePartition}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, TaskContext}
 
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 class InfiniteSingleIterator[T](elem: T) extends Iterator[T] {
@@ -17,44 +18,57 @@ object InfiniteSingleIterator {
 }
 
 class SpatialKnnJoinRDD[G <: STObject : ClassTag, V : ClassTag, V2: ClassTag ](
-                                                                    left: RDD[(G,V)], right: RDD[Index[V2]],
+                                                                    _left: RDD[(G,V)], _right: RDD[Index[V2]],
                                                                     k: Int,
                                                                     distFunc: (STObject,STObject) => Distance
-                                                                ) extends RDD[(V,V2)](left.context, Nil) {
+//                                                                    oneToMany:Boolean = false
+                                                                ) extends JoinRDD[(G,V), Index[V2], (V,V2)](_left, _right, true, false) {
 
-  override protected def getPartitions = {
+  override def getPartitions = {
     val leftParts:Seq[Int] = left.partitions.indices
     right.partitions.iterator.zipWithIndex.map{case (rp, i) =>
       OneToManyPartition(i, right, left, rp.index, leftParts)
     }.toArray
   }
 
-  override def compute(split: Partition, context: TaskContext): Iterator[(V,V2)] = {
-    val p = split.asInstanceOf[OneToManyPartition]
+  override protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext) = ???
 
+  override protected def computeWithOneToMany(p: OneToManyPartition, context: TaskContext) = {
     val indexes = right.iterator(right.partitions(p.leftIndex), context)
 
-    indexes.flatMap { idx =>
-      if(!idx.isInstanceOf[KnnIndex[_]])
-        throw new IllegalArgumentException(s"must be of KnnIndex ${idx.getClass}!")
+    indexes.flatMap{
+      case index: KnnIndex[V2] =>
 
-      val index = idx.asInstanceOf[KnnIndex[V2]]
-      p.rightPartitions.iterator.flatMap { rp =>
-        left.iterator(rp, context).flatMap { case (lg, lv) =>
-          val leftIter = InfiniteSingleIterator(lv)
-          val kNNs = index.kNN(lg, k, distFunc)
-          leftIter.zip(kNNs)
+//        val neighbors = ListBuffer.empty[(V,V2)]
+//        val rightPartitionsIter = p.rightPartitions.iterator
+//
+//        while(rightPartitionsIter.hasNext && neighbors.size < k) {
+//          val rp = rightPartitionsIter.next()
+//          left.iterator(rp, context).foreach{ case (lg, lv) =>
+//
+//            val kNNs = index.kNN(lg, k, distFunc)
+//            var toTake = 0
+//            val toAdd = kNNs.takeWhile{ _ =>
+//              toTake += 1
+//              neighbors.length + toTake < k
+//            }
+//
+//
+//            neighbors ++= InfiniteSingleIterator(lv).zip(toAdd)
+//          }
+//        }
+//
+//        neighbors.iterator
+
+        p.rightPartitions.iterator.flatMap { rp =>
+          left.iterator(rp, context).flatMap { case (lg, lv) =>
+            val leftIter = InfiniteSingleIterator(lv)
+            val kNNs = index.kNN(lg, k, distFunc)
+            leftIter.zip(kNNs)
+          }
         }
-      }
+      case idx@ _ =>
+        throw new IllegalArgumentException(s"must be of KnnIndex ${idx.getClass}!")
     }
   }
-
-  override def getPreferredLocations(split: Partition): Seq[String] = split match {
-    case otm: OneToManyPartition =>
-      (left.preferredLocations(otm.leftPartition) ++
-        otm.rightPartitions.flatMap(right.preferredLocations)).distinct
-    case jp: JoinPartition =>
-      (left.preferredLocations(jp.leftPartition) ++ right.preferredLocations(jp.rightPartition)).distinct
-  }
-
 }

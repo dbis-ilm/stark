@@ -1,95 +1,57 @@
 package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject
-import dbis.stark.spatial.JoinPredicate
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.Index
-import dbis.stark.spatial.partitioner.{JoinPartition, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{OneToManyPartition, OneToOnePartition}
+import dbis.stark.spatial.{JoinPredicate, JoinRDD}
+import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Dependency, NarrowDependency, Partition, TaskContext}
 
-import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
 class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag](
-    var left: RDD[Index[(G,V)]],
-    var right: RDD[(G,V2)],
-    pred: JoinPredicate.JoinPredicate
-    )  extends RDD[(V,V2)](left.context, Nil) {
+    _left: RDD[Index[(G,V)]],
+    _right: RDD[(G,V2)],
+    predicateFunction: (G,G) => Boolean,
+    private val checkParties: Boolean,
+    oneToMany: Boolean = false
+    )  extends JoinRDD[Index[(G,V)],(G,V2),(V,V2)](_left,_right, oneToMany, checkParties) {
   
-  val numPartitionsInright = right.partitions.length
 
-  val predicateFunction = JoinPredicate.predicateFunction(pred)
+  def this(left: RDD[Index[(G,V)]], right:RDD[(G,V2)], predicate: JoinPredicate, oneToMany:Boolean) =
+    this(left, right, JoinPredicate.predicateFunction(predicate), checkParties = false, oneToMany = oneToMany)
 
-  private lazy val rightParti = right.partitioner.map {
-    case sp: SpatialPartitioner => sp
-  }
-
-  private lazy val leftParti = left.partitioner.map {
-    case sp: SpatialPartitioner => sp
-  }
-
-
-  override def getPartitions: Array[Partition] = {
-    val parts = ListBuffer.empty[JoinPartition]
-
-    val checkPartitions = leftParti.isDefined && rightParti.isDefined
-    var idx = 0
-    for (
-      s1 <- left.partitions;
-      s2 <- right.partitions
-      if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
-
-      parts += JoinPartition(idx, left, right, s1.index, s2.index)
-      idx += 1
-    }
-    parts.toArray
-  }
-
-  override def getPreferredLocations(split: Partition): Seq[String] = {
-    val currSplit = split.asInstanceOf[JoinPartition]
-    (left.preferredLocations(currSplit.leftPartition) ++ right.preferredLocations(currSplit.rightPartition)).distinct
-  }
-
-  override def compute(split: Partition, context: TaskContext): Iterator[(V, V2)] = {
-    val currSplit = split.asInstanceOf[JoinPartition]
-
-//    val rightArray = right.iterator(currSplit.rightPartition, context).toArray
-
-    val resultIter = left.iterator(currSplit.leftPartition, context).flatMap{ tree =>
-      
+  override protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext) = {
+    left.iterator(partition.leftPartition, context).flatMap{ tree =>
       /*
        * Returns:
-  		 * an Envelope (for STRtrees), an Interval (for SIRtrees), or other object 
-  		 * (for other subclasses of AbstractSTRtree)
-  		 * 
-  		 * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
+       * an Envelope (for STRtrees), an Interval (for SIRtrees), or other object
+       * (for other subclasses of AbstractSTRtree)
+       *
+       * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
 
-      right.iterator(currSplit.rightPartition, context).flatMap { case (rg,rv) =>
+      right.iterator(partition.rightPartition, context).flatMap { case (rg,rv) =>
         tree.query(rg)
           .filter { case (lg,_) => predicateFunction(lg,rg)}
           .map{ case (_,lv) => (lv,rv) }
       }
     }
-    
-    resultIter
-    
   }
 
-  override def getDependencies: Seq[Dependency[_]] = List(
-    new NarrowDependency(left) {
-      def getParents(id: Int): Seq[Int] = List(id / numPartitionsInright)
-    },
-    new NarrowDependency(right) {
-      def getParents(id: Int): Seq[Int] = List(id % numPartitionsInright)
-    }
-  )
+  override protected def computeWithOneToMany(partition: OneToManyPartition, context: TaskContext) = {
+    left.iterator(partition.leftPartition, context).flatMap { tree =>
 
-  override def clearDependencies() {
-    super.clearDependencies()
-    left = null
-    right = null
-  }  
+      partition.rightPartitions.iterator.flatMap{ rp =>
+        right.iterator(rp, context).flatMap { case (rg,rv) =>
+          tree.query(rg)
+            .filter { case (lg,_) => predicateFunction(lg,rg)}
+            .map{ case (_,lv) => (lv,rv) }
+        }
+      }
+    }
+  }
 }
 

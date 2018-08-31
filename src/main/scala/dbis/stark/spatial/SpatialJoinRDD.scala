@@ -2,12 +2,10 @@ package dbis.stark.spatial
 
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
-import dbis.stark.spatial.partitioner.{JoinPartition, OneToManyPartition, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{OneToOnePartition, OneToManyPartition}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 /**
@@ -15,8 +13,8 @@ import scala.reflect.ClassTag
   *
   * Currently this is a nested loop implementation
   *
-  * @param left The left input RDD
-  * @param right The right input RDD
+  * @param _left The left input RDD
+  * @param _right The right input RDD
   * @param predicateFunc The predicate to apply in the join (join condition)
   * @param indexConfig The (optional) configuration for indexing
   * @param checkParties Perform partition check
@@ -24,15 +22,12 @@ import scala.reflect.ClassTag
   * @tparam V The type representing payload data in left RDD
   * @tparam V2 The type representing payload data in right RDD
   */
-class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] private (
-  var left: RDD[(G,V)],
-  var right: RDD[(G,V2)],
+class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] private (_left: RDD[(G,V)],
+                                                                                   _right: RDD[(G,V2)],
   predicateFunc: (G,G) => Boolean,
   indexConfig: Option[IndexConfig],
   private val checkParties: Boolean,
-  oneToMany: Boolean)  extends RDD[(V,V2)](left.context, Nil) {
-
-  private val numPartitionsInRight = right.getNumPartitions
+  oneToMany: Boolean)  extends JoinRDD[(G,V),(G,V2),(V,V2)](_left, _right, oneToMany, checkParties) { // RDD[(V,V2)](left.context, Nil) {
 
   /**
     * Create a new join operator with the given predicate.
@@ -60,69 +55,9 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
            predicate: (G,G) => Boolean, oneToMany: Boolean) =
     this(left, right, predicate, None, checkParties = false, oneToMany)
 
-  override def getPartitions: Array[Partition] = {
 
-    val parts = ListBuffer.empty[Partition]
 
-    if (leftParti.isDefined && leftParti == rightParti) {
-
-      left.partitions.iterator.zip(right.partitions.iterator).foreach { case (l, r) =>
-        if (oneToMany)
-          parts += OneToManyPartition(l.index, left, right, l.index, Seq(r.index))
-        else
-          parts += JoinPartition(l.index, left, right, l.index, r.index)
-      }
-
-    } else {
-      val checkPartitions = checkParties && leftParti.isDefined && rightParti.isDefined
-
-      if (oneToMany) {
-
-        val pairs = mutable.Map.empty[Int, ListBuffer[Int]]
-        for (
-          s1 <- left.partitions;
-          s2 <- right.partitions
-          if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
-
-          if (pairs.contains(s1.index)) {
-            pairs(s1.index) += s2.index
-          } else
-            pairs += s1.index -> ListBuffer(s2.index)
-        }
-
-        pairs.iterator.zipWithIndex.foreach { case ((lIdx, rights), idx) =>
-          parts += OneToManyPartition(idx, left, right, lIdx, rights)
-        }
-
-      } else { // "normal" join partition
-
-        var idx = 0
-        for (
-          s1 <- left.partitions;
-          s2 <- right.partitions
-          if !checkPartitions || leftParti.get.partitionExtent(s1.index).intersects(rightParti.get.partitionExtent(s2.index))) {
-
-          val p = JoinPartition(idx, left, right, s1.index, s2.index) //, leftContainsRight, rightContainsLeft)
-          parts += p
-          idx += 1
-        }
-      }
-    }
-
-    parts.toArray
-  }
-
-  private[stark] lazy val leftParti = left.partitioner.flatMap{
-    case sp: SpatialPartitioner => Some(sp)
-    case _ => None
-  }
-
-  private[stark] lazy val rightParti = right.partitioner.flatMap{
-    case sp: SpatialPartitioner => Some(sp)
-    case _ => None
-  }
-
-  private def computeWithJoinPartition(partition: JoinPartition, context: TaskContext): Iterator[(V,V2)] = {
+  protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext): Iterator[(V,V2)] = {
 
     // if treeOrder is <= 0 we do not use indexing
     if(indexConfig.isEmpty) {
@@ -157,8 +92,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     }
   }
 
-  private def computeWithOneToMany(partition1: OneToManyPartition, context: TaskContext): Iterator[(V,V2)] = {
-    val split = partition1
+  protected def computeWithOneToMany(split: OneToManyPartition, context: TaskContext): Iterator[(V,V2)] = {
 
     // if treeOrder is <= 0 we do not use indexing
     if(indexConfig.isEmpty) {
@@ -197,32 +131,5 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     }
   }
 
-  override def compute(s: Partition, context: TaskContext): Iterator[(V, V2)] = s match {
-    case jp: JoinPartition => computeWithJoinPartition(jp, context)
-    case otm: OneToManyPartition => computeWithOneToMany(otm, context)
-  }
-
-  override def getPreferredLocations(split: Partition): Seq[String] = split match {
-    case otm: OneToManyPartition =>
-      (left.preferredLocations(otm.leftPartition) ++
-        otm.rightPartitions.flatMap(right.preferredLocations)).distinct
-    case jp: JoinPartition =>
-      (left.preferredLocations(jp.leftPartition) ++ right.preferredLocations(jp.rightPartition)).distinct
-  }
-
-  override def getDependencies: Seq[Dependency[_]] = List(
-    new NarrowDependency(left) {
-      def getParents(id: Int): Seq[Int] = List(id / numPartitionsInRight)
-    },
-    new NarrowDependency(right) {
-      def getParents(id: Int): Seq[Int] = List(id % numPartitionsInRight)
-    }
-  )
-
-  override def clearDependencies() {
-    super.clearDependencies()
-    left = null
-    right = null
-  }
 
 }

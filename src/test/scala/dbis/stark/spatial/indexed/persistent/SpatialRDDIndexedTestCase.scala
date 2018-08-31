@@ -162,7 +162,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.intersects _).collect()
+    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.intersects _, oneToMany = false).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -192,7 +192,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.contains _).collect()
+    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.contains _, oneToMany = false).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -223,7 +223,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.containedby _).collect()
+    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.containedby _, oneToMany = false).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -254,7 +254,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid) _).collect()
+    val spatialJoinResult = rdd1.join(rdd2, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid) _, oneToMany = false).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the

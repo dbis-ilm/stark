@@ -182,7 +182,8 @@ abstract class SpatialPartitioner(
     printPartitions(Paths.get(fName))
   }
 
-  protected[stark] def writeToFile(strings: Seq[String], fName: Path) =
+
+  protected[stark] def writeToFile(strings: Iterable[String], fName: Path) =
     java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
 }
 

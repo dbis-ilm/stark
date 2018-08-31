@@ -1,10 +1,12 @@
 package dbis.stark.raster
 
+import java.nio.file.Path
+
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.{NPoint, NRectRange}
 import dbis.stark.spatial.partitioner.SpatialPartitioner
-import org.apache.spark.{Partition, Partitioner}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+import org.apache.spark.Partition
 import org.locationtech.jts.geom.GeometryFactory
 
 import scala.collection.mutable.ListBuffer
@@ -12,7 +14,7 @@ import scala.collection.mutable.ListBuffer
 case class RasterPartition(index: Int, cell: Int) extends Partition
 
 abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
-                                 val minX: Double, val maxX: Double, val minY: Double, val maxY: Double) extends Partitioner {
+                                 minX: Double, maxX: Double, minY: Double, maxY: Double) extends SpatialPartitioner(minX, maxX, minY, maxY) {
   val partitionWidth = (maxX - minX) / partitionsX
   val partitionsHeight = (maxY - minY) / partitionsY
 
@@ -37,6 +39,7 @@ abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
 
     NRectRange(NPoint(a, b-partitionsHeight), NPoint(a + partitionWidth, b))
   }
+
 }
 
 class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
@@ -83,6 +86,15 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
     }
 
     result.toArray
+  }
+
+  override def partitionBounds(idx: Int) = Cell(idToNRectRange(idx))
+
+  override def partitionExtent(idx: Int) = idToNRectRange(idx)
+
+  override def printPartitions(fName: Path): Unit = {
+    val strings = (0 until numPartitions).iterator.map(i => partitionExtent(i).wkt).toIterable
+    writeToFile(strings, fName)
   }
 }
 

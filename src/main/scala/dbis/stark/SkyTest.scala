@@ -2,7 +2,8 @@ package dbis.stark
 
 import dbis.stark.spatial.Skyline
 import org.apache.spark.{SparkConf, SparkContext}
-import dbis.stark.spatial.SpatialRDD._
+//import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 
 /**
   * Created by hg on 13.04.17.

@@ -19,15 +19,14 @@ import scala.reflect.ClassTag
  * @param rdd The [[org.apache.spark.rdd.RDD]] to partition
  * @param dimensions The dimensionality of the input data
  */
-class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
-                                                                     rdd: RDD[(G,V)],
-                                                                     partitionsPerDimension: Int,
-                                                                     pointsOnly: Boolean,
-                                                                     _minX: Double,
-                                                                     _maxX: Double,
-                                                                     _minY: Double,
-                                                                     _maxY: Double,
-                                                                     dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
+                                                                    protected val partitionsPerDimension: Int,
+                                                                    protected val pointsOnly: Boolean,
+                                                                    _minX: Double,
+                                                                    _maxX: Double,
+                                                                    _minY: Double,
+                                                                    _maxY: Double,
+                                                                    dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
 
   require(dimensions == 2, "Only 2 dimensions supported currently")
 
@@ -49,25 +48,23 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
   protected[this] val yLength: Double = math.abs(maxY - minY) / partitionsPerDimension
 
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
-  private val partitions: Array[Cell] = {
-    (if(pointsOnly) {
+  private val partitions: Array[(Cell,Int)] = {
+    if(pointsOnly) {
       SpatialPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
     } else {
       SpatialPartitioner.buildHistogram(rdd,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
 
-    }).map(_._1)
-
+    }
   }
 
   override def printPartitions(fName: Path): Unit = {
-    val list2 = partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList
+    val list2 = partitions.map { case (cell, _) => s"${cell.id};${cell.range.wkt}" }.toList
     super.writeToFile(list2, fName)
-
   }
 
-  override def partitionBounds(idx: Int): Cell = partitions(idx) //getCellBounds(idx)
+  override def partitionBounds(idx: Int): Cell = partitions(idx)._1 //getCellBounds(idx)
 
-  override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
+  override def partitionExtent(idx: Int): NRectRange = partitions(idx)._1.extent
 
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 
@@ -89,5 +86,21 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
 
     id
+  }
+
+  override def equals(obj: scala.Any) = obj match {
+    case sp: SpatialGridPartitioner[G,_] =>
+      sp.partitionsPerDimension == partitionsPerDimension &&
+      sp.pointsOnly == pointsOnly &&
+      sp.minX == minX && sp.maxX == maxX &&
+      sp.minY == minY && sp.maxY == maxY
+    case _ => false
+  }
+
+
+
+  override def hashCode(): Int = {
+    val state = Iterator(partitionsPerDimension, pointsOnly, minX, maxX,minY,maxY)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
   }
 }

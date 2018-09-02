@@ -3,7 +3,8 @@ package dbis.stark
 //import com.vividsolutions.jts.geom.{Envelope, Geometry, Point}
 //import com.vividsolutions.jts.io.WKTReader
 import STObject._
-import org.locationtech.jts.geom.{Envelope, Geometry}
+import dbis.stark.spatial.Utils
+import org.locationtech.jts.geom._
 import org.locationtech.jts.io.WKTReader
 
 /**
@@ -107,35 +108,36 @@ case class STObject(
   }
   
   override def hashCode() = (g,time).hashCode()
-  
-  
+
+
   def getGeo = g
   def getTemp = time
   
 }
 
 object STObject {
-  
+
+  type GeoType = Geometry
+  type MBR = Envelope
+
   def apply(wkt: String): STObject = this(new WKTReader().read(wkt))
   def apply(wkt: String, ts: Long): STObject = STObject(new WKTReader().read(wkt), ts)
   def apply(wkt: String, start: Long, end: Long): STObject = STObject(wkt, Interval(start, end))
   def apply(wkt: String, ts: Instant): STObject = this(new WKTReader().read(wkt), ts)
   def apply(wkt: String, temp: Interval): STObject = this(new WKTReader().read(wkt), temp)
+
   def apply(g: GeoType): STObject = this(g, None)
   def apply(g: GeoType, t: TemporalExpression): STObject = this(g, Some(t))
-  
   def apply(g: GeoType, time: Long): STObject = this(g, Some(Instant(time)))
   def apply(g: GeoType, start: Long, stop: Long): STObject = this(g, Some(Interval(start, stop)))
 //  def apply(g: GeoType, start: Long, stop: Option[Long]): STObject = this(g, Some(Interval(start, Instant(stop))))
+  def apply(e: MBR): STObject = this(Utils.makeGeo(e), None)
 
-  def apply(x: Double, y: Double): STObject = this(new WKTReader().read(s"POINT($x $y)"))
-  def apply(x: Double, y: Double, ts: Long): STObject = this(new WKTReader().read(s"POINT($x $y)"), ts)
-  def apply(x: Double, y: Double, z: Double): STObject = this(new WKTReader().read(s"POINT($x $y $z)"))
-  def apply(x: Double, y: Double, z: Double, ts: Long): STObject = this(new WKTReader().read(s"POINT($x $y $z)"), ts)
+  def apply(x: Double, y: Double): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)))
+  def apply(x: Double, y: Double, ts: Long): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)), ts)
+  def apply(x: Double, y: Double, z: Double): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y,z)))
+  def apply(x: Double, y: Double, z: Double, ts: Long): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y,z)), ts)
 
-  type GeoType = Geometry
-  type MBR = Envelope
-  
   implicit def getInternal(s: STObject): GeoType = s.g
   
   implicit def makeSTObject(g: GeoType): STObject = STObject(g)
@@ -146,6 +148,8 @@ object STObject {
 	 * @param s The WKT string
 	 * @return The geometry parsed from the given textual representation
 	 */
-	implicit def stringToGeom(s: String): STObject = STObject(s)
+	implicit def fromWKT(s: String): STObject = STObject(s)
+
+  implicit def asString(s: STObject): String = s.toString
   
 }

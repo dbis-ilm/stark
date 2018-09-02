@@ -66,7 +66,7 @@ class RTreeTest extends FlatSpec with Matchers {
     
     val queryresult = tree.query(q).toList
     queryresult.size shouldBe 6
-    queryresult should contain only ((STObject(q),2013))
+    queryresult should contain only ((q,2013))
   }
   
   it should "return cancidates for point DS" in {

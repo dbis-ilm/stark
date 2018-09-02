@@ -53,6 +53,5 @@ private[sql] class TileUDT extends UserDefinedType[Tile[Byte]] {
 }
 
 case object TileUDT extends TileUDT {
-  println("register TileUDT")
   UDTRegistration.register(classOf[Tile[Byte]].getName, classOf[TileUDT].getName)
 }

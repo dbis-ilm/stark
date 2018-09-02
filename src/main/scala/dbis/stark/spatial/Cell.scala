@@ -6,7 +6,7 @@ package dbis.stark.spatial
  * @param range The computed bounds of the cell
  * @param extent The theoretical bounds of the cell with the minimum and maximum extent of the contained geometries
  */
-case class Cell(var id: Int, range: NRectRange, var extent: NRectRange) extends Cloneable {
+case class Cell(var id: Int, var range: NRectRange, var extent: NRectRange) extends Cloneable {
   override def hashCode() = range.hashCode()
   override def equals(other: Any) = other match {
     case Cell(_,otherRange, _) => range.equals(otherRange)
@@ -18,8 +18,11 @@ case class Cell(var id: Int, range: NRectRange, var extent: NRectRange) extends 
     * @param r The range to extent by
     */
   def extendBy(r: NRectRange): Unit = { extent = extent.extend(r) }
+  def extendBy(p: NPoint): Unit = { extent = extent.extend(p) }
   
   override def clone(): Cell = Cell(id, range.clone(), extent.clone())
+
+  def intersects(other: Cell) = range.intersects(other.range) || extent.intersects(other.extent)
 }
 
 object Cell {

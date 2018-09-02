@@ -3,7 +3,7 @@ package dbis.stark.raster
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.indexed.IndexConfig
+import dbis.stark.spatial.indexed.{Index, IndexConfig}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, Partitioner, TaskContext}
 
@@ -66,11 +66,17 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
 //  def join(other: RDD[STObject], predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RasterRDD[U] =
 //    new RasterJoinVectorRDD(this, other, predicate, indexConf)
 
-  def join[P: ClassTag](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RDD[(Tile[U],P)] =
-    new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf)
+  def join[P: ClassTag](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate,
+                        indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(Tile[U],P)] =
+    new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany)
+
+  def join[P: ClassTag](other: RDD[Index[P]], pixelDefault: U, predicate: JoinPredicate, oneToMany: Boolean): RDD[(Tile[U],P)] = {
+    RasterJoinIndexedVectorRDD(this, other, predicate, pixelDefault, oneToMany)
+  }
 }
 
 
 object  RasterRDD {
+  implicit def toRasterRDD[U : ClassTag](rdd: RDD[Tile[U]]) = new RasterRDD[U](rdd)
   implicit def toDrawable(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctions(rdd)
 }

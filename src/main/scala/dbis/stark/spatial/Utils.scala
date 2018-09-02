@@ -4,12 +4,25 @@ import org.locationtech.jts.geom.{Envelope, GeometryFactory, Point}
 import dbis.stark.STObject.{GeoType, MBR}
 
 object Utils {
-  
+
+  @inline
   def toEnvelope(r: NRectRange): MBR = new Envelope(r.ll(0), r.ur(0), r.ll(1), r.ur(1))
-//  {
-//    val s = s"""POLYGON ((${r.ll(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ll(1)}, ${r.ur(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ur(1)}, ${r.ll(0)} ${r.ll(1)}))"""
-//    new WKTReader().read(s).getEnvelopeInternal
-//  }
+
+  @inline
+  def fromGeo(g: GeoType): NRectRange = {
+    val env = g.getEnvelopeInternal
+    fromEnvelope(env)
+  }
+
+  def fromEnvelope(env: MBR): NRectRange =
+    NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+
+
+  def makeGeo(mbr: MBR): GeoType = {
+    val fac = new GeometryFactory()
+    fac.toGeometry(mbr)
+  }
+
 
   def getCenter(g: GeoType): Point = {
     var center = g.getCentroid

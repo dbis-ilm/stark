@@ -1,22 +1,36 @@
 package dbis.stark.spatial
 
-import java.awt.image.BufferedImage
 import java.io.File
 
 import dbis.stark.STObject.MBR
-
-import scala.reflect.ClassTag
-import dbis.stark.{Distance, STObject}
+import dbis.stark.spatial.indexed.Index
 import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
 import dbis.stark.visualization.Visualization
+import dbis.stark.{Distance, STObject}
 import javax.imageio.ImageIO
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.rdd.{PairRDDFunctions, RDD}
+
+import scala.reflect.ClassTag
 
 abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: RDD[(G,V)]) extends PairRDDFunctions[G,V](rdd) {
 
   def partitionBy(strategy: PartitionerConfig) = {
     val partitioner = PartitionerFactory.get(strategy, rdd)
+
+//    rdd.map{ case (g,v) =>
+//      val partId = partitioner.getPartition(g)
+//      (partId, (g,v))
+//    }
+////      .repartition(partitioner.numPartitions)
+//      .partitionBy(new Partitioner{
+//      override def numPartitions = partitioner.numPartitions
+//
+//      override def getPartition(key: Any) = key.asInstanceOf[Int]
+//    })
+//      .map(_._2)
+
+
     rdd.partitionBy(partitioner)
   }
 
@@ -73,8 +87,10 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean): RDD[(V,V2)]
-  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner]): RDD[(V,V2)]
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean): RDD[(V,V2)]
+  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner], oneToManyPartitioning: Boolean): RDD[(V,V2)]
+
+  def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)]
 
   def skyline(ref: STObject,
               distFunc: (STObject, STObject) => (Distance, Distance),

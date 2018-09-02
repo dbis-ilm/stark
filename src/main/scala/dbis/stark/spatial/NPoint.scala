@@ -10,26 +10,27 @@ trait WKT {
  * @param c: The array of coordinate values in each dimension
  */
 case class NPoint(c: Array[Double]) extends Cloneable with WKT {
+
   require(!c.exists(_.isNaN), s"Coordinate value must not be NaN: ${c.mkString("; ")}")
   require(c.length >= 2, "dimension must be >= 2")
 
   override def wkt: String = s"POINT(${c.mkString(" ")})"
 
-	def apply(idx:Int): Double = c(idx)
+  def apply(idx:Int): Double = c(idx)
 
-	/**
-	 * The dimensionality of this point 
-	 */
-	def dim: Int = c.length
+  /**
+    * The dimensionality of this point
+    */
+  def dim: Int = c.length
 
-	
-//	def mergeMin(other: NPoint) = NPoint(
-//	    c.zip(other.c).map { case (l,r) => math.min(l, r) }
-//    )
 
-//  def mergeMax(other: NPoint) = NPoint(
-//    c.zip(other.c).map { case (l,r) => math.max(l, r) }
-//  )
+  //	def mergeMin(other: NPoint) = NPoint(
+  //	    c.zip(other.c).map { case (l,r) => math.min(l, r) }
+  //    )
+
+  //  def mergeMax(other: NPoint) = NPoint(
+  //    c.zip(other.c).map { case (l,r) => math.max(l, r) }
+  //  )
 
   def mergeMin(other: NPoint): NPoint = {
     val arr = new Array[Double](c.length)
@@ -51,17 +52,22 @@ case class NPoint(c: Array[Double]) extends Cloneable with WKT {
     NPoint(arr)
   }
 
+  def withValue(dim: Int, newValue: Double): NPoint = {
+    val newC = c.clone()
+    newC.update(dim, newValue)
+    NPoint(newC)
+  }
 
-	/*
+  /*
 	 * Override this because we need to compare "deep", i.e.
-	 * all values instead of just the reference, which may be 
+	 * all values instead of just the reference, which may be
 	 * different for two arrays with the same values
 	 */
-	override def equals(that: Any): Boolean = that match {
-		case NPoint(vals) => this.c.deep == vals.deep
-		case _ => false
-	}
-	
+  override def equals(that: Any): Boolean = that match {
+    case NPoint(vals) => this.c.deep == vals.deep
+    case _ => false
+  }
+
 	/* just as we need to override equals, we also need to 
 	 * compute a deep hash code 
 	 */

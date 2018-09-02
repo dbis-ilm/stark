@@ -19,14 +19,17 @@ object SpatialPartitioner {
   /**
     * Determine the min/max extents of a given RDD
     *
-    * Since we use right-open intervals in [[NRectRange]] we add 1 to the both max values
+    * Since we use right-open intervals in [[NRectRange]] we add [[EPS]] to the both max values
     *
     * @param rdd The RDD
     * @tparam G The data type representing spatio-temporal data
     * @tparam V The type for payload data
     * @return Returns a 4-tuple for min/max values in the two dimensions in the form <code>(min-x, max-x, min-y, max-y)</code>
     */
-  protected[stark] def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) = {
+  def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) = {
+
+//    val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
+
     val (minX, maxX, minY, maxY) = rdd.map{ case (g,_) =>
       val env = g.getEnvelopeInternal
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
@@ -41,6 +44,25 @@ object SpatialPartitioner {
     }
     
     // do +1 for the max values to achieve right open intervals 
+    (minX, maxX + EPS, minY, maxY + EPS)
+  }
+
+  def getMinMax[G <: STObject, V](samples: Iterator[(G,V)]): (Double, Double, Double, Double) = {
+
+    val (minX, maxX, minY, maxY) = samples.map{ case (g,_) =>
+      val env = g.getEnvelopeInternal
+      (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
+
+    }.reduce { (oldMM, newMM) =>
+      val newMinX = oldMM._1 min newMM._1
+      val newMaxX = oldMM._2 max newMM._2
+      val newMinY = oldMM._3 min newMM._3
+      val newMaxY = oldMM._4 max newMM._4
+
+      (newMinX, newMaxX, newMinY, newMaxY)
+    }
+
+    // do +1 for the max values to achieve right open intervals
     (minX, maxX + EPS, minY, maxY + EPS)
   }
 
@@ -103,9 +125,9 @@ object SpatialPartitioner {
 
       rdd.map { case (g, _) =>
         val p = Utils.getCenter(g.getGeo)
-
-        val env = g.getEnvelopeInternal
-        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+//        val env = g.getEnvelopeInternal
+//        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+        val extent = Utils.fromGeo(g.getGeo)
         val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
         (cellId,(1, extent))
@@ -160,7 +182,8 @@ abstract class SpatialPartitioner(
     printPartitions(Paths.get(fName))
   }
 
-  protected[stark] def writeToFile(strings: List[String], fName: Path) =
+
+  protected[stark] def writeToFile(strings: Iterable[String], fName: Path) =
     java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
 }
 

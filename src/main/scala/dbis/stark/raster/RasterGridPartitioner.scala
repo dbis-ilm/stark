@@ -1,10 +1,12 @@
 package dbis.stark.raster
 
+import java.nio.file.Path
+
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.{NPoint, NRectRange}
 import dbis.stark.spatial.partitioner.SpatialPartitioner
-import org.apache.spark.{Partition, Partitioner}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+import org.apache.spark.Partition
 import org.locationtech.jts.geom.GeometryFactory
 
 import scala.collection.mutable.ListBuffer
@@ -12,7 +14,7 @@ import scala.collection.mutable.ListBuffer
 case class RasterPartition(index: Int, cell: Int) extends Partition
 
 abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
-                                 val minX: Double, val maxX: Double, val minY: Double, val maxY: Double) extends Partitioner {
+                                 minX: Double, maxX: Double, minY: Double, maxY: Double) extends SpatialPartitioner(minX, maxX, minY, maxY) {
   val partitionWidth = (maxX - minX) / partitionsX
   val partitionsHeight = (maxY - minY) / partitionsY
 
@@ -37,6 +39,7 @@ abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
 
     NRectRange(NPoint(a, b-partitionsHeight), NPoint(a + partitionWidth, b))
   }
+
 }
 
 class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
@@ -48,8 +51,14 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
     SpatialPartitioner.getCellId(tile.ulx, tile.uly, minX, minY, maxX, maxY, partitionWidth, partitionsHeight, partitionsX)
   }
 
+  /**
+    * Return the partitions that intersect with the spatial component of the provided object
+    * @param g The object to apply as a filter
+    * @return Returns all partitions that intersect with the given object
+    */
   protected[raster] def getPartitionsFor(g: STObject): Array[Partition] = {
 
+    // get the factory to instantiate vector geometry objects
     val factory = new GeometryFactory(g.getGeo.getPrecisionModel, g.getGeo.getSRID)
 
     var i = 0
@@ -58,10 +67,16 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
     val result = ListBuffer.empty[RasterPartition]
 
     while( i < numPartitions) {
+      // get the MBR of partition
       val cellMBR = idToMBR(i)
 
+      // convert the MBR to a geometry
       val cellGeom = factory.toGeometry(cellMBR)
 
+      /* if the partition intersects with the geo
+       * create a special RasterPartition, with the ID
+       * of the actual partition (i) and a sequence number (currID)
+       */
       if(g.getGeo.intersects(cellGeom)) {
         result += RasterPartition(currId, i)
         currId += 1
@@ -72,9 +87,24 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
 
     result.toArray
   }
+
+  override def partitionBounds(idx: Int) = Cell(idToNRectRange(idx))
+
+  override def partitionExtent(idx: Int) = idToNRectRange(idx)
+
+  override def printPartitions(fName: Path): Unit = {
+    val strings = (0 until numPartitions).iterator.map(i => partitionExtent(i).wkt).toIterable
+    writeToFile(strings, fName)
+  }
 }
 
 object RasterGridPartitioner {
+
+  /**
+    * Determine min and max value for the raster RDD
+    * @param rdd The RDD
+    * @return A tuple of (minX, maxX, minY, maxY)
+    */
   def getMinMax(rdd: RasterRDD[_]) = rdd.map { t =>
     (t.ulx, t.ulx + t.width, t.uly - t.height, t.uly)
   }.reduce{(t1,t2) =>

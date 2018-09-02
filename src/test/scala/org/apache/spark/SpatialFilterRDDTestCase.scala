@@ -1,8 +1,8 @@
-package dbis.stark.spatial
+package org.apache.spark
 
-import dbis.stark.{STObject, TestUtils}
+import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
-import org.apache.spark.SparkContext
+import dbis.stark.{STObject, StarkTestUtils}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
@@ -10,7 +10,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
   private var sc: SparkContext = _
 
   override def beforeAll() {
-    sc = TestUtils.createSparkContext("spatialfilterrddtestcase")
+    sc = StarkTestUtils.createSparkContext("spatialfilterrddtestcase")
   }
 
   override def afterAll() {
@@ -20,7 +20,7 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
 
   "A SpatialFilterRDD" should "return all partitions if no spatial partitioner was applied" in {
 
-    val raw = TestUtils.createRDD(sc)
+    val raw = StarkTestUtils.createRDD(sc)
 
     val q: STObject = "POINT (53.483437 -2.2040706)"
 
@@ -31,9 +31,9 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
 
   it should "prune partitions when GRID partitioner was applied" in {
 
-    val raw = TestUtils.createRDD(sc)
+    val raw = StarkTestUtils.createRDD(sc)
 
-    val grid = new SpatialGridPartitioner(raw, 10, false)
+    val grid = new SpatialGridPartitioner(raw, 10, true)
 
     val gridRdd = raw.partitionBy(grid)
     val q: STObject = "POINT (53.483437 -2.2040706)"
@@ -53,9 +53,9 @@ class SpatialFilterRDDTestCase extends FlatSpec with Matchers with BeforeAndAfte
 
   it should "prune partitions when BSP partitioner was applied" in {
 
-    val raw = TestUtils.createRDD(sc)
+    val raw = StarkTestUtils.createRDD(sc)
 
-    val bsp = new BSPartitioner(raw, 1, 50, false)
+    val bsp = new BSPartitioner(raw, 1, 50, true)
 
     val bspRdd = raw.partitionBy(bsp)
     val q: STObject = "POINT (53.483437 -2.2040706)"

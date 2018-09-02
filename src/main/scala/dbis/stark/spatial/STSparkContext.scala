@@ -1,13 +1,16 @@
 package dbis.stark.spatial
 
+import java.io.File
 import java.nio.file.Paths
 
+import dbis.stark.raster.Tile
 import dbis.stark.{Instant, Interval, STObject}
 import dbis.stark.spatial.SpatialRDD._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
+import scala.io.Source
 import scala.reflect.ClassTag
 
 
@@ -51,6 +54,38 @@ class STSparkContext(private val sc: SparkContext) {
       sc.emptyRDD[T]
     else
       sc.objectFile(partitionstoLoad)
+  }
+
+  def tileFiles(folderPath: String, filePrefix: String, tileWidth: Int, tileHeight: Int, totalWidth: Int): RDD[Tile[Double]] = {
+    val dir = new File(folderPath)
+    var fileList = List[File]()
+    if(dir.exists() && dir.isDirectory) {
+      fileList = dir.listFiles.filter(_.isFile).toList
+    }
+
+    var uplx = 0
+    var uply = 0
+    var tileList = List[Tile[Double]]()
+
+    for(f <- fileList) {
+      if(f.getName.startsWith(filePrefix)) {
+        val data = Source.fromFile(f)
+          .getLines()
+          .map(_.split(",").map(_.toDouble))
+          .flatten
+          .toArray
+
+        tileList ::= Tile[Double](uplx, uply + tileHeight, tileWidth, tileHeight, data)
+        if(uplx + tileWidth >= totalWidth) {//for now tiles will be loaded row by row
+          uplx = 0
+          uply += tileHeight
+        } else {
+          uplx += tileWidth
+        }
+      }
+    }
+
+    sc.parallelize(tileList)
   }
 
   private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {

@@ -215,7 +215,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
 
     // TODO: specify parititoner as parameter - but it has to work on distance RDD...
-    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, pointsOnly = false)
+    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, pointsOnly = true)
     val partedDistRDD = distanceRDD.partitionBy(partitioner)
 
     val cachedDistRDD = if(allowCache) partedDistRDD.cache() else partedDistRDD
@@ -234,9 +234,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       // TODO: here we can be more selective by computing which partitions are dominated
       // based on the partiton index
+      //FIXME is this ok, if dominateas eg wants maximum values?
       (idx until partitioner.numPartitions).foreach{ otherPart =>
         val otherMin = partitioner.partitionExtent(otherPart).ll.c
         val otherMinTup = STObject(otherMin(0), otherMin(1))
+
 
         if(Skyline.centroidDominates(currMaxTup, otherMinTup)) {
           globalBS(otherPart) = false

@@ -182,11 +182,11 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
 
     val res = rdd.cluster(
-        keyExtractor = { case (_,(id, _, _,_)) => id } , // key extractor to extract point IDs from tuple //keyExtractor = _._2._1,
-        minPts = 10, 
-        epsilon = 5.0,  
-        maxPartitionCost = 500,
+        minPts = 10 , // key extractor to extract point IDs from tuple //keyExtractor = _._2._1,
+        epsilon = 5.0,
+        keyExtractor = { case (_,(id, _, _,_)) => id },
         includeNoise = true,
+        maxPartitionCost = 500,
         outfile = Some(f.toString))
     
     res.count() shouldBe rdd.count() 
@@ -360,14 +360,14 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
       val refDist = Distance.euclid(q,skylinePoint._1)
       val skylineRef = STObject(refDist._1.value, refDist._2.value)
 
-      val forAll = rdd.filter( _._1 != q )
+      val dominated = rdd.filter( _._1 != q )
         .map{ case (l,_) => Distance.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
           Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
         }
         .collect()
 
-      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
+      withClue(s"skyline point ${skylinePoint._1} is dominated"){dominated shouldBe empty}
     }
 
   }
@@ -380,8 +380,10 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val skyline = rdd.skyline(q, Distance.euclid, Skyline.centroidDominates,ppD=5).collect()
     val skylineAgg = rdd.skylineAgg(q, Distance.euclid, Skyline.centroidDominates).collect()
+    val skylineAngular = rdd.skylineAngular(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
 
-    skyline should contain theSameElementsAs skylineAgg
+    withClue("skyline vs agg"){skyline should contain theSameElementsAs skylineAgg}
+    withClue("skyline vs angular"){skyline should contain theSameElementsAs skylineAngular}
   }
 
 

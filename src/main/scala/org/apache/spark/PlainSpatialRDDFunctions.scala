@@ -44,19 +44,19 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   /**
    * Find all elements that intersect with a given query geometry
    */
-  def intersects(qry: G) = self.withScope{ new SpatialFilterRDD[G,V](self, qry, JoinPredicate.INTERSECTS) }
+  def intersects(qry: G): SpatialFilterRDD[G, V] = self.withScope{ new SpatialFilterRDD[G,V](self, qry, JoinPredicate.INTERSECTS) }
 
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = self.withScope{new SpatialFilterRDD[G,V](self, qry, JoinPredicate.CONTAINEDBY) }
+  def containedby(qry: G): SpatialFilterRDD[G, V] = self.withScope{new SpatialFilterRDD[G,V](self, qry, JoinPredicate.CONTAINEDBY) }
 
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(o: G) = self.withScope{new SpatialFilterRDD[G,V](self, o, JoinPredicate.CONTAINS) }
+  def contains(o: G): SpatialFilterRDD[G, V] = self.withScope{new SpatialFilterRDD[G,V](self, o, JoinPredicate.CONTAINS) }
 
-  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
+  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance): SpatialFilterRDD[G, V] =
     self.withScope{ new SpatialFilterRDD(self, qry, PredicatesFunctions.withinDistance(maxDist, distFunc) _) }
 
 
@@ -95,7 +95,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean): SpatialJoinRDD[G, V, V2] = self.withScope {
     val cleanF = self.context.clean(pred)
     new SpatialJoinRDD(self, other, cleanF, oneToManyPartitioning)
   }
@@ -103,7 +103,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
-  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToManyPartitioning: Boolean = false): SpatialJoinRDD[G, V, V2] = self.withScope {
     new SpatialJoinRDD(
       if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
       if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
@@ -132,7 +132,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  includeNoise: Boolean = true,
 		  maxPartitionCost: Int = 10,
 		  outfile: Option[String] = None
-		  ) = self.withScope{
+		  ): RDD[(G, (Int, V))] = self.withScope{
 
 	  // create a dbscan object with given parameters
 	  val dbscan = new DBScan[KeyType,(G,V)](epsilon, minPts)
@@ -312,6 +312,49 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     self.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
   }
+
+  def skylineAngular2(ref: STObject,
+                      distFunc: (STObject, STObject) => (Distance, Distance),
+                      dominatesRel: (STObject, STObject) => Boolean,
+                      ppd: Int): RDD[(G,V)] = {
+
+    // for each partition (NOT necessarily spatial partition)
+    self.mapPartitions{ iter =>
+
+      val parti = new AngularPartitioner(dimensions = 2, ppD = ppd, firstQuadrantOnly = true)
+
+      val externalMap = SpatialRDD.createExternalSkylineMap[G,V](dominatesRel)
+
+      val values = iter.map{ case (g,v) =>
+        val (sDist,tDist) = distFunc(ref, g)
+        val distSO = STObject(sDist.minValue,tDist.minValue)
+        val id = parti.getPartition(distSO) // assign each element to its partition,
+        (id,(distSO, (g,v))) // by prepending the partition ID as key
+      }
+
+      /* and insert into an external map
+       * during insert, each bucket is created by key and the value is the skyline for this partition id
+       */
+      externalMap.insertAll(values)
+
+      externalMap.iterator
+
+      /* Now, in the map each bucket corresponds to an (theoretical) angular partition and the value is the Skyline
+       * This mapping exists for every physical partition, so in the next step, merge those partitions
+       *
+       * This can be done by reducing by key so that we merge all skyline with the same logical angular partition ID
+       */
+    }
+    .reduceByKey{ (skyline1, skyline2) => skyline1.merge(skyline2) }
+    .flatMap(_._2.iterator)
+    .coalesce(1)
+    .mapPartitions{ iter =>
+      val skyline = new Skyline[(G,V)](dominates = dominatesRel)
+      iter.foreach(skyline.insert)
+      skyline.iterator.map(_._2)
+    }
+  }
+
 
   // LIVE
 

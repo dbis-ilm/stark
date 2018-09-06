@@ -1,7 +1,7 @@
 package org.apache.spark
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.{JoinPredicate, PredicatesFunctions}
+import dbis.stark.spatial.{JoinPredicate, PredicatesFunctions, Skyline}
 import dbis.stark.spatial.indexed.{Index, IndexConfig}
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
 import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory}
@@ -107,18 +107,26 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
  */
 object SpatialRDD {
 
-  def createExternalMap[G : ClassTag, V : ClassTag, V2: ClassTag](): ExternalAppendOnlyMap[G, (V,V2), ListBuffer[(V,V2)]] = {
+  def createExternalSkylineMap[G <: STObject : ClassTag, V : ClassTag](dominates: (STObject,STObject) => Boolean):
+    ExternalAppendOnlyMap[Int, (STObject,(G,V)), Skyline[(G,V)]] = {
 
-    type ValuePair = (V,V2)
-    type Combiner = ListBuffer[ValuePair]
+    type ValuePair = (G,V)
+    type Combiner = Skyline[ValuePair]
 
-    val createCombiner: ValuePair => Combiner = pair => ListBuffer(pair)
+    val createCombiner: ((STObject, ValuePair)) => Combiner = pair => {
+      new Skyline(List((pair._1,pair._2)), dominates)
+    }
 
-    val mergeValue: (Combiner, ValuePair) => Combiner = (list, value) => list += value
+    val mergeValue: (Combiner, (STObject, ValuePair)) => Combiner = (skyline, value) => {
+      skyline.insert(value._1,value._2)
+      skyline
+    }
 
-    val mergeCombiners: ( Combiner, Combiner ) => Combiner = (c1, c2) => c1 ++= c2
+    val mergeCombiners: ( Combiner, Combiner ) => Combiner = (c1, c2) => {
+      c1.merge(c2)
+    }
 
-    new ExternalAppendOnlyMap[G, ValuePair, Combiner](createCombiner, mergeValue, mergeCombiners)
+    new ExternalAppendOnlyMap[Int, (STObject, ValuePair), Combiner](createCombiner, mergeValue, mergeCombiners)
 
   }
   

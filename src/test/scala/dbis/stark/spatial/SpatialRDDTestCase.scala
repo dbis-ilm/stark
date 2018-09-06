@@ -335,6 +335,39 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
+  it should "compute the correct skyline with logical angular partitioning" in {
+
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(StarkTestUtils.makeTimeStamp(2013, 6, 1)))
+
+    val start = System.currentTimeMillis()
+    val s = rdd.filter(_._1 != q).skylineAngular2(q, Distance.euclid, Skyline.centroidDominates, ppd = 10)
+    val skyline = s.collect()
+
+    val end = System.currentTimeMillis()
+    println(s"${end -start}ms")
+
+    //    println(skyline.mkString("\n"))
+
+    skyline should not be empty
+
+    // check that there is no point in the RDD that dominates any skyline point
+    skyline.foreach { skylinePoint =>
+      val refDist = Distance.euclid(q,skylinePoint._1)
+      val skylineRef = STObject(refDist._1.value, refDist._2.value)
+
+      val forAll = rdd.filter( _._1 != q )
+        .map{ case (l,_) => Distance.euclid(q,l)}
+        .filter{ case (sDist, tDist) =>
+          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
+        }
+        .collect()
+
+      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
+    }
+
+  }
+
 
   it should "compute the correct skyline" in {
 
@@ -381,9 +414,11 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val skyline = rdd.skyline(q, Distance.euclid, Skyline.centroidDominates,ppD=5).collect()
     val skylineAgg = rdd.skylineAgg(q, Distance.euclid, Skyline.centroidDominates).collect()
     val skylineAngular = rdd.skylineAngular(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
+    val skylineAngular2 = rdd.skylineAngular2(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
 
     withClue("skyline vs agg"){skyline should contain theSameElementsAs skylineAgg}
     withClue("skyline vs angular"){skyline should contain theSameElementsAs skylineAngular}
+    withClue("skyline vs angular2"){skyline should contain theSameElementsAs skylineAngular2}
   }
 
 

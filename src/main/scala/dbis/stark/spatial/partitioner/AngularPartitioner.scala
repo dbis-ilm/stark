@@ -38,8 +38,6 @@ object SphereCoordinate {
     SphereCoordinate(r, theta)
   }
 
-  def apply(point: NPoint): SphereCoordinate = apply(point.c)
-
   /**
    * Convert the given point, given as an array of cartesian coordinate values
    * into a spherical coordinate
@@ -93,10 +91,7 @@ class AngularPartitioner(
    */
 //  private val theMap = mutable.Map.empty[Int, Int]
 
-
-
-  // partitions in Dimension 0
-  val phi = (if(firstQuadrantOnly) 90 else 360) / ppD.toDouble
+  val (start,phi) = if(firstQuadrantOnly) (0.0, (math.Pi / 2)/ ppD.toDouble) else (-math.Pi,(2 * math.Pi)/ ppD.toDouble )
 
   override def numPartitions: Int = ppD
 
@@ -104,12 +99,14 @@ class AngularPartitioner(
     val so = key.asInstanceOf[STObject]
     val g = SphereCoordinate(so)
 
-    var i = 1
-    while(i * phi < g.angle) {
-      i += 1
+    var step = 1
+
+    while(start +(step*phi) < g.angle) {
+//      println(s"${-math.Pi + i*phi} vs $g")
+      step += 1
     }
 
-    i-1
+    step-1
 
 //    val h = (g.angle / phi).toInt.hashCode()
 //

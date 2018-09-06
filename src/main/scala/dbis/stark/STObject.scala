@@ -75,12 +75,12 @@ case class STObject(
   
   def after(t: TemporalExpression) = time.map(_ > t)
 
-  def getMaxX = this.g.getCoordinates.iterator.map(c => c.x).max
-  def getMinX = this.g.getCoordinates.iterator.map(c => c.x).min
-  def getMaxY = this.g.getCoordinates.iterator.map(c => c.y).max
-  def getMinY = this.g.getCoordinates.iterator.map(c => c.y).min
-  def getMinZ = this.g.getCoordinates.iterator.map(c => c.z).min
-  def getMaxZ = this.g.getCoordinates.iterator.map(c => c.z).max
+  lazy val getMaxX = this.g.getCoordinates.iterator.map(c => c.x).max
+  lazy val getMinX = this.g.getCoordinates.iterator.map(c => c.x).min
+  lazy val getMaxY = this.g.getCoordinates.iterator.map(c => c.y).max
+  lazy val getMinY = this.g.getCoordinates.iterator.map(c => c.y).min
+  lazy val getMinZ = this.g.getCoordinates.iterator.map(c => c.z).min
+  lazy val getMaxZ = this.g.getCoordinates.iterator.map(c => c.z).max
 
   def getMinMaxXY = this.g.getCoordinates.iterator.map(c => (c.x, c.y, c.x,c.y)).reduce( (l,r) => {
     val minX = math.min(l._1, r._1)

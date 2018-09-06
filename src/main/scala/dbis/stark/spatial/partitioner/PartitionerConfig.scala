@@ -35,7 +35,7 @@ case class RTreeStrategy(order: Int, pointsOnly: Boolean = false,
 
 
 object PartitionerFactory {
-  def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): SpatialPartitioner = strategy match {
+  def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): GridPartitioner = strategy match {
     case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor) => minmax match {
       case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly)
       case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor)

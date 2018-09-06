@@ -223,7 +223,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMax = SpatialPartitioner.getMinMax(rdd)
+    val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
     val parti = new BSPartitioner(rdd, 1, 10*1000, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
@@ -274,7 +274,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMax = SpatialPartitioner.getMinMax(rdd)
+    val minMax = GridPartitioner.getMinMax(rdd)
 
 //    BSPartitioner.numCellThreshold = -5
     val parti = new BSPartitioner(rdd, 1, 100, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
@@ -339,7 +339,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMax = SpatialPartitioner.getMinMax(rdd)
+    val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = -1
     val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
@@ -393,7 +393,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMax = SpatialPartitioner.getMinMax(rdd)
+    val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = -1
     val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0.1) // disable sampling
@@ -444,7 +444,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMax = SpatialPartitioner.getMinMax(rdd)
+      val minMax = GridPartitioner.getMinMax(rdd)
       BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
       val parti = new BSPartitioner(rdd, sideLength = 0.2, maxCostPerPartition = 100,
           pointsOnly = false, minMax = minMax, sampleFraction = 0)
@@ -453,7 +453,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMaxTaxi = SpatialPartitioner.getMinMax(rddtaxi)
+      val minMaxTaxi = GridPartitioner.getMinMax(rddtaxi)
       val partiTaxi = new BSPartitioner(rddtaxi, sideLength = 0.1, maxCostPerPartition = 100,
         pointsOnly = true, minMax = minMaxTaxi, sampleFraction = 0)
 

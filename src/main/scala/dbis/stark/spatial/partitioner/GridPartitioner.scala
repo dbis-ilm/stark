@@ -8,10 +8,23 @@ import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 
+
+trait SpatialPartitioner extends Partitioner {
+  def printPartitions(fName: java.nio.file.Path): Unit
+
+  def printPartitions(fName: String): Unit =
+    printPartitions(Paths.get(fName))
+
+
+  protected[stark] def writeToFile(strings: Iterable[String], fName: Path) =
+    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+}
+
+
 /**
   * Contains convenience functions used in spatial partitioners
   */
-object SpatialPartitioner {
+object GridPartitioner {
 
   var EPS: Double = 1 / 1000000.0
 
@@ -33,17 +46,17 @@ object SpatialPartitioner {
     val (minX, maxX, minY, maxY) = rdd.map{ case (g,_) =>
       val env = g.getEnvelopeInternal
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
-      
-    }.reduce { (oldMM, newMM) => 
+
+    }.reduce { (oldMM, newMM) =>
       val newMinX = oldMM._1 min newMM._1
       val newMaxX = oldMM._2 max newMM._2
       val newMinY = oldMM._3 min newMM._3
       val newMaxY = oldMM._4 max newMM._4
-      
-      (newMinX, newMaxX, newMinY, newMaxY)  
+
+      (newMinX, newMaxX, newMinY, newMaxY)
     }
-    
-    // do +1 for the max values to achieve right open intervals 
+
+    // do +1 for the max values to achieve right open intervals
     (minX, maxX + EPS, minY, maxY + EPS)
   }
 
@@ -168,22 +181,13 @@ object SpatialPartitioner {
   * @param minY The min value in y dimension
   * @param maxY The max value in y dimension
   */
-abstract class SpatialPartitioner(
+abstract class GridPartitioner(
     val minX: Double, var maxX: Double, val minY: Double, var maxY: Double
-  ) extends Partitioner {
+  ) extends SpatialPartitioner {
 
 
   def partitionBounds(idx: Int): Cell
   def partitionExtent(idx: Int): NRectRange
 
-  def printPartitions(fName: java.nio.file.Path): Unit
 
-  def printPartitions(fName: String): Unit = {
-    printPartitions(Paths.get(fName))
-  }
-
-
-  protected[stark] def writeToFile(strings: Iterable[String], fName: Path) =
-    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
 }
-

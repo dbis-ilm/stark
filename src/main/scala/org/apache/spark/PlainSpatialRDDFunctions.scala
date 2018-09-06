@@ -7,7 +7,7 @@ import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialGridPartitioner, SpatialPartitioner}
+import dbis.stark.spatial.partitioner._
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
@@ -27,7 +27,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   def saveAsStarkTextFile(path: String): Unit = self.partitioner.foreach {
-    case sp: SpatialPartitioner =>
+    case sp: GridPartitioner =>
       val wkts = self.partitions.indices.map{ i =>
         Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
       }
@@ -103,7 +103,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
-  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
     new SpatialJoinRDD(
       if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
       if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
@@ -281,24 +281,54 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     self.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
   }
 
+  def skylineAngular(ref: STObject,
+                     distFunc: (STObject, STObject) => (Distance, Distance),
+                     dominatesRel: (STObject, STObject) => Boolean,
+                     ppd: Int): RDD[(G,V)] = self.withScope{
+
+    require(ppd > 0)
+
+
+    def combine(sky: Skyline[(G,V)], tuple: (STObject,(G,V))): Skyline[(G,V)] = {
+      sky.insert(tuple)
+      sky
+    }
+
+    def merge(sky1: Skyline[(G,V)], sky2: Skyline[(G,V)]): Skyline[(G,V)] = {
+      sky1.merge(sky2)
+    }
+
+
+    val startSkyline = new Skyline[(G,V)](dominates = dominatesRel)
+
+    val parti = new AngularPartitioner(2, ppd, true)
+    val skyline = self.map{ case (g,v) =>
+      val (sDist,tDist) = distFunc(ref, g)
+      (STObject(sDist.minValue,tDist.minValue), (g,v))
+    }.partitionBy(parti)
+      .aggregate(startSkyline)(combine,merge)
+
+    self.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
+  }
+
   // LIVE
 
   def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, RTreeConfig(order))
 
-  def liveIndex(partitioner: SpatialPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] =
+  def liveIndex(partitioner: GridPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] =
     liveIndex(Some(partitioner), RTreeConfig(order))
 
   def liveIndex(indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, indexConfig)
-  def liveIndex(partitioner: SpatialPartitioner, indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(Some(partitioner), indexConfig)
+  def liveIndex(partitioner: GridPartitioner, indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(Some(partitioner), indexConfig)
 
-  def liveIndex(partitioner: Option[SpatialPartitioner], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(partitioner, RTreeConfig(order))
+  def liveIndex(partitioner: Option[GridPartitioner], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(partitioner, RTreeConfig(order))
 
-  def liveIndex(partitioner: Option[SpatialPartitioner], indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = {
+  def liveIndex(partitioner: Option[GridPartitioner], indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = {
     val reparted = if(partitioner.isDefined) self.partitionBy(partitioner.get) else self
     new LiveIndexedSpatialRDDFunctions(reparted, indexConfig)
   }
 
-  def index(partitioner: SpatialPartitioner, order: Int): RDD[Index[(G,V)]] = index(Some(partitioner), RTreeConfig(order))
+  def index(partitioner: GridPartitioner, order: Int): RDD[Index[(G,V)]] = index(Some(partitioner), RTreeConfig(order))
 
   /**
     * Create an index for each partition.
@@ -307,7 +337,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     * and thus changes the type of the RDD from {{{ RDD[(STObject, V)]  }}} to
     * {{{ RDD[Index[STObject, (STObject, V)]] }}}
     */
-  def index(partitioner: Option[SpatialPartitioner] = None, indexConfig: IndexConfig): RDD[Index[(G,V)]] = {
+  def index(partitioner: Option[GridPartitioner] = None, indexConfig: IndexConfig): RDD[Index[(G,V)]] = {
     val reparted = if(partitioner.isDefined) self.partitionBy(partitioner.get) else self
 
     reparted.mapPartitions({ iter  =>

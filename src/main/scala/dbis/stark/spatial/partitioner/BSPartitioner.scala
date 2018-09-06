@@ -54,7 +54,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       private val _maxX: Double,
       private val _minY: Double,
       private val _maxY: Double,
-      val sampleFraction: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+      val sampleFraction: Double) extends GridPartitioner(_minX, _maxX, _minY, _maxY) {
 
   protected[partitioner] val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
 
@@ -72,7 +72,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
            sampleFraction: Double = 0) =
-    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd), sampleFraction)
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, GridPartitioner.getMinMax(rdd), sampleFraction)
 
 
 //  val s = Cell(0, NRectRange(NPoint(ll), NPoint(ur)))
@@ -107,7 +107,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     * cell it belongs and then simply aggregate by cell
     */
   protected[spatial] val cells: Array[(Cell, Int)] =
-    SpatialPartitioner.buildHistogram(theRDD,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
+    GridPartitioner.buildHistogram(theRDD,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
@@ -190,7 +190,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     }
 
     if(outside) {
-      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, SpatialPartitioner.EPS)
+      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, GridPartitioner.EPS)
 
       if(!pointsOnly)
         bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))

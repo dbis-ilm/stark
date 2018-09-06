@@ -13,7 +13,7 @@ import scala.collection.JavaConverters._
 class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
                                         _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                         maxCost: Int, pointsOnly: Boolean)
-  extends SpatialPartitioner(_minX,_maxX,_minY, _maxY) {
+  extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
 
   require(maxCost > 0)
 
@@ -21,7 +21,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     this(samples, minMax._1, minMax._2, minMax._3, minMax._4, maxCost, pointsOnly)
 
   def this(samples: Seq[(G,V)], maxCost: Int, pointsOnly: Boolean = true) =
-    this(samples, maxCost, SpatialPartitioner.getMinMax(samples.iterator), pointsOnly)
+    this(samples, maxCost, GridPartitioner.getMinMax(samples.iterator), pointsOnly)
 
   protected[spatial] val partitions: Array[Cell] = {
 

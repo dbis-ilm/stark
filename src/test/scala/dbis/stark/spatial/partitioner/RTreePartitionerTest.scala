@@ -86,7 +86,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMaxBlocks = SpatialPartitioner.getMinMax(rddblocks)
+    val minMaxBlocks = GridPartitioner.getMinMax(rddblocks)
     val sampleBlocks = rddblocks.sample(withReplacement = false, 0.1).collect()
     val partiBlocks = new RTreePartitioner(sampleBlocks, 10, minMaxBlocks, false)
 
@@ -94,7 +94,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMaxTaxi = SpatialPartitioner.getMinMax(rddtaxi)
+    val minMaxTaxi = GridPartitioner.getMinMax(rddtaxi)
     val partiTaxi = new RTreePartitioner(rddtaxi.sample(withReplacement = false, 0.1).collect(), 10, minMaxTaxi, false)
 
     val matches = for(t <- partiTaxi.partitions;

@@ -1,9 +1,9 @@
-package dbis.spark.spatial
+package dbis.stark.spatial.partitioner
 
 import java.nio.file.Path
 
+import dbis.stark.STObject
 import dbis.stark.spatial.NPoint
-import dbis.stark.spatial.partitioner.SpatialPartitioner
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -31,6 +31,12 @@ case class SphereCoordinate(radial: Double, angle: Double) {
 }
 
 object SphereCoordinate {
+
+  def apply(so: STObject): SphereCoordinate = {
+    val r = math.sqrt( math.pow(so.getMaxX,2) + math.pow(so.getMaxY, 2))
+    val theta = math.atan2(so.getMaxY, so.getMaxX)
+    SphereCoordinate(r, theta)
+  }
 
   def apply(point: NPoint): SphereCoordinate = apply(point.c)
 
@@ -65,7 +71,7 @@ case class SphereRegion(start: SphereCoordinate, end: SphereCoordinate) {
  * @param dimensions The number of dimensions in cartesian space
  * @param ppD The number of partition to generate in each dimension
  */
-class AngularPartitioner[V: ClassTag](
+class AngularPartitioner(
     dimensions: Int,
     ppD: Int,
     firstQuadrantOnly: Boolean = false) extends SpatialPartitioner {
@@ -85,38 +91,29 @@ class AngularPartitioner[V: ClassTag](
    * neighbored partitions will most likely not have successive
    * IDs
    */
-  private val theMap = mutable.Map.empty[Int, Int]
+//  private val theMap = mutable.Map.empty[Int, Int]
 
 
-  def getId(p: SphereCoordinate) = {
 
-    val h = (p.angle / phi).toInt.hashCode()
-    theMap.getOrElseUpdate(h, => {
-      ???
-    })
-    var id: Int = -1 
-    theMap.get(h) match {
-      case Some(h2) =>
-        id = h2
-      case None =>
-        id = theMap.size
-        theMap += (h -> id)
+  // partitions in Dimension 0
+  val phi = (if(firstQuadrantOnly) 90 else 360) / ppD.toDouble
+
+  override def numPartitions: Int = ppD
+
+  override def getPartition(key: Any): Int = {
+    val so = key.asInstanceOf[STObject]
+    val g = SphereCoordinate(so)
+
+    var i = 1
+    while(i * phi < g.angle) {
+      i += 1
     }
 
-    id
-  }
-  
-  // partitions in Dimension 0 
-  val phi = (if(firstQuadrantOnly) 90 else 360) / ppD.toDouble
-  
-  override def numPartitions: Int = ppD
-  
-  override def getPartition(key: Any): Int = {
-    val g = key.asInstanceOf[SphereCoordinate]
-    
-    val cellId = getId(g)
-    
-    cellId
+    i-1
+
+//    val h = (g.angle / phi).toInt.hashCode()
+//
+//    theMap.getOrElseUpdate(h, theMap.size)
   }
 
   override def printPartitions(fName: Path): Unit = {

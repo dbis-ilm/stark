@@ -2,7 +2,7 @@ package dbis.stark.spatial.indexed.live
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed._
-import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.partitioner.GridPartitioner
 import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.SpatialFilterRDD
@@ -54,7 +54,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val r = self.mapPartitionsWithIndex({ (idx, iter) =>
               val partitionCheck = self.partitioner.forall { p =>
                 p match {
-                  case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+                  case sp: GridPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
                   case _ => true
                 }
               }
@@ -115,7 +115,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param partitioner The partitioner to partition both RDDs with
    * @return Returns an RDD containing the Join result
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = {
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToManyPartitioning: Boolean = false) = {
       new SpatialJoinRDD(
           if(partitioner.isDefined) self.partitionBy(partitioner.get) else self,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,

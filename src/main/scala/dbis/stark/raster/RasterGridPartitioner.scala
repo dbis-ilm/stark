@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.partitioner.GridPartitioner
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.Partition
 import org.locationtech.jts.geom.GeometryFactory
@@ -14,7 +14,7 @@ import scala.collection.mutable.ListBuffer
 case class RasterPartition(index: Int, cell: Int) extends Partition
 
 abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
-                                 minX: Double, maxX: Double, minY: Double, maxY: Double) extends SpatialPartitioner(minX, maxX, minY, maxY) {
+                                 minX: Double, maxX: Double, minY: Double, maxY: Double) extends GridPartitioner(minX, maxX, minY, maxY) {
   val partitionWidth = (maxX - minX) / partitionsX
   val partitionsHeight = (maxY - minY) / partitionsY
 
@@ -48,7 +48,7 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
 
   override def getPartition(key: Any) = {
     val tile = key.asInstanceOf[Tile[_]]
-    SpatialPartitioner.getCellId(tile.ulx, tile.uly, minX, minY, maxX, maxY, partitionWidth, partitionsHeight, partitionsX)
+    GridPartitioner.getCellId(tile.ulx, tile.uly, minX, minY, maxX, maxY, partitionWidth, partitionsHeight, partitionsX)
   }
 
   /**

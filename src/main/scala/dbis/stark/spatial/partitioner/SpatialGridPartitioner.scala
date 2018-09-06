@@ -26,7 +26,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,
                                                                     _maxX: Double,
                                                                     _minY: Double,
                                                                     _maxY: Double,
-                                                                    dimensions: Int) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+                                                                    dimensions: Int) extends GridPartitioner(_minX, _maxX, _minY, _maxY) {
 
   require(dimensions == 2, "Only 2 dimensions supported currently")
 
@@ -41,7 +41,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,
            partitionsPerDimension: Int,
            pointsOnly: Boolean,
            dimensions: Int = 2) =
-    this(rdd, partitionsPerDimension, pointsOnly, SpatialPartitioner.getMinMax(rdd), dimensions)
+    this(rdd, partitionsPerDimension, pointsOnly, GridPartitioner.getMinMax(rdd), dimensions)
 
 
   protected[this] val xLength: Double = math.abs(maxX - minX) / partitionsPerDimension
@@ -50,9 +50,9 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
   private val partitions: Array[(Cell,Int)] = {
     if(pointsOnly) {
-      SpatialPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
+      GridPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
     } else {
-      SpatialPartitioner.buildHistogram(rdd,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
+      GridPartitioner.buildHistogram(rdd,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
 
     }
   }
@@ -81,7 +81,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,
 
     val center = Utils.getCenter(g.getGeo)
 
-    val id = SpatialPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
+    val id = GridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
 

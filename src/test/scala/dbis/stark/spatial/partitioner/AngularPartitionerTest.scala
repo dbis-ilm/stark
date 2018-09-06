@@ -1,10 +1,7 @@
-package dbis.spark.spatial
+package dbis.stark.spatial.partitioner
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import org.apache.spark.SparkConf
-import org.apache.spark.SparkContext
-import com.vividsolutions.jts.io.WKTReader
+import dbis.stark.STObject
+import org.scalatest.{FlatSpec, Matchers}
 
 class AngularPartitionerTest extends FlatSpec with Matchers {
   
@@ -22,7 +19,7 @@ class AngularPartitionerTest extends FlatSpec with Matchers {
       Array(1,-1)
     )
     
-    val sphereCoords = (0 to 3).map { i => SphereCoordinate(points(i)) }
+    val sphereCoords = (0 to 3).map { i => STObject(points(i)(0), points(i)(1)) }
     
     sphereCoords.foreach(println)
     

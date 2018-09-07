@@ -33,6 +33,9 @@ class Skyline[PayloadType](var skylinePoints: List[(STObject, PayloadType)] = Li
 
   def iterator: Iterator[(STObject, PayloadType)] = skylinePoints.iterator
 
+  def isEmpty: Boolean = skylinePoints.isEmpty
+  def nonEmpty: Boolean = skylinePoints.nonEmpty
+
   override def clone(): Skyline[PayloadType] = {
     val l = ListBuffer.empty[(STObject, PayloadType)]
     skylinePoints.foreach(l += _)

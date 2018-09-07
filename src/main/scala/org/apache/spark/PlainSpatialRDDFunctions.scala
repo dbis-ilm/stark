@@ -323,21 +323,35 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       val parti = new AngularPartitioner(dimensions = 2, ppD = ppd, firstQuadrantOnly = true)
 
-      val externalMap = SpatialRDD.createExternalSkylineMap[G,V](dominatesRel)
 
+
+//      val externalMap = Array.tabulate(ppd){_ => new Skyline[(G,V)](dominates = dominatesRel)}
+//
+//      while(iter.hasNext) {
+//        val (g,v) = iter.next()
+//
+//        val (sDist,tDist) = distFunc(ref, g)
+//        val distSO = STObject(sDist.minValue,tDist.minValue)
+//        val id = parti.getPartition(distSO) // assign each element to its partition,
+//        externalMap(id).insert((distSO, (g,v)))
+//      }
+//      externalMap.iterator.filter(_.nonEmpty).zipWithIndex.map{ case (s,i) => (i,s)}
+
+      val externalMap = SpatialRDD.createExternalSkylineMap[G,V](dominatesRel)
       val values = iter.map{ case (g,v) =>
         val (sDist,tDist) = distFunc(ref, g)
         val distSO = STObject(sDist.minValue,tDist.minValue)
         val id = parti.getPartition(distSO) // assign each element to its partition,
-        (id,(distSO, (g,v))) // by prepending the partition ID as key
-      }
 
+        (id, (distSO,(g,v)))
+      }
       /* and insert into an external map
        * during insert, each bucket is created by key and the value is the skyline for this partition id
        */
       externalMap.insertAll(values)
-
       externalMap.iterator
+
+
 
       /* Now, in the map each bucket corresponds to an (theoretical) angular partition and the value is the Skyline
        * This mapping exists for every physical partition, so in the next step, merge those partitions
@@ -346,12 +360,14 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
        */
     }
     .reduceByKey{ (skyline1, skyline2) => skyline1.merge(skyline2) }
-    .flatMap(_._2.iterator)
+//    .flatMap(_._2.iterator)
     .coalesce(1)
     .mapPartitions{ iter =>
-      val skyline = new Skyline[(G,V)](dominates = dominatesRel)
-      iter.foreach(skyline.insert)
-      skyline.iterator.map(_._2)
+//      val skyline = new Skyline[(G,V)](dominates = dominatesRel)
+//      iter.foreach(skyline.insert)
+//      skyline.iterator.map(_._2)
+
+      iter.map(_._2).reduce(_.merge(_)).iterator.map(_._2)
     }
   }
 

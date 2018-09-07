@@ -3,10 +3,6 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
-import dbis.stark.spatial.NPoint
-
-import scala.collection.mutable
-import scala.reflect.ClassTag
 
 /**
  * Represents spherical coordinates in n dimensional space
@@ -25,8 +21,6 @@ case class SphereCoordinate(radial: Double, angle: Double) {
    * Checks all angles of if this coordinate are smaller than from the other coordinate
    */
   def <(other: SphereCoordinate): Boolean = angle < other.angle
-
-//  override def toString = s"SphereCoordinate($radial; $angle)"
 
 }
 
@@ -77,20 +71,14 @@ class AngularPartitioner(
   require(dimensions == 2)
   require(ppD > 1)
 
-
-  /*
-   * We use this map to associate a hash value of the
-   * angular coordinates to a partition ID.
-   * We need this, because the ID must be in 0..numPartitions
-   * but the hash value is way beyond that.
+  /* Phi is the angle width of a partition and depends on the number of partitions to create as well as
+   * on the region to cover. if [[firstQuadrantOnly]] is true, then we only have to cover 90 degree - used
+   * for Skyline computation. Otherweise we have to cover the whole 360 degree.
    *
-   * Although this is a simple solution, this causes that
-   * there is no ordering between the partitions, i.e. two
-   * neighbored partitions will most likely not have successive
-   * IDs
+   * Since the angles are computed based in math.Pi the start value defines the minimal possible value expected.
+   * Angles start at 0 for [[firstQuadrantOnly]] or -Pi otherwise.
+   *
    */
-//  private val theMap = mutable.Map.empty[Int, Int]
-
   val (start,phi) = if(firstQuadrantOnly) (0.0, (math.Pi / 2)/ ppD.toDouble) else (-math.Pi,(2 * math.Pi)/ ppD.toDouble )
 
   override def numPartitions: Int = ppD
@@ -100,17 +88,11 @@ class AngularPartitioner(
     val g = SphereCoordinate(so)
 
     var step = 1
-
     while(start +(step*phi) < g.angle) {
-//      println(s"${-math.Pi + i*phi} vs $g")
       step += 1
     }
 
     step-1
-
-//    val h = (g.angle / phi).toInt.hashCode()
-//
-//    theMap.getOrElseUpdate(h, theMap.size)
   }
 
   override def printPartitions(fName: Path): Unit = {

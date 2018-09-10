@@ -115,12 +115,12 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param partitioner The partitioner to partition both RDDs with
    * @return Returns an RDD containing the Join result
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToManyPartitioning: Boolean = false) = {
+  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false) = {
       new SpatialJoinRDD(
           if(partitioner.isDefined) self.partitionBy(partitioner.get) else self,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
           pred,
-        Some(indexConfig), oneToMany = oneToManyPartitioning)
+        Some(indexConfig), oneToMany = oneToMany)
   }
 
   def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {

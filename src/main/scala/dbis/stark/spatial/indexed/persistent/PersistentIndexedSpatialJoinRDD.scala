@@ -21,7 +21,7 @@ class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
   
 
   def this(left: RDD[Index[(G,V)]], right:RDD[(G,V2)], predicate: JoinPredicate, oneToMany:Boolean) =
-    this(left, right, JoinPredicate.predicateFunction(predicate), checkParties = false, oneToMany = oneToMany)
+    this(left, right, JoinPredicate.predicateFunction(predicate), checkParties = true, oneToMany = oneToMany)
 
   override protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext) = {
     left.iterator(partition.leftPartition, context).flatMap{ tree =>

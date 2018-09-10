@@ -103,11 +103,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
-  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToManyPartitioning: Boolean = false): SpatialJoinRDD[G, V, V2] = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false): SpatialJoinRDD[G, V, V2] = self.withScope {
     new SpatialJoinRDD(
       if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
       if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
-      pred, oneToMany = oneToManyPartitioning)
+      pred, oneToMany = oneToMany)
   }
 
   override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = self.withScope {
@@ -376,20 +376,20 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, RTreeConfig(order))
 
-  def liveIndex(partitioner: GridPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] =
+  def liveIndex(partitioner: SpatialPartitioner, order: Int): LiveIndexedSpatialRDDFunctions[G,V] =
     liveIndex(Some(partitioner), RTreeConfig(order))
 
   def liveIndex(indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, indexConfig)
-  def liveIndex(partitioner: GridPartitioner, indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(Some(partitioner), indexConfig)
+  def liveIndex(partitioner: SpatialPartitioner, indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(Some(partitioner), indexConfig)
 
-  def liveIndex(partitioner: Option[GridPartitioner], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(partitioner, RTreeConfig(order))
+  def liveIndex(partitioner: Option[SpatialPartitioner], order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(partitioner, RTreeConfig(order))
 
-  def liveIndex(partitioner: Option[GridPartitioner], indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = {
+  def liveIndex(partitioner: Option[SpatialPartitioner], indexConfig: IndexConfig): LiveIndexedSpatialRDDFunctions[G,V] = {
     val reparted = if(partitioner.isDefined) self.partitionBy(partitioner.get) else self
     new LiveIndexedSpatialRDDFunctions(reparted, indexConfig)
   }
 
-  def index(partitioner: GridPartitioner, order: Int): RDD[Index[(G,V)]] = index(Some(partitioner), RTreeConfig(order))
+  def index(partitioner: SpatialPartitioner, order: Int): RDD[Index[(G,V)]] = index(Some(partitioner), RTreeConfig(order))
 
   /**
     * Create an index for each partition.
@@ -398,7 +398,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     * and thus changes the type of the RDD from {{{ RDD[(STObject, V)]  }}} to
     * {{{ RDD[Index[STObject, (STObject, V)]] }}}
     */
-  def index(partitioner: Option[GridPartitioner] = None, indexConfig: IndexConfig): RDD[Index[(G,V)]] = {
+  def index(partitioner: Option[SpatialPartitioner] = None, indexConfig: IndexConfig): RDD[Index[(G,V)]] = {
     val reparted = if(partitioner.isDefined) self.partitionBy(partitioner.get) else self
 
     reparted.mapPartitions({ iter  =>

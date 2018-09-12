@@ -106,13 +106,15 @@ class RTree[D: ClassTag ](
    * 
    * @return Returns a list containing all Data items in the tree
    */
-  def items = super.itemsTree()
+  def _items = super.itemsTree()
       .iterator()
       .flatMap{ l => (l: @unchecked) match {
         case d: Data[D] => Iterator.single(d)
         case a: java.util.ArrayList[_] => unnest(a)
         } 
       }
+
+  override def items = _items.map(_.data)
 
   def lastLevelNodes = boundablesAtLevel(depth()).asScala.map(_.asInstanceOf[AbstractNode])
 

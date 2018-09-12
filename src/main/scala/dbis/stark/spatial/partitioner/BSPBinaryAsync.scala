@@ -175,7 +175,7 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     }
 
     if(numCells == 1) {
-      println(s"WARNING: ONLY ONE cell is in this partition $part in dim $dim")
+//      println(s"WARNING: ONLY ONE cell is in this partition $part in dim $dim")
       return (Some(part), None, costEstimation(part))
     }
 
@@ -267,8 +267,8 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
       r2 = None
 
     val partCost = costEstimation(part)
-    println(s"split ($dim) $part ($partCost) into \n ${r1.map(_.wkt).getOrElse("-")} ($cost1)\n ${r2.map(_.wkt).getOrElse("-")} ($cost2)")
-    println("")
+//    println(s"split ($dim) $part ($partCost) into \n ${r1.map(_.wkt).getOrElse("-")} ($cost1)\n ${r2.map(_.wkt).getOrElse("-")} ($cost2)")
+//    println("")
 
     require(cost1 + cost2 == partCost, s"costs do not match partCost=$partCost != cost1=$cost1 + cost2=$cost2")
 

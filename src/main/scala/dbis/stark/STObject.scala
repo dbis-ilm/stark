@@ -47,7 +47,21 @@ case class STObject(
   
   def containsSpatial(t: STObject) = g.contains(t.g)
   def containsTemporal(t: STObject) = time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.contains(t.time.get))
-  
+
+
+  @inline
+  def covers(o: STObject) = coversSpatial(o) && coversTemporal(o)
+
+  @inline
+  def coversSpatial(o: STObject) = g.covers(o.getGeo)
+  def coversTemporal(o: STObject) = time.isEmpty && o.time.isEmpty || (time.isDefined && o.time.isDefined && time.get.contains(o.time.get))
+
+
+  def coveredByTemporal(o: STObject) = g.coveredBy(o.getGeo)
+
+  def coveredBySpatial(o: STObject) = time.isEmpty && o.time.isEmpty || (time.isDefined && o.time.isDefined && time.get.containedBy(o.time.get))
+
+  def coveredBy(o: STObject) = coveredBySpatial(o) && coveredByTemporal(o)
   /**
    * Check if this spatial object completely contains the other given object.
    * <br><br>

@@ -37,6 +37,9 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
 
   def intersects(qry: G): RDD[(G,V)]
 
+  def covers(o: G): RDD[(G, V)]
+  def coveredby(o: G): RDD[(G, V)]
+
   /**
    * Find all elements that are contained by a given query geometry
    */

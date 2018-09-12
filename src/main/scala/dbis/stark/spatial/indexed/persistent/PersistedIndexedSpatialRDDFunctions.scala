@@ -19,6 +19,14 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     tree.query(qry).filter{ c => c._1.intersects(qry)}
   }
 
+  def covers(qry: G) = self.flatMap{ tree =>
+    tree.query(qry).filter{ c => c._1.covers(qry)}
+  }
+
+  def coveredby(qry: G) = self.flatMap{ tree =>
+    tree.query(qry).filter{ c => c._1.coveredBy(qry)}
+  }
+
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToMany: Boolean) =
     new PersistentIndexedSpatialJoinRDD(self, other, pred, oneToMany)
 

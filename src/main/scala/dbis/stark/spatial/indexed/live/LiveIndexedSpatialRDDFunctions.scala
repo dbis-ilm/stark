@@ -15,13 +15,16 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                              indexConfig: IndexConfig
        ) extends SpatialRDDFunctions[G, V](self) with Serializable {
 
-  def intersects(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
+  override def intersects(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
 
-  def contains(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINS, Some(indexConfig))
+  override def contains(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINS, Some(indexConfig))
 
-  def containedby(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
+  override def covers(qry: G) = new SpatialFilterRDD[G,V](self, qry, JoinPredicate.COVERS, Some(indexConfig))
+  override def coveredby(qry: G) = new SpatialFilterRDD[G,V](self, qry, JoinPredicate.COVEREDBY, Some(indexConfig))
 
-  def withinDistance(
+  override def containedby(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
+
+  override def withinDistance(
 		  qry: G,
 		  maxDist: Distance,
 		  distFunc: (STObject,STObject) => Distance
@@ -50,7 +53,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         }
 
 
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
+  override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
     val r = self.mapPartitionsWithIndex({ (idx, iter) =>
               val partitionCheck = self.partitioner.forall { p =>
                 p match {
@@ -99,7 +102,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * and the parameter is the geometry of other
    * @return Returns an RDD containing the Join result
    */
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = {
+  override def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = {
     new SpatialJoinRDD(self, other, pred, oneToMany = oneToManyPartitioning)
   }
 
@@ -115,7 +118,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param partitioner The partitioner to partition both RDDs with
    * @return Returns an RDD containing the Join result
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false) = {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false) = {
       new SpatialJoinRDD(
           if(partitioner.isDefined) self.partitionBy(partitioner.get) else self,
           if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
@@ -123,11 +126,11 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         Some(indexConfig), oneToMany = oneToMany)
   }
 
-  def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {
+  override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {
     new SpatialKnnJoinRDD(self, other, k, distFunc)
   }
-  
-  def cluster[KeyType](
+
+  override def cluster[KeyType](
 		  minPts: Int,
 		  epsilon: Double,
 		  keyExtractor: ((G,V)) => KeyType,

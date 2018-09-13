@@ -4,7 +4,7 @@ import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.{JoinPredicate, PredicatesFunctions, Skyline}
 import dbis.stark.spatial.indexed.{Index, IndexConfig}
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory}
+import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.{CartesianRDD, RDD}
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
@@ -106,6 +106,11 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
  * simple RDDs to SpatialRDDs
  */
 object SpatialRDD {
+
+  def isSpatialParti(p: Option[Partitioner]) = p.flatMap {
+    case _: SpatialPartitioner => Some(true)
+    case _ => Some(false)
+  }.getOrElse(false)
 
   def createExternalSkylineMap[G <: STObject : ClassTag, V : ClassTag](dominates: (STObject,STObject) => Boolean):
     ExternalAppendOnlyMap[Int, (STObject,(G,V)), Skyline[(G,V)]] = {

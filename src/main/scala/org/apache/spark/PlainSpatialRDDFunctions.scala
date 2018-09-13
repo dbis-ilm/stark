@@ -108,10 +108,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false): SpatialJoinRDD[G, V, V2] = self.withScope {
-    new SpatialJoinRDD(
-      if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
-      if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
-      pred, oneToMany = oneToMany)
+      new SpatialJoinRDD(
+        if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
+        if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
+        pred, oneToMany = oneToMany)
   }
 
   override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = self.withScope {

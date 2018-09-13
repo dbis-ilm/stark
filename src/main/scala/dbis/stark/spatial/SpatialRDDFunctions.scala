@@ -4,7 +4,7 @@ import java.io.File
 
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.Index
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, GridPartitioner}
+import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, PartitionerFactory}
 import dbis.stark.visualization.Visualization
 import dbis.stark.{Distance, STObject}
 import javax.imageio.ImageIO

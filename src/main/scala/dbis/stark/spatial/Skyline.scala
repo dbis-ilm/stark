@@ -24,15 +24,17 @@ object Skyline extends  Serializable{
 
 class Skyline[PayloadType](var skylinePoints: List[(STObject, PayloadType)] = List.empty,
                           dominates: (STObject, STObject) => Boolean) extends Serializable with Cloneable {
-  type T = (STObject, PayloadType)
 
-  def insert(tuple: T): Unit = {
+  def insert(tuple: (STObject, PayloadType)): Unit = {
     if(!skylinePoints.exists{ case (sp,_) => dominates(sp, tuple._1)}) {
-      this.skylinePoints = skylinePoints.filterNot{ case (sp,_) => dominates(tuple._1, sp)} ++ List(tuple)
+      this.skylinePoints = skylinePoints.filterNot{ case (sp,_) => dominates(tuple._1, sp)} :+ tuple
     }
   }
 
   def iterator: Iterator[(STObject, PayloadType)] = skylinePoints.iterator
+
+  def isEmpty: Boolean = skylinePoints.isEmpty
+  def nonEmpty: Boolean = skylinePoints.nonEmpty
 
   override def clone(): Skyline[PayloadType] = {
     val l = ListBuffer.empty[(STObject, PayloadType)]

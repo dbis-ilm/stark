@@ -48,6 +48,12 @@ class IntervalTree1[D: ClassTag ]() extends SortedPackedIntervalRTree with Index
 
   override private[indexed] def root() = ???
 
+  override def items = {
+    val visitor: InvertavlTreeVisitor = new InvertavlTreeVisitor()
+    this.query(Double.MinValue, Double.MaxValue, visitor)
+    visitor.getVisitedItems.map(_.asInstanceOf[Data[D]].data).iterator
+  }
+
 }
 
 

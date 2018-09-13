@@ -114,10 +114,10 @@ object RasterUtils {
     * @param tile The tile
     * @return The geometry representing the tile
     */
-  def tileToGeo(tile: Tile[_]): GeoType = {
-    val mbr = new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly)
-    geoFactory.toGeometry(mbr)
-  }
+  @inline
+  def tileToGeo(tile: Tile[_]): GeoType =
+    geoFactory.toGeometry(new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly))
+
 
   def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Short = 1): Tile[U] =
     new Tile[U](mbr.getMinX,mbr.getMaxY,

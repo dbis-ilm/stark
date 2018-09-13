@@ -9,10 +9,14 @@ object Utils {
   def toEnvelope(r: NRectRange): MBR = new Envelope(r.ll(0), r.ur(0), r.ll(1), r.ur(1))
 
   @inline
-  def fromEnvelope(g: GeoType): NRectRange = {
+  def fromGeo(g: GeoType): NRectRange = {
     val env = g.getEnvelopeInternal
-    NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+    fromEnvelope(env)
   }
+
+  def fromEnvelope(env: MBR): NRectRange =
+    NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+
 
   def makeGeo(mbr: MBR): GeoType = {
     val fac = new GeometryFactory()

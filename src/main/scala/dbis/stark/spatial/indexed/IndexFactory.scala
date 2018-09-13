@@ -42,6 +42,8 @@ trait Index[V] {
     *         Users of this method need to cast to the correct type.
     */
   private[indexed] def root(): Any
+
+  def items: Iterator[V]
 }
 
 /**

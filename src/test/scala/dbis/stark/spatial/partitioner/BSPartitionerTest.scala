@@ -324,9 +324,14 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println("No cell contains this point!")
         }
 
+
+
         fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
       }
+
     }
+
+
   }
 
   it  should "create real partitions correctly for taxi" taggedAs Slow in {

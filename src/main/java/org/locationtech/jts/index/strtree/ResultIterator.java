@@ -76,7 +76,8 @@ public class ResultIterator<T> implements Iterator<T> {
     private void findNextObject() {
 
         T found = null;
-        do {
+
+        while(found == null && !stack.isEmpty()) {
             // get the next element to process ...
             Pair pair = stack.pop();
 
@@ -118,7 +119,7 @@ public class ResultIterator<T> implements Iterator<T> {
             }
 
             // continue the search if nothing was found yet but there are other nodes to process
-        } while(found == null && !stack.isEmpty()) ;
+        }
 
         // return the found value - or null if nothing was left to find
         next = found;

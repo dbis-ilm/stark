@@ -1,7 +1,7 @@
 package dbis.stark
 
 import dbis.stark.ScalarDistance._
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.indexed.{IndexConfig, IntervalTreeConfig, QuadTreeConfig, RTreeConfig}
 import dbis.stark.spatial._
 import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}

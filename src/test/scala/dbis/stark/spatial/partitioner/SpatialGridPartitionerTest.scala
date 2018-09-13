@@ -1,7 +1,7 @@
 package dbis.stark.spatial.partitioner
 
 import dbis.stark.STObject
-import dbis.stark.spatial.SpatialRDD._
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.JoinPredicate
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -26,7 +26,7 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
 //      .filter { arr => !arr(1).contains("0 0")}
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMax = SpatialPartitioner.getMinMax(rdd)
+      val minMax = GridPartitioner.getMinMax(rdd)
 
       val parti = new SpatialGridPartitioner(rdd, partitionsPerDimension = 3, false, minMax, dimensions = 2)
 

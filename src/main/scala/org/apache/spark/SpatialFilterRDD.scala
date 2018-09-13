@@ -1,12 +1,12 @@
-package dbis.stark.spatial
+package org.apache.spark
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
-import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{SpatialPartition, GridPartitioner}
+import dbis.stark.spatial.{JoinPredicate, TemporalPartitioner, Utils}
 import dbis.stark.{Interval, STObject}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{InterruptibleIterator, Partition, Partitioner, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -22,39 +22,38 @@ import scala.reflect.ClassTag
   * @tparam G The type representing spatio-temporal data
   * @tparam V The payload data
   */
-class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (private val parent: RDD[(G,V)],
-                                                                        qry: G,
-                                                                        predicate: JoinPredicate,
-                                                                        predicateFunc: (G,G) => Boolean,
-                                                                        indexConfig: Option[IndexConfig],
-                                                                        private val checkParties: Boolean) extends RDD[(G,V)](parent) {
+class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] (@transient private val parent: RDD[(G,V)],
+                                                                        qry: G, predicate: JoinPredicate, predicateFunc: (G,G) => Boolean,
+                                                                        indexConfig: Option[IndexConfig], private val checkParties: Boolean)
+  extends SpatialRDD[G,V](parent) {
 
   def this(parent: RDD[(G,V)], qry: G, predicateFunc: (G,G) => Boolean) =
     this(parent, qry,null, predicateFunc, None, false)
 
   def this(parent: RDD[(G,V)], qry: G, predicate: JoinPredicate, indexConfig: Option[IndexConfig] = None) =
-    this(parent, qry, predicate,JoinPredicate.predicateFunction(predicate), indexConfig, true)
+    this(parent, qry, predicate, parent.context.clean(JoinPredicate.predicateFunction(predicate)), indexConfig, true)
 
   /**
     * The partitioner of this RDD.
     *
     * This will always be set to the parent's partitioner
     */
-  override val partitioner: Option[Partitioner] = parent.partitioner
+//  override val partitioner: Option[Partitioner] = parent.partitioner
 
   /**
     * Return the partitions that have to be processed.
     *
-    * We apply partition pruning in this step: If a [[dbis.stark.spatial.partitioner.SpatialPartitioner]]
+    * We apply partition pruning in this step: If a [[dbis.stark.spatial.partitioner.GridPartitioner]]
     * is present, we check if the partition can contain candidates. If not, it is not returned
     * here.
     *
-    *
     * @return The list of partitions of this RDD
     */
-  override def getPartitions: Array[Partition] = partitioner.map{
+  override def getPartitions: Array[Partition] = {
+    val parent = firstParent[(G,V)]
+    partitioner.map{
       // check if this is a spatial partitioner
-      case sp: SpatialPartitioner if checkParties =>
+      case sp: GridPartitioner if checkParties =>
 
         val spatialParts = ListBuffer.empty[Partition]
 
@@ -83,7 +82,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (private 
 
         val spatialParts = ListBuffer.empty[Partition]
 
-//        val qryEnv = qry.getGeo.getEnvelopeInternal
+        //        val qryEnv = qry.getGeo.getEnvelopeInternal
         var i = 0
         var cnt = 0
         val numParentParts = parent.getNumPartitions
@@ -123,7 +122,9 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (private 
       case _ =>
         parent.partitions
 
-    }.getOrElse(parent.partitions) // no partitioner
+    }.getOrElse(parent.partitions)
+  } // no partitioner
+
 
 
   @DeveloperApi
@@ -137,20 +138,21 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] private (private 
       case _ => inputSplit
     }
 
+    val inputIter = firstParent[(G,V)].iterator(split, context)
 
     val resultIter = if (indexConfig.isDefined) {
 
       val tree = IndexFactory.get[G, (G, V)](indexConfig.get)
       // insert everything into the tree
-      parent.iterator(split, context).foreach { case (g, v) => tree.insert(g, (g, v)) }
+      inputIter.foreach { case (g, v) => tree.insert(g, (g, v)) }
 
       // query tree and perform candidates check
       tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
 
     } else {
-      parent.iterator(split, context).filter { case (g, _) => predicateFunc(g, qry) }
+      inputIter.filter { case (g, _) => predicateFunc(g, qry) }
     }
-
     new InterruptibleIterator(context, resultIter)
+//    resultIter
   }
 }

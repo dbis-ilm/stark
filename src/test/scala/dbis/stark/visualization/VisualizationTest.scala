@@ -3,12 +3,10 @@ package dbis.stark.visualization
 import java.awt.Color
 import java.nio.file.{Files, Paths}
 
-import dbis.stark.TestUtils.makeTimeStamp
-import dbis.stark.{STObject, TestUtils}
+import dbis.stark.StarkTestUtils
 import dbis.stark.raster.Tile
-import dbis.stark.spatial.SpatialRDD._
 import org.apache.spark.SparkContext
-import org.locationtech.jts.geom.Envelope
+import org.apache.spark.SpatialRDD._
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 
@@ -18,7 +16,7 @@ class VisualizationTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   private var sc: SparkContext = _
 
   override def beforeAll() {
-    sc = TestUtils.createSparkContext("spatialrddtestcase")
+    sc = StarkTestUtils.createSparkContext("spatialrddtestcase")
   }
 
   override def afterAll() {
@@ -28,7 +26,7 @@ class VisualizationTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 //  "The visualization"
   ignore should "create a PNG file" in {
-    val rdd = TestUtils.createRDD(sc)
+    val rdd = StarkTestUtils.createRDD(sc)
 
     val path = "/tmp/testimg"
 
@@ -39,7 +37,7 @@ class VisualizationTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should "create a PNG file on a world map" in {
-    val rdd = TestUtils.createPolyRDD(sc)
+    val rdd = StarkTestUtils.createPolyRDD(sc)
     //val rdd = TestUtils.createPointRDD(sc)
 
     val path = "/tmp/testimg"
@@ -52,7 +50,7 @@ class VisualizationTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   ignore should "create a jpg file" in {
-    val rdd = TestUtils.createRDD(sc)
+    val rdd = StarkTestUtils.createRDD(sc)
 
     val path = "/tmp/testimg"
 

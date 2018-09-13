@@ -165,6 +165,7 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
    * @return Returns the two created partitions along with their cost difference
    */
   private def bestSplitInDimension(dim: Int, part: NRectRange): (Option[NRectRange], Option[NRectRange], Int) = {
+
     val numCells = cellsPerDimension(part)(dim)
 
     // there are fewer than 2 cells in the requested dimension (i.e. 0 or 1) -- we cannot further split this!

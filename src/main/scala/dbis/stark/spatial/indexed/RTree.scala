@@ -1,9 +1,9 @@
 package dbis.stark.spatial.indexed
 
-import dbis.stark.STObject.{GeoType, MBR}
+import dbis.stark.STObject.GeoType
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
-import org.locationtech.jts.index.strtree.{ItemBoundable, ItemDistance, STRtreePlus}
+import org.locationtech.jts.index.strtree.{AbstractNode, ItemBoundable, ItemDistance, STRtreePlus}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -18,12 +18,9 @@ protected[indexed] class Data[D](val data: D, val so: STObject) extends Serializ
  * @param capacity The number of elements in a node
  */
 class RTree[D: ClassTag ](
-    @transient private val capacity: Int
+    @transient private val capacity: Int = 10
   ) extends STRtreePlus[Data[D]](capacity) with Index[D] with KnnIndex[D] with WithinDistanceIndex[D] { // we extend the STRtreePlus (based on JTSPlus) which implements kNN search
 
-//  private var timestamp = 0
-//  protected[indexed] def ts: Int = timestamp
-  
   /**
    * Insert data into the tree
    * 
@@ -46,7 +43,7 @@ class RTree[D: ClassTag ](
   def oldQuery(box: STObject): Iterator[D] =
     super.query(box.getGeo.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[D]].data)
 
-  def query(box: STObject): Iterator[D] =
+  override def query(box: STObject): Iterator[D] =
     super.iteratorQuery(box.getGeo.getEnvelopeInternal).asScala.map(_.data)
 
   /**
@@ -109,14 +106,18 @@ class RTree[D: ClassTag ](
    * 
    * @return Returns a list containing all Data items in the tree
    */
-  protected[indexed] def items = super.itemsTree()
+  def _items = super.itemsTree()
       .iterator()
       .flatMap{ l => (l: @unchecked) match {
         case d: Data[D] => Iterator.single(d)
         case a: java.util.ArrayList[_] => unnest(a)
         } 
       }
-  
+
+  override def items = _items.map(_.data)
+
+  def lastLevelNodes = boundablesAtLevel(depth()-1).asScala.map(_.asInstanceOf[AbstractNode])
+
   /**
    * If the tree was queried using the *RO methods you can use this method
    * to retreive the final result of the tree.

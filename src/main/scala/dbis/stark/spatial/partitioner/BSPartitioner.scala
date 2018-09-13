@@ -46,15 +46,15 @@ object BSPartitioner {
   * @tparam V Payload data type
   */
 class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
-      rdd: RDD[(G,V)],
+      @transient private val rdd: RDD[(G,V)],
       val sideLength: Double,
-      maxCostPerPartition: Double,
-      pointsOnly: Boolean,
-      _minX: Double,
-      _maxX: Double,
-      _minY: Double,
-      _maxY: Double,
-      sampleFraction: Double) extends SpatialPartitioner(_minX, _maxX, _minY, _maxY) {
+      val maxCostPerPartition: Double,
+      val pointsOnly: Boolean,
+      private val _minX: Double,
+      private val _maxX: Double,
+      private val _minY: Double,
+      private val _maxY: Double,
+      val sampleFraction: Double) extends GridPartitioner(_minX, _maxX, _minY, _maxY) {
 
   protected[partitioner] val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
 
@@ -72,7 +72,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
            sampleFraction: Double = 0) =
-    this(rdd, sideLength, maxCostPerPartition, pointsOnly, SpatialPartitioner.getMinMax(rdd), sampleFraction)
+    this(rdd, sideLength, maxCostPerPartition, pointsOnly, GridPartitioner.getMinMax(rdd), sampleFraction)
 
 
 //  val s = Cell(0, NRectRange(NPoint(ll), NPoint(ur)))
@@ -107,7 +107,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     * cell it belongs and then simply aggregate by cell
     */
   protected[spatial] val cells: Array[(Cell, Int)] =
-    SpatialPartitioner.buildHistogram(theRDD,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
+    GridPartitioner.buildHistogram(theRDD,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
@@ -192,12 +192,24 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     }
 
     if(outside) {
-      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, SpatialPartitioner.EPS)
+      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, GridPartitioner.EPS)
 
       if(!pointsOnly)
-        bsp.partitions(partitionId).extendBy(Utils.fromEnvelope(g.getGeo))
+        bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
     partitionId
+  }
+
+  override def equals(obj: scala.Any) = obj match {
+    case sp: BSPartitioner[G,_] =>
+      sp.rdd == rdd &&
+      sp.sideLength == sideLength &&
+      sp.maxCostPerPartition == maxCostPerPartition &&
+      sp.pointsOnly == pointsOnly &&
+      sp.sampleFraction == sampleFraction &&
+      sp.minX == minX && sp.maxX == maxX &&
+      sp.minY == minY && sp.maxY == maxY
+    case _ => false
   }
 }

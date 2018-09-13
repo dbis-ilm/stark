@@ -1,6 +1,6 @@
 package dbis.stark.dbscan
 
-import dbis.stark.TestUtils
+import dbis.stark.StarkTestUtils
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
@@ -55,8 +55,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
 //  "SparkDBScan"
   it  should "find a clustering with grid partitioning" in {
-    TestUtils.rmrf("grid-results")
-    TestUtils.rmrf("grid-mbbs")
+    StarkTestUtils.rmrf("grid-results")
+    StarkTestUtils.rmrf("grid-mbbs")
 
     val dbscan = new DBScan[Long,List[String]]().setEpsilon(0.3).setMinPts(10).setPPD(4)
     val data = sc.textFile("src/test/resources/labeled_data.csv")
@@ -82,8 +82,8 @@ class SparkDBScanSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   it should "find a clustering with binary space partitioning" in {
-    TestUtils.rmrf("bsp-results")
-    TestUtils.rmrf("bsp-mbbs")
+    StarkTestUtils.rmrf("bsp-results")
+    StarkTestUtils.rmrf("bsp-mbbs")
 
     val dbscan = new DBScan[Long, List[String]]().setEpsilon(0.3).setMinPts(10).setMaxPartitionSize(100)
     val data = sc.textFile("src/test/resources/labeled_data.csv")

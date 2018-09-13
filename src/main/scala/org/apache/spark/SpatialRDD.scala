@@ -1,12 +1,13 @@
-package dbis.stark.spatial
+package org.apache.spark
 
-import dbis.stark.spatial.indexed.Index
+import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial.{JoinPredicate, PredicatesFunctions, Skyline}
+import dbis.stark.spatial.indexed.{Index, IndexConfig}
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.PartitionerConfig
+import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory}
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{CartesianRDD, RDD}
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
-import org.apache.spark.{Dependency, OneToOneDependency, Partition, SparkContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -24,14 +25,21 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
   def this(@transient oneParent: RDD[(G,V)]) =
     this(oneParent.context , List(new OneToOneDependency(oneParent)))
 
-  override val partitioner = firstParent[(G,V)].partitioner  
-    
+  override val partitioner = firstParent[(G,V)].partitioner
+
+//  override protected def getPreferredLocations(split: Partition) =
+//    firstParent[(G,V)].getPreferredLocations(split)
+
   /**
    * We do not repartition our data.
    */
   override protected def getPartitions: Array[Partition] = firstParent[(G,V)].partitions
 
-  def partitionBy(strategy: PartitionerConfig) = new PlainSpatialRDDFunctions(this).partitionBy(strategy)
+//  def partitionBy(strategy: PartitionerConfig) = withScope {
+//    val partitioner = PartitionerFactory.get(strategy, this)
+//    firstParent[(G,V)].partitionBy(partitioner)
+//  }
+//    new PlainSpatialRDDFunctions(this).partitionBy(strategy)
 
   /**
    * Find all elements that are within a given radius around the given object
@@ -40,12 +48,29 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
       qry: G, 
       maxDist: Distance,
       distFunc: (STObject,STObject) => Distance
-    ) = new PlainSpatialRDDFunctions(this).withinDistance(qry, maxDist, distFunc)
+    ) = withScope {
+    new SpatialFilterRDD(this, qry, context.clean(PredicatesFunctions.withinDistance(maxDist, distFunc) _))
+  }
+
+
+//    new PlainSpatialRDDFunctions(this).withinDistance(qry, maxDist, distFunc)
+
+
+  def filter(qry: G, pred: JoinPredicate, index: Option[IndexConfig] = None) = withScope {
+    val f = JoinPredicate.predicateFunction(pred)
+    val cleanF = _sc.clean(f)
+    new SpatialFilterRDD(this, qry, pred, cleanF, index, checkParties = true)
+  }
 
   /**
    * Compute an intersection of the elements in this RDD with the given geometry
    */
-  def intersects(qry: G) = new PlainSpatialRDDFunctions(this).intersects(qry) 
+  //new PlainSpatialRDDFunctions(this).intersects(qry)
+  def intersects(qry: G) =  withScope {
+    val cleanF = _sc.clean(JoinPredicate.predicateFunction(JoinPredicate.INTERSECTS))
+
+    new SpatialFilterRDD(this, qry, JoinPredicate.INTERSECTS, cleanF, None, checkParties = true)
+  }
 
   /**
    * Find all elements that are contained by the given geometry
@@ -82,20 +107,28 @@ abstract class SpatialRDD[G <: STObject : ClassTag, V: ClassTag](
  */
 object SpatialRDD {
 
-  protected[stark] def createExternalMap[G : ClassTag, V : ClassTag, V2: ClassTag](): ExternalAppendOnlyMap[G, (V,V2), ListBuffer[(V,V2)]] = {
-    
-    type ValuePair = (V,V2)
-    type Combiner = ListBuffer[ValuePair]
-    
-    val createCombiner: ValuePair => Combiner = pair => ListBuffer(pair)
-    
-    val mergeValue: (Combiner, ValuePair) => Combiner = (list, value) => list += value
-    
-    val mergeCombiners: ( Combiner, Combiner ) => Combiner = (c1, c2) => c1 ++= c2
-    
-    new ExternalAppendOnlyMap[G, ValuePair, Combiner](createCombiner, mergeValue, mergeCombiners)
-    
-  }  
+  def createExternalSkylineMap[G <: STObject : ClassTag, V : ClassTag](dominates: (STObject,STObject) => Boolean):
+    ExternalAppendOnlyMap[Int, (STObject,(G,V)), Skyline[(G,V)]] = {
+
+    type ValuePair = (G,V)
+    type Combiner = Skyline[ValuePair]
+
+    val createCombiner: ((STObject, ValuePair)) => Combiner = pair => {
+      new Skyline(List((pair._1,pair._2)), dominates)
+    }
+
+    val mergeValue: (Combiner, (STObject, ValuePair)) => Combiner = (skyline, value) => {
+      skyline.insert(value._1,value._2)
+      skyline
+    }
+
+    val mergeCombiners: ( Combiner, Combiner ) => Combiner = (c1, c2) => {
+      c1.merge(c2)
+    }
+
+    new ExternalAppendOnlyMap[Int, (STObject, ValuePair), Combiner](createCombiner, mergeValue, mergeCombiners)
+
+  }
   
   
   /**

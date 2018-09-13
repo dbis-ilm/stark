@@ -2,11 +2,12 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.{Path, Paths}
 
-import scala.collection.JavaConverters._
 import dbis.stark.STObject
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
+
+import scala.collection.JavaConverters._
 
 
 trait SpatialPartitioner extends Partitioner {

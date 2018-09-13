@@ -2,11 +2,12 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.{Path, Paths}
 
-import scala.collection.JavaConverters._
 import dbis.stark.STObject
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
+
+import scala.collection.JavaConverters._
 
 
 trait SpatialPartitioner extends Partitioner {
@@ -110,57 +111,85 @@ object GridPartitioner {
   }
 
 
-  def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double): Array[(Cell,Int)] = {
+  def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int,
+                                       minX: Double, minY: Double, maxX: Double, maxY: Double,
+                                       xLength: Double, yLength:Double): Array[(Cell,Int)] = {
+
+    case class CellHistogram(buckets: Array[(Cell, Int)])
+
+    def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
+
+      val p = Utils.getCenter(pt._1.getGeo)
+      val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
+
+      histo1.buckets(cellId)._2 + 1
+      if(!pointsOnly)
+        histo1.buckets(cellId)._1.extent.extend(Utils.fromGeo(pt._1.getGeo))
+      histo1
+    }
+
+    def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
+
+      val newBuckets = histo1.buckets.iterator.zip(histo2.buckets.iterator).map{ case ((cell1, cnt1),(cell2,cnt2)) =>
+
+        val newCell = if(pointsOnly) Cell(cell1.range) else Cell(cell1.range, cell1.extent.extend(cell2.extent))
+        val newCnt = cnt1 + cnt2
+        (newCell, newCnt)
+      }.toArray
+
+      CellHistogram(newBuckets)
+    }
 
     val histo = buildGrid(numXCells,numYCells, xLength, yLength, minX,minY)
+
+    rdd.aggregate(CellHistogram(histo))(seq, combine).buckets
 
     /* fill the array. If with extent, we need to keep the exent of each element and combine it later
      * to create the extent of a cell based on the extents of its contained objects
      */
-    if(pointsOnly) {
-      rdd.map{ case (g,_) =>
-        val p = Utils.getCenter(g.getGeo)
-
-        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-
-        (cellId, 1)
-      }
-      .reduceByKey(_ + _)
-//      .collect
-      .cache()
-      .toLocalIterator
-      .foreach{ case (cellId, cnt) =>
-        histo(cellId) = (histo(cellId)._1, cnt)
-      }
-
-
-    } else {
-
-      rdd.map { case (g, _) =>
-        val p = Utils.getCenter(g.getGeo)
-//        val env = g.getEnvelopeInternal
-//        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-        val extent = Utils.fromGeo(g.getGeo)
-        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-
-        (cellId,(1, extent))
-      }
-      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
-        val cnt = lCnt + rCnt
-
-        val extent = lExtent.extend(rExtent)
-
-        (cnt, extent)
-
-      }
-//        .collect
-      .cache()
-      .toLocalIterator
-      .foreach{case (cellId, (cnt,ex)) =>
-        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
-      }
-    }
-    histo
+//    if(pointsOnly) {
+//      rdd.map{ case (g,_) =>
+//        val p = Utils.getCenter(g.getGeo)
+//
+//        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
+//
+//        (cellId, 1)
+//      }
+//      .reduceByKey(_ + _)
+////      .collect
+//      .cache()
+//      .toLocalIterator
+//      .foreach{ case (cellId, cnt) =>
+//        histo(cellId) = (histo(cellId)._1, cnt)
+//      }
+//
+//
+//    } else {
+//      rdd.map { case (g, _) =>
+//        val p = Utils.getCenter(g.getGeo)
+////        val env = g.getEnvelopeInternal
+////        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
+//        val extent = Utils.fromGeo(g.getGeo)
+//        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
+//
+//        (cellId,(1, extent))
+//      }
+//      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
+//        val cnt = lCnt + rCnt
+//
+//        val extent = lExtent.extend(rExtent)
+//
+//        (cnt, extent)
+//
+//      }
+////        .collect
+//      .cache()
+//      .toLocalIterator
+//      .foreach{case (cellId, (cnt,ex)) =>
+//        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
+//      }
+//    }
+//    histo
 
   }
 

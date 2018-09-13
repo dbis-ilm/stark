@@ -5,7 +5,7 @@ import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.partitioner.GridPartitioner
 import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.SpatialFilterRDD
+import org.apache.spark.{SpatialFilterRDD, SpatialRDD}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -119,11 +119,31 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @return Returns an RDD containing the Join result
    */
   override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false) = {
+    if(SpatialRDD.isSpatialParti(self.partitioner) && self.partitioner == other.partitioner) {
+      self.zipPartitions(other){ case (leftIter, rightIter) =>
+
+        if(leftIter.isEmpty || rightIter.isEmpty)
+          Seq.empty[(V,V2)].iterator
+        else {
+          val predicateFunction = JoinPredicate.predicateFunction(pred)
+
+          val index = IndexFactory.get[G,V](indexConfig)
+          leftIter.foreach{ case (g,v) => index.insert(g,v)}
+
+          rightIter.flatMap { case (rg, rv) =>
+            index.query(rg)
+              .filter { case (lg, _) => predicateFunction(lg, rg) }
+              .map { case (_, lv) => (lv, rv) }
+          }
+        }
+      }
+    } else {
       new SpatialJoinRDD(
-          if(partitioner.isDefined) self.partitionBy(partitioner.get) else self,
-          if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
-          pred,
+        if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
+        if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
+        pred,
         Some(indexConfig), oneToMany = oneToMany)
+    }
   }
 
   override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {

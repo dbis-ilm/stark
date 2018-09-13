@@ -1,11 +1,11 @@
 package dbis.stark.spatial.indexed.persistent
 
-import dbis.stark.spatial.{JoinPredicate, SpatialKnnJoinRDD, SpatialRDDFunctions}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
-import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.GridPartitioner
+import dbis.stark.spatial.{JoinPredicate, SpatialKnnJoinRDD, SpatialRDDFunctions}
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.Partitioner
+import org.apache.spark.SpatialRDD
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -35,12 +35,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
   override def join[V2: ClassTag](right: RDD[(G, V2)], predicate: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false): RDD[(V, V2)] = {
 
-    def isSpatialParti(p: Option[Partitioner]) = p.flatMap {
-      case _: SpatialPartitioner => Some(true)
-      case _ => Some(false)
-    }.getOrElse(false)
-
-    if(isSpatialParti(self.partitioner) && self.partitioner == right.partitioner) {
+    if(SpatialRDD.isSpatialParti(self.partitioner) && self.partitioner == right.partitioner) {
       self.zipPartitions(right) { case (leftIter, rightIter) =>
 
         if(leftIter.isEmpty || rightIter.isEmpty)

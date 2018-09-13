@@ -270,8 +270,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     val partedBlocks = rddBlocks.partitionBy(partiBlocksSample).cache()
 
     val start = System.currentTimeMillis()
-    val blocksTaxiJoin = partedBlocks.liveIndex(RTreeConfig(order = 5)).join(partedTaxi, JoinPredicate.INTERSECTS, oneToManyPartitioning = true)
-    val taxiBlocksJoin = partedTaxi.liveIndex(RTreeConfig(order = 5)).join(partedBlocks, JoinPredicate.INTERSECTS, oneToManyPartitioning = true)
+    val blocksTaxiJoin = partedBlocks.liveIndex(RTreeConfig(order = 5)).join(partedTaxi, JoinPredicate.INTERSECTS, oneToMany = true)
+    val taxiBlocksJoin = partedTaxi.liveIndex(RTreeConfig(order = 5)).join(partedBlocks, JoinPredicate.INTERSECTS, oneToMany = true)
 
     val blocksTaxiCnt = blocksTaxiJoin.sortByKey().collect()
     val taxiBlocksCnt = taxiBlocksJoin.sortByKey().collect()
@@ -312,7 +312,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     }
   }
 
-  it should "produce same join results with sampling as without" taggedAs (Sampling) in {
+  it should "produce same join results with sampling as without" taggedAs Sampling in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)

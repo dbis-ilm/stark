@@ -34,10 +34,13 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       tree.insert(g.getGeo, dummy)
     }
 
-    val children = tree.getRoot.getChildBoundables.iterator().asScala
+    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
+
+    //val children = tree.getRoot.getChildBoundables.iterator().asScala
+    val children = tree.lastLevelNodes
 
     children.zipWithIndex.map{ case (child, idx) =>
-      val mbr = child.asInstanceOf[Boundable].getBounds.asInstanceOf[MBR]
+      val mbr = child.getBounds.asInstanceOf[MBR]
       Cell(idx, Utils.fromEnvelope(mbr))
     }.toArray
   }

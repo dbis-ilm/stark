@@ -92,16 +92,23 @@ class BSPBinaryAsync(private val _start: NRectRange,
 /**
   * A SplitTask represents the splitting of a partition into two partitions.
   * The generated two partitions are further processed by new SplitTasks in parallel
+  * @param universe The global space to find partitions in
   * @param range The range to split
   * @param cellHistogram The histogram to use for cost estimation
   * @param sideLength The side length of a cell
   * @param maxCostPerPartition Cost threshold allowed per partition
   * @param pointsOnly True if the dataset contains only points
   */
-class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Cell, Int)],
+class SplitTask(universe: NRectRange,
+                range: NRectRange, protected[stark] val cellHistogram: Array[(Cell, Int)],
                 private val sideLength: Double,
                 private val maxCostPerPartition: Double,
                 private val pointsOnly: Boolean) extends RecursiveTask[List[Cell]] {
+
+
+  def this(range: NRectRange, cellHistogram: Array[(Cell, Int)],
+        sideLength: Double, maxCostPerPartition: Double, pointsOnly: Boolean) =
+    this(range, range,cellHistogram, sideLength,maxCostPerPartition, pointsOnly)
 
   private val numXCells = cellsPerDimension(range)(0)
 
@@ -113,8 +120,8 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
   // compute the ID of the cell containing a given point
   protected[spatial] def cellId(p: NPoint): Int = {
     //TODO make multidimensional
-    val x = math.floor(math.abs(p(0) - range.ll(0)) / sideLength).toInt
-    val y = math.floor(math.abs(p(1) - range.ll(1)) / sideLength).toInt
+    val x = math.floor(math.abs(p(0) - universe.ll(0)) / sideLength).toInt
+    val y = math.floor(math.abs(p(1) - universe.ll(1)) / sideLength).toInt
     y * numXCells + x
   }
 
@@ -267,11 +274,11 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     if(cost2 <= 0)
       r2 = None
 
-    val partCost = costEstimation(part)
+//    val partCost = costEstimation(part)
 //    println(s"split ($dim) $part ($partCost) into \n ${r1.map(_.wkt).getOrElse("-")} ($cost1)\n ${r2.map(_.wkt).getOrElse("-")} ($cost2)")
-//    println("")
+    println("")
 
-    require(cost1 + cost2 == partCost, s"costs do not match partCost=$partCost != cost1=$cost1 + cost2=$cost2")
+//    require(cost1 + cost2 == partCost, s"costs do not match partCost=$partCost != cost1=$cost1 + cost2=$cost2")
 
     (r1, r2, minDiff)
 
@@ -287,7 +294,7 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     */
   def findBestSplit(part: NRectRange): (Option[NRectRange], Option[NRectRange]) = {
 
-    val splitWithMinDiff = (0 until part.dim)
+    val splitWithMinDiff = (0 until part.dim).iterator
 //                              .par // parallel processing of each dimension
                               .map(dim => bestSplitInDimension(dim, part)) // find best split for that dimension
                                                                             // results in one candidate split per dimension
@@ -307,7 +314,7 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
     val cellIds = getCellsIn(part)
 
     var i = 0
-    var extent = part
+    var extent = part.clone()
 
     while(i < cellIds.length) {
       val id = cellIds(i)
@@ -346,10 +353,10 @@ class SplitTask(range: NRectRange, protected[stark] val cellHistogram: Array[(Ce
 
       // ... create new sub tasks
       val task1 = s1.filter(r => !r.equals(range))
-                    .map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
+                    .map(p => new SplitTask(universe, p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
 
       val task2 = s2.filter(r => !r.equals(range))
-                    .map(p => new SplitTask(p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
+                    .map(p => new SplitTask(universe, p, cellHistogram, sideLength, maxCostPerPartition, pointsOnly))
 
       // start the first task
       task1.foreach(_.fork())

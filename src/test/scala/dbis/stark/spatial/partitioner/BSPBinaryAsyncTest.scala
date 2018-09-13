@@ -21,8 +21,6 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
     val bspTask = new SplitTask(startRange, histo,
       sideLength = 1.0, maxCostPerPartition = 3, pointsOnly = true )
 
-
-
     bspTask.getCellsIn(startRange) should contain only (0 to 15 :_*)
 
   }
@@ -113,6 +111,33 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
 
     extent shouldBe theRange
 
+
+  }
+
+  it should "estimate costs correctly" in {
+    var i = -1
+    val histoSeq = for(y <- 0 to 3;
+                       x <- 0 to 3) yield {
+      i += 1
+      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
+    }
+
+    val histo = Array(histoSeq: _*)
+
+    println(histo.mkString("\n"))
+
+    val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
+
+    val bspTask = new SplitTask(startRange, histo,
+      sideLength = 1.0, maxCostPerPartition = 3, pointsOnly = false )
+
+    histo.foreach{ case (cell,_) =>
+      bspTask.costEstimation(cell.range) shouldBe 1
+    }
+
+    bspTask.costEstimation(startRange) shouldBe 16
+
+    bspTask.costEstimation(NRectRange(NPoint(0.5, 0.5), NPoint(1,1))) shouldBe 1
 
   }
 

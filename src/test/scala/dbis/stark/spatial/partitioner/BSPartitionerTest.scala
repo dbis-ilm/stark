@@ -2,12 +2,13 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Paths
 
-import dbis.stark.{STObject, StarkTestUtils}
+import dbis.stark.{STObject, StarkKryoRegistrator, StarkTestUtils}
 import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.tagobjects.Slow
@@ -21,6 +22,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   override def beforeAll() {
     val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2")
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator[Any]].getName)
     sc = new SparkContext(conf)
   }
   

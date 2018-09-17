@@ -15,7 +15,8 @@ libraryDependencies ++= Seq(
    "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
    //"com.assembla.scala-incubator" %% "graph-core" % "1.11.0",
    "org.scala-graph" %% "graph-core" % "1.11.4",
-   "com.github.scopt" %% "scopt" % "3.5.0"
+   "com.github.scopt" %% "scopt" % "3.5.0",
+   "com.esotericsoftware" % "kryo" % "4.0.2"
 )
 
 test in assembly := {}

@@ -23,7 +23,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   override def beforeAll() {
     val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2")
     conf.set("spark.serializer", classOf[KryoSerializer].getName)
-    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator[Any]].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
   }
   

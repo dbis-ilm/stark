@@ -7,6 +7,7 @@ import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -17,6 +18,8 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   override def beforeAll() {
     val conf = new SparkConf().setMaster("local").setAppName("indexedspatialrddtestcase").set("spark.ui.showConsoleProgress", "false")
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
   }
   

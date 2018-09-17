@@ -2,8 +2,45 @@ package dbis.stark
 
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
+import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{NPoint, NRectRange}
 import org.locationtech.jts.geom._
+
+import scala.reflect.ClassTag
+
+class RTreeSerializer extends Serializer[RTree[Any]] {
+  val soSerializer = new STObjectSerializer
+  override def write(kryo: Kryo, output: Output, tree: RTree[Any]): Unit = {
+    tree.build()
+
+    output.writeInt(tree.getNodeCapacity, true)
+    output.writeInt(tree.size(), true)
+
+    tree._items.foreach{ d =>
+      kryo.writeObject(output, d.so, soSerializer)
+      kryo.writeClassAndObject(output, d.data)
+    }
+  }
+
+  override def read(kryo: Kryo, input: Input, dType: Class[RTree[Any]]): RTree[Any] = {
+    val capacity = input.readInt(true)
+    val size = input.readInt(true)
+
+    val tree = new RTree[Any](capacity)
+
+    var i = 0
+    while(i < size) {
+      val so = kryo.readObject(input, classOf[STObject], soSerializer)
+      val data = kryo.readClassAndObject(input).asInstanceOf[Any]
+
+      tree.insert(so, data)
+      i += 1
+    }
+
+    tree.build()
+    tree
+  }
+}
 
 class NPointSerializer extends Serializer[NPoint] {
   override def write(kryo: Kryo, output: Output, p: NPoint): Unit = {
@@ -65,8 +102,6 @@ object GeometrySerializer {
   private val POINT: Byte = 0x0
   private val POLYGON: Byte = 0x1
   private val LINESTRING: Byte = 0x2
-  private val ENVELOPE: Byte = 0x3
-
 }
 
 class GeometrySerializer extends Serializer[Geometry] {
@@ -209,16 +244,16 @@ class STObjectSerializer extends Serializer[STObject] {
   }
 }
 
-class StarkSerializer[Payload] extends Serializer[(STObject, Payload)] {
+class StarkSerializer extends Serializer[(STObject, Any)] {
 
-  override def write(kryo: Kryo, output: Output, obj: (STObject, Payload)): Unit = {
+  override def write(kryo: Kryo, output: Output, obj: (STObject, Any)): Unit = {
     kryo.writeObject(output, obj._1, new STObjectSerializer())
     kryo.writeClassAndObject(output, obj._2)
   }
 
-  override def read(kryo: Kryo, input: Input, dType: Class[(STObject,Payload)]): (STObject,Payload) = {
+  override def read(kryo: Kryo, input: Input, dType: Class[(STObject,Any)]): (STObject,Any) = {
     val so = kryo.readObject(input, classOf[STObject])
-    val payload = kryo.readClassAndObject(input).asInstanceOf[Payload]
+    val payload = kryo.readClassAndObject(input).asInstanceOf[Any]
 
     (so, payload)
   }

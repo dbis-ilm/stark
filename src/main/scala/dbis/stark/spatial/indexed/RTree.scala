@@ -116,7 +116,7 @@ class RTree[D: ClassTag ](
 
   override def items = _items.map(_.data)
 
-  def lastLevelNodes = boundablesAtLevel(depth()).asScala.map(_.asInstanceOf[AbstractNode])
+  def lastLevelNodes = boundablesAtLevel(depth()-1).asScala.map(_.asInstanceOf[AbstractNode])
 
   /**
    * If the tree was queried using the *RO methods you can use this method

@@ -3,10 +3,8 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, Utils}
-import org.locationtech.jts.index.strtree.Boundable
 
 import scala.collection.JavaConverters._
 
@@ -37,10 +35,12 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
 
     //val children = tree.getRoot.getChildBoundables.iterator().asScala
-    val children = tree.lastLevelNodes
+//    val children = tree.lastLevelNodes
 
-    children.zipWithIndex.map{ case (child, idx) =>
-      val mbr = child.getBounds.asInstanceOf[MBR]
+    val children = tree.queryBoundary().asScala
+
+    children.zipWithIndex.map{ case (mbr, idx) =>
+//      val mbr = child.getBounds.asInstanceOf[MBR]
       Cell(idx, Utils.fromEnvelope(mbr))
     }.toArray
   }
@@ -98,6 +98,8 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
 
 //      if(!pointsOnly)
         partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+    } else if(!pointsOnly) {
+      partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
 

@@ -9,6 +9,7 @@ import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConverters._
 
+case class CellHistogram(buckets: Array[(Cell, Int)])
 
 trait SpatialPartitioner extends Partitioner {
   def printPartitions(fName: java.nio.file.Path): Unit
@@ -114,8 +115,6 @@ object GridPartitioner {
   def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int,
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
                                        xLength: Double, yLength:Double): Array[(Cell,Int)] = {
-
-    case class CellHistogram(buckets: Array[(Cell, Int)])
 
     def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
 

@@ -414,6 +414,13 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     preservesPartitioning = true) // preserve partitioning
   }
 
+  def index(indexConfig: IndexConfig,config: Option[PartitionerConfig]): RDD[Index[(G,V)]] = config match {
+    case None =>
+      val noIdx: Option[SpatialPartitioner] = None
+      index(noIdx, indexConfig)
+    case Some(c) => index(c, indexConfig)
+  }
+
   def index(partitionerConfig: PartitionerConfig, indexConfig: IndexConfig): RDD[Index[(G,V)]] =
     index(Some(PartitionerFactory.get(partitionerConfig, self)), indexConfig)
 

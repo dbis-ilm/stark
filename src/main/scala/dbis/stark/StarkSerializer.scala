@@ -4,10 +4,107 @@ import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.CellHistogram
-import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+import dbis.stark.spatial._
 import org.locationtech.jts.geom._
 
-import scala.reflect.ClassTag
+import scala.collection.mutable.ListBuffer
+
+class SkylineSerializer extends Serializer[Skyline[Any]] {
+  val stobjectSerializer = new STObjectSerializer
+
+  override def write(kryo: Kryo, output: Output, skyline: Skyline[Any]): Unit = {
+    output.writeInt(skyline.skylinePoints.length, true)
+    skyline.skylinePoints.foreach { case (so,v) =>
+      kryo.writeObject(output, so, stobjectSerializer)
+      kryo.writeClassAndObject(output, v)
+    }
+    kryo.writeClassAndObject(output, skyline.dominatesFunc)
+  }
+
+  override def read(kryo: Kryo, input: Input, `type`: Class[Skyline[Any]]): Skyline[Any] = {
+    val num = input.readInt(true)
+    var i = 0
+    val l = ListBuffer.empty[(STObject, Any)]
+    while(i < num) {
+      val so = kryo.readObject(input, classOf[STObject], stobjectSerializer)
+      val v = kryo.readClassAndObject(input)
+      l += ((so,v))
+
+      i += 1
+    }
+    val func = kryo.readClassAndObject(input).asInstanceOf[(STObject,STObject) => Boolean]
+
+    new Skyline[Any](l.toList, func)
+  }
+}
+
+object DistanceSerializer {
+  private val scalar: Byte = 0x0
+  private val interval: Byte = 0x1
+}
+
+class DistanceSerializer extends Serializer[Distance] {
+  override def write(kryo: Kryo, output: Output, dist: Distance): Unit = dist match {
+    case sd: ScalarDistance =>
+      output.writeByte(DistanceSerializer.scalar)
+      output.writeDouble(sd.value)
+    case IntervalDistance(min,max) =>
+      output.writeByte(DistanceSerializer.interval)
+      output.writeDouble(min)
+      output.writeDouble(max)
+  }
+
+  override def read(kryo: Kryo, input: Input, `type`: Class[Distance]): Distance = input.readByte() match {
+    case DistanceSerializer.scalar =>
+      val v = input.readDouble()
+      ScalarDistance(v)
+    case DistanceSerializer.interval =>
+      val min = input.readDouble()
+      val max = input.readDouble()
+      IntervalDistance(min, max)
+  }
+}
+
+class KnnSerializer extends Serializer[KNN[Any]] {
+  val distSerializer = new DistanceSerializer
+  override def write(kryo: Kryo, output: Output, knn: KNN[Any]): Unit = {
+
+    output.writeInt(knn.k, true)
+    output.writeInt(knn.posMax, true)
+    output.writeInt(knn.posMin, true)
+    output.writeInt(knn.m, true)
+
+    knn.iterator.foreach{ case (dist,v) =>
+      kryo.writeObject(output, dist, distSerializer)
+      kryo.writeClassAndObject(output, v)
+    }
+  }
+
+  override def read(kryo: Kryo, input: Input, `type`: Class[KNN[Any]]): KNN[Any] = {
+    val k = input.readInt(true)
+    val posMax = input.readInt(true)
+    val posMin = input.readInt(true)
+    val m = input.readInt(true)
+
+    val objs = new Array[(Distance,Any)](k)
+    var i = 0
+    while(i <= m) {
+      val dist = kryo.readObject(input, classOf[Distance], distSerializer)
+      val v = kryo.readClassAndObject(input).asInstanceOf[Any]
+
+      objs(i) = (dist,v)
+      i += 1
+    }
+
+    val knn = new KNN[Any](k)
+    knn.m = m
+    knn.posMin = posMin
+    knn.posMax = posMax
+    knn.nn = objs
+
+    knn
+  }
+}
 
 class RTreeSerializer extends Serializer[RTree[Any]] {
   val soSerializer = new STObjectSerializer
@@ -244,7 +341,7 @@ class TemporalSerializer extends Serializer[TemporalExpression] {
   override def write(kryo: Kryo, output: Output, obj: TemporalExpression): Unit = obj match {
     case Instant(t) =>
       output.writeByte(TemporalSerializer.INSTANT)
-      output.writeLong(t)
+      output.writeLong(t, true)
     case Interval(start, end) =>
       output.writeByte(TemporalSerializer.INTERVAL)
       kryo.writeObject(output, start, this)
@@ -257,7 +354,7 @@ class TemporalSerializer extends Serializer[TemporalExpression] {
   override def read(kryo: Kryo, input: Input, dType: Class[TemporalExpression]): TemporalExpression = {
     input.readByte() match {
       case TemporalSerializer.INSTANT =>
-        val l = input.readLong()
+        val l = input.readLong(true)
         Instant(l)
       case TemporalSerializer.INTERVAL =>
         val start = kryo.readObject(input, classOf[Instant], this)
@@ -302,14 +399,16 @@ class STObjectSerializer extends Serializer[STObject] {
 
 class StarkSerializer extends Serializer[(STObject, Any)] {
 
+  val soSerializer = new STObjectSerializer
+
   override def write(kryo: Kryo, output: Output, obj: (STObject, Any)): Unit = {
-    kryo.writeObject(output, obj._1, new STObjectSerializer())
+    kryo.writeObject(output, obj._1, soSerializer)
     kryo.writeClassAndObject(output, obj._2)
   }
 
   override def read(kryo: Kryo, input: Input, dType: Class[(STObject,Any)]): (STObject,Any) = {
-    val so = kryo.readObject(input, classOf[STObject])
-    val payload = kryo.readClassAndObject(input).asInstanceOf[Any]
+    val so = kryo.readObject(input, classOf[STObject], soSerializer)
+    val payload = kryo.readClassAndObject(input)
 
     (so, payload)
   }

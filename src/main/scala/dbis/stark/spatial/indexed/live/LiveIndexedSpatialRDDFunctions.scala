@@ -55,14 +55,14 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
     val r = self.mapPartitionsWithIndex({ (idx, iter) =>
-              val partitionCheck = self.partitioner.forall { p =>
-                p match {
-                  case sp: GridPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-                  case _ => true
-                }
-              }
-
-              if(partitionCheck) {
+//              val partitionCheck = self.partitioner.forall { p =>
+//                p match {
+//                  case sp: GridPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+//                  case _ => true
+//                }
+//              }
+//
+//              if(partitionCheck) {
 
                 val tree = IndexFactory.get[G,(G,V)](indexConfig)
 
@@ -75,9 +75,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                 idxTree.build()
 
                 idxTree.kNN(qry, k, distFunc)
-              }
-              else
-                Iterator.empty
+//              }
+//              else
+//                Iterator.empty
 
             })
 
@@ -86,6 +86,34 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           .take(k)
 
     self.sparkContext.parallelize(r)
+  }
+
+  override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
+    val knns = self.mapPartitions({iter =>
+      val tree = IndexFactory.get[G,(G,V)](indexConfig)
+
+      require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
+
+      val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
+
+      iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
+
+      idxTree.build()
+
+      val knnIter = idxTree.kNN(qry, k, distFunc)
+                            .map{ case (g,v) => (distFunc(g,qry),(g,v))}
+                            .toArray
+
+      val knn = new KNN[(G,V)](k)
+
+      knn.set(knnIter)
+      Iterator.single(knn)
+
+    }, true)
+        .reduce(_.merge(_))
+
+
+    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
   }
 
   /**

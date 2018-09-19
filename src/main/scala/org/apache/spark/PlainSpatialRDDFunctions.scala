@@ -66,28 +66,51 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = self.withScope{
 //    // compute k NN for each partition individually --> n * k results
-//    val r = rdd.mapPartitions({iter => iter.map { case (g,v) =>
-//        val d = distFunc(g,qry)
-//        (g,(d,v)) // compute and return distance
-//      }
-//      .toList
-//      .sortWith(_._2._1 < _._2._1) // on distance
-//      .take(k) // take only the fist k
-//      .toIterator // remove the iterator
-//    })
-//
-//    // sort all n lists and sort by distance, then take only the first k elements
-//    val arr = r.sortBy(_._2._1, ascending = true).take(k)
-//
-//    // return as an RDD
-//    rdd.sparkContext.parallelize(arr)
+    val r = self.mapPartitions({iter => iter.map { case (g,v) =>
+        val d = distFunc(g,qry)
+        (g,(d,v)) // compute and return distance
+      }
+      .toList
+      .sortWith(_._2._1 < _._2._1) // on distance
+      .take(k) // take only the fist k
+      .toIterator // remove the iterator
+    })
 
-    val knn = self.map{ case(g,v) => (distFunc(qry,g), (g,v)) } // compute distances and make it key
-                  .sortByKey(ascending = true) // sort by distance
-                  .take(k) // take only the first k elements
-                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
+    // sort all n lists and sort by distance, then take only the first k elements
+    val arr = r.sortBy(_._2._1, ascending = true).take(k)
 
-    self.sparkContext.parallelize(knn) // return as RDD
+    // return as an RDD
+    self.sparkContext.parallelize(arr)
+
+//    val knn = self.map{ case(g,v) =>
+//        (distFunc(qry,g), (g,v))
+//    }// compute distances and make it key
+//                  .sortByKey(ascending = true) // sort by distance
+//                  .take(k) // take only the first k elements
+//                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
+//
+//    self.sparkContext.parallelize(knn) // return as RDD
+  }
+
+
+  override def knnAgg(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance,V))] = {
+    type Data = (G,V)
+    def combine(knn: KNN[Data], tuple: Data) = {
+      val dist = distFunc(ref, tuple._1)
+      knn.insert((dist,tuple))
+      knn
+    }
+
+    def merge(knn1: KNN[Data], knn2: KNN[Data]) = {
+      knn1.merge(knn2)
+    }
+
+    val empty = new KNN[Data](k)
+
+    val knn = self.aggregate(empty)(combine, merge)
+
+    self.sparkContext.parallelize(knn.iterator.map{ case (dist,(g,v)) => (g,(dist,v)) }.toSeq)
+
   }
 
 

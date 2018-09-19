@@ -3,7 +3,7 @@ package dbis.stark.spatial.indexed.persistent
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
 import dbis.stark.spatial.partitioner.GridPartitioner
-import dbis.stark.spatial.{JoinPredicate, SpatialKnnJoinRDD, SpatialRDDFunctions}
+import dbis.stark.spatial.{JoinPredicate, KNN, SpatialKnnJoinRDD, SpatialRDDFunctions}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.SpatialRDD
 import org.apache.spark.rdd.RDD
@@ -71,6 +71,28 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     self.sparkContext.parallelize(nn)
   }
 
+  override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] = {
+
+    val knns = self.mapPartitions({ trees =>
+      trees.flatMap { tree =>
+        require(tree.isInstanceOf[KnnIndex[_]], s"kNN function requires KnnIndex but got: ${tree.getClass}")
+        val knnIter = tree.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)
+          .map{ case (g,v) => (distFunc(g,qry), (g,v))}
+          .toIndexedSeq
+
+        val knn = new KNN[(G,V)](k)
+        knn.set(knnIter)
+
+        Iterator.single(knn)
+
+      }
+    }, true)
+        .reduce(_.merge(_))
+
+    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
+
+  }
+
   override def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
     self.mapPartitions({ trees =>
     trees.flatMap{ tree =>
@@ -91,5 +113,6 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
   override def cluster[KeyType](minPts: Int, epsilon: Double, keyExtractor: ((G,V)) => KeyType,
                         includeNoise: Boolean = true, maxPartitionCost: Int = 10,outfile: Option[String] = None) : RDD[(G, (Int, V))] = ???
+
 
 }

@@ -29,7 +29,7 @@ abstract class Distance extends Serializable {
   * @param min The smallest distance
   * @param max The greatest distance
   */
-class IntervalDistance(private val min: Double, private val max: Double) extends Distance with Serializable{
+case class IntervalDistance(private val min: Double, private val max: Double) extends Distance with Serializable{
 
   require(min <= max, s"min value must be <= max value, but $min > $max")
 
@@ -75,9 +75,9 @@ class IntervalDistance(private val min: Double, private val max: Double) extends
   override def toString: String = s"[$min;$max]"
 }
 
-object IntervalDistance {
-  def apply(min: Double, max: Double): IntervalDistance = new IntervalDistance(min,max)
-}
+//object IntervalDistance {
+//  def apply(min: Double, max: Double): IntervalDistance = new IntervalDistance(min,max)
+//}
 
 /**
   * A [[ScalarDistance]] represents a distance measure with exactly one value

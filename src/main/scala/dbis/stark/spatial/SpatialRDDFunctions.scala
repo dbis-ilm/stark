@@ -54,7 +54,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
   def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance): RDD[(G,V)]
       
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))]
-
+  def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))]
 
   def visualize(imageWidth: Int, imageHeight: Int,
                 path: String,

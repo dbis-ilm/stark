@@ -35,6 +35,7 @@ class Skyline[PayloadType](var skylinePoints: List[(STObject, PayloadType)] = Li
 
   def isEmpty: Boolean = skylinePoints.isEmpty
   def nonEmpty: Boolean = skylinePoints.nonEmpty
+  protected[stark] lazy val dominatesFunc = dominates
 
   override def clone(): Skyline[PayloadType] = {
     val l = ListBuffer.empty[(STObject, PayloadType)]

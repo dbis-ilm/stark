@@ -3,7 +3,8 @@ package dbis.stark
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.{NPoint, NRectRange}
+import dbis.stark.spatial.partitioner.CellHistogram
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.locationtech.jts.geom._
 
 import scala.reflect.ClassTag
@@ -77,6 +78,61 @@ class NRectSerializer extends Serializer[NRectRange] {
     val ll = pointSer.read(kryo, input, classOf[NPoint])
     val ur = pointSer.read(kryo, input, classOf[NPoint])
     NRectRange(ll, ur)
+  }
+}
+
+class CellSerializer extends Serializer[Cell] {
+  val rectSerializer = new NRectSerializer
+  override def write(kryo: Kryo, output: Output, cell: Cell) = {
+    output.writeInt(cell.id, true)
+    kryo.writeObject(output, cell.range, rectSerializer)
+    val same = cell.range == cell.extent
+    output.writeBoolean(same)
+    if(!same)
+      kryo.writeObject(output, cell.extent, rectSerializer)
+  }
+
+  override def read(kryo: Kryo, input: Input, dType: Class[Cell]) = {
+    val id = input.readInt(true)
+    val range = kryo.readObject(input, classOf[NRectRange], rectSerializer)
+    val same = input.readBoolean()
+    if(!same) {
+      val extent = kryo.readObject(input, classOf[NRectRange], rectSerializer)
+      Cell(id, range, extent)
+    }
+    else
+      Cell(id, range)
+  }
+}
+
+class HistogramSerializer extends Serializer[CellHistogram] {
+  val cellSerializer = new CellSerializer
+  override def write(kryo: Kryo, output: Output, histo: CellHistogram) = {
+    output.writeInt(histo.buckets.length, true)
+    var i = 0
+    while(i < histo.buckets.length) {
+      val (cell, cnt) = histo.buckets(i)
+      kryo.writeObject(output, cell, cellSerializer)
+      output.writeInt(cnt, true)
+
+      i += 1
+    }
+  }
+
+  override def read(kryo: Kryo, input: Input, `type`: Class[CellHistogram]) = {
+    val num = input.readInt(true)
+    val buckets = new Array[(Cell, Int)](num)
+    var i = 0
+    while(i < num) {
+      val cell = kryo.readObject(input, classOf[Cell], cellSerializer)
+      val cnt = input.readInt(true)
+
+      buckets(i) = (cell, cnt)
+
+      i += 1
+    }
+
+    CellHistogram(buckets)
   }
 }
 

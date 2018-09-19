@@ -2,7 +2,8 @@ package dbis.stark
 
 import com.esotericsoftware.kryo.Kryo
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.{NPoint, NRectRange}
+import dbis.stark.spatial.partitioner.CellHistogram
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.serializer.KryoRegistrator
 import org.locationtech.jts.geom._
 
@@ -31,6 +32,9 @@ class StarkKryoRegistrator extends KryoRegistrator {
 
     kryo.register(classOf[NPoint], new NPointSerializer())
     kryo.register(classOf[NRectRange], new NRectSerializer())
+
+    kryo.register(classOf[Cell], new CellSerializer)
+    kryo.register(classOf[CellHistogram], new HistogramSerializer)
 
     kryo.register(classOf[RTree[_]], new RTreeSerializer)
 

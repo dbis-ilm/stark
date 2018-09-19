@@ -14,7 +14,11 @@ package dbis.stark.spatial
  */
 case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
 
-  def dist(p: NPoint) = math.sqrt(center.c.iterator.zip(p.c.iterator).map{ case (l,r) => l - r}.map(math.pow(_,2)).sum)
+  def dist(p: NPoint) = {
+    points.iterator.map { corner =>
+      math.sqrt(corner.c.iterator.zip(p.c.iterator).map{ case (l,r) => l - r}.map(math.pow(_,2)).sum)
+    }.min
+  }
 
 
   require(ll.dim >= 2, "dimension must be >= 2")
@@ -66,7 +70,7 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
     points.exists { p => r.contains(p) } || r.points.exists(p => this.contains(p))
 
   //TODO: make n-dimensional
-  def points = Array(ll, NPoint(ur(0),ll(1)),ur, NPoint(ll(0),ur(1)))
+  lazy val points = Array(ll, NPoint(ur(0),ll(1)),ur, NPoint(ll(0),ur(1)))
   
   override def wkt: String = s"POLYGON(( ${(points :+ ll).map(p => s"${p(0)} ${p(1)}").mkString(", ")} ))"
 

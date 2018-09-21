@@ -50,7 +50,7 @@ class STSparkContext(private val sc: SparkContext) {
     if(partitionstoLoad.isEmpty)
       sc.emptyRDD[T]
     else
-      sc.objectFile(partitionstoLoad)
+      sc.objectFile[T](partitionstoLoad)
   }
 
   private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {

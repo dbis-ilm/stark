@@ -25,7 +25,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                        self: RDD[(G,V)]
   ) extends SpatialRDDFunctions[G,V](self) with Serializable {
 
-
+  // FIXME: won't write anything if no partitioner is set!
+  // FIXME: writes the (STObject,Payload) tuple as text - need a formatter function!
   def saveAsStarkTextFile(path: String): Unit = self.partitioner.foreach {
     case sp: GridPartitioner =>
       val wkts = self.partitions.indices.map{ i =>
@@ -39,7 +40,18 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     case _ => self.saveAsTextFile(path)
   }
 
+  def saveAsStarkObjectFile(path: String): Unit = self.partitioner.foreach {
+    case sp: GridPartitioner =>
+      val wkts = self.partitions.indices.map{ i =>
+        Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+      }
 
+      self.saveAsObjectFile(path)
+      self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+
+    // in case there is no or not a spatial partitioner, use normal save
+    case _ => self.saveAsObjectFile(path)
+  }
 
   /**
    * Find all elements that intersect with a given query geometry

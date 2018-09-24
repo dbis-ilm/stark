@@ -7,7 +7,7 @@ import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialGridPartitioner, SpatialPartitioner}
+import dbis.stark.spatial.partitioner._
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
@@ -25,9 +25,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                        self: RDD[(G,V)]
   ) extends SpatialRDDFunctions[G,V](self) with Serializable {
 
-
+  // FIXME: won't write anything if no partitioner is set!
+  // FIXME: writes the (STObject,Payload) tuple as text - need a formatter function!
   def saveAsStarkTextFile(path: String): Unit = self.partitioner.foreach {
-    case sp: SpatialPartitioner =>
+    case sp: GridPartitioner =>
       val wkts = self.partitions.indices.map{ i =>
         Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
       }
@@ -39,51 +40,89 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     case _ => self.saveAsTextFile(path)
   }
 
+  def saveAsStarkObjectFile(path: String): Unit = self.partitioner.foreach {
+    case sp: GridPartitioner =>
+      val wkts = self.partitions.indices.map{ i =>
+        Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+      }
 
+      self.saveAsObjectFile(path)
+      self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+
+    // in case there is no or not a spatial partitioner, use normal save
+    case _ => self.saveAsObjectFile(path)
+  }
 
   /**
    * Find all elements that intersect with a given query geometry
    */
-  def intersects(qry: G) = self.withScope{ new SpatialFilterRDD[G,V](self, qry, JoinPredicate.INTERSECTS) }
+  override def intersects(qry: G): SpatialFilterRDD[G, V] = self.withScope{ new SpatialFilterRDD[G,V](self, qry, JoinPredicate.INTERSECTS) }
 
   /**
    * Find all elements that are contained by a given query geometry
    */
-  def containedby(qry: G) = self.withScope{new SpatialFilterRDD[G,V](self, qry, JoinPredicate.CONTAINEDBY) }
+  override def containedby(qry: G): SpatialFilterRDD[G, V] = self.withScope{new SpatialFilterRDD[G,V](self, qry, JoinPredicate.CONTAINEDBY) }
 
   /**
    * Find all elements that contain a given other geometry
    */
-  def contains(o: G) = self.withScope{new SpatialFilterRDD[G,V](self, o, JoinPredicate.CONTAINS) }
+  override def contains(o: G): SpatialFilterRDD[G, V] = self.withScope{new SpatialFilterRDD[G,V](self, o, JoinPredicate.CONTAINS) }
 
-  def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
+  override def covers(o: G): SpatialFilterRDD[G, V] = self.withScope{new SpatialFilterRDD[G,V](self, o, JoinPredicate.COVERS) }
+
+  override def coveredby(o: G): SpatialFilterRDD[G, V] = self.withScope{new SpatialFilterRDD[G,V](self, o, JoinPredicate.COVEREDBY) }
+
+  override def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance): SpatialFilterRDD[G, V] =
     self.withScope{ new SpatialFilterRDD(self, qry, PredicatesFunctions.withinDistance(maxDist, distFunc) _) }
 
 
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = self.withScope{
+  override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = self.withScope{
 //    // compute k NN for each partition individually --> n * k results
-//    val r = rdd.mapPartitions({iter => iter.map { case (g,v) =>
-//        val d = distFunc(g,qry)
-//        (g,(d,v)) // compute and return distance
-//      }
-//      .toList
-//      .sortWith(_._2._1 < _._2._1) // on distance
-//      .take(k) // take only the fist k
-//      .toIterator // remove the iterator
-//    })
-//
-//    // sort all n lists and sort by distance, then take only the first k elements
-//    val arr = r.sortBy(_._2._1, ascending = true).take(k)
-//
-//    // return as an RDD
-//    rdd.sparkContext.parallelize(arr)
+    val r = self.mapPartitions({iter => iter.map { case (g,v) =>
+        val d = distFunc(g,qry)
+        (g,(d,v)) // compute and return distance
+      }
+      .toList
+      .sortWith(_._2._1 < _._2._1) // on distance
+      .take(k) // take only the fist k
+      .toIterator // remove the iterator
+    })
 
-    val knn = self.map{ case(g,v) => (distFunc(qry,g), (g,v)) } // compute distances and make it key
-                  .sortByKey(ascending = true) // sort by distance
-                  .take(k) // take only the first k elements
-                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
+    // sort all n lists and sort by distance, then take only the first k elements
+    val arr = r.sortBy(_._2._1, ascending = true).take(k)
 
-    self.sparkContext.parallelize(knn) // return as RDD
+    // return as an RDD
+    self.sparkContext.parallelize(arr)
+
+//    val knn = self.map{ case(g,v) =>
+//        (distFunc(qry,g), (g,v))
+//    }// compute distances and make it key
+//                  .sortByKey(ascending = true) // sort by distance
+//                  .take(k) // take only the first k elements
+//                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
+//
+//    self.sparkContext.parallelize(knn) // return as RDD
+  }
+
+
+  override def knnAgg(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance,V))] = {
+    type Data = (G,V)
+    def combine(knn: KNN[Data], tuple: Data) = {
+      val dist = distFunc(ref, tuple._1)
+      knn.insert((dist,tuple))
+      knn
+    }
+
+    def merge(knn1: KNN[Data], knn2: KNN[Data]) = {
+      knn1.merge(knn2)
+    }
+
+    val empty = new KNN[Data](k)
+
+    val knn = self.aggregate(empty)(combine, merge)
+
+    self.sparkContext.parallelize(knn.iterator.map{ case (dist,(g,v)) => (g,(dist,v)) }.toSeq)
+
   }
 
 
@@ -95,7 +134,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param pred The join predicate as a function
    * @return Returns a RDD with the joined values
    */
-  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = self.withScope {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean): SpatialJoinRDD[G, V, V2] = self.withScope {
     val cleanF = self.context.clean(pred)
     new SpatialJoinRDD(self, other, cleanF, oneToManyPartitioning)
   }
@@ -103,11 +142,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
-  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = self.withScope {
-    new SpatialJoinRDD(
-      if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
-      if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
-      pred, oneToMany = oneToManyPartitioning)
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false): SpatialJoinRDD[G, V, V2] = self.withScope {
+      new SpatialJoinRDD(
+        if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
+        if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
+        pred, oneToMany = oneToMany)
   }
 
   override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = self.withScope {
@@ -132,7 +171,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		  includeNoise: Boolean = true,
 		  maxPartitionCost: Int = 10,
 		  outfile: Option[String] = None
-		  ) = self.withScope{
+		  ): RDD[(G, (Int, V))] = self.withScope{
 
 	  // create a dbscan object with given parameters
 	  val dbscan = new DBScan[KeyType,(G,V)](epsilon, minPts)
@@ -215,7 +254,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
 
     // TODO: specify parititoner as parameter - but it has to work on distance RDD...
-    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, pointsOnly = false)
+    val partitioner = new SpatialGridPartitioner(distanceRDD, ppD, pointsOnly = true)
     val partedDistRDD = distanceRDD.partitionBy(partitioner)
 
     val cachedDistRDD = if(allowCache) partedDistRDD.cache() else partedDistRDD
@@ -234,9 +273,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       // TODO: here we can be more selective by computing which partitions are dominated
       // based on the partiton index
+      //FIXME is this ok, if dominateas eg wants maximum values?
       (idx until partitioner.numPartitions).foreach{ otherPart =>
         val otherMin = partitioner.partitionExtent(otherPart).ll.c
         val otherMinTup = STObject(otherMin(0), otherMin(1))
+
 
         if(Skyline.centroidDominates(currMaxTup, otherMinTup)) {
           globalBS(otherPart) = false
@@ -281,6 +322,95 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     self.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
   }
 
+  def skylineAngular(ref: STObject,
+                     distFunc: (STObject, STObject) => (Distance, Distance),
+                     dominatesRel: (STObject, STObject) => Boolean,
+                     ppd: Int): RDD[(G,V)] = self.withScope{
+
+    require(ppd > 0)
+
+
+    def combine(sky: Skyline[(G,V)], tuple: (STObject,(G,V))): Skyline[(G,V)] = {
+      sky.insert(tuple)
+      sky
+    }
+
+    def merge(sky1: Skyline[(G,V)], sky2: Skyline[(G,V)]): Skyline[(G,V)] = {
+      sky1.merge(sky2)
+    }
+
+
+    val startSkyline = new Skyline[(G,V)](dominates = dominatesRel)
+
+    val parti = new AngularPartitioner(2, ppd, true)
+    val skyline = self.map{ case (g,v) =>
+      val (sDist,tDist) = distFunc(ref, g)
+      (STObject(sDist.minValue,tDist.minValue), (g,v))
+    }.partitionBy(parti)
+      .aggregate(startSkyline)(combine,merge)
+
+    self.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
+  }
+
+  def skylineAngular2(ref: STObject,
+                      distFunc: (STObject, STObject) => (Distance, Distance),
+                      dominatesRel: (STObject, STObject) => Boolean,
+                      ppd: Int): RDD[(G,V)] = {
+
+    // for each partition (NOT necessarily spatial partition)
+    self.mapPartitions{ iter =>
+
+      val parti = new AngularPartitioner(dimensions = 2, ppD = ppd, firstQuadrantOnly = true)
+
+
+
+//      val externalMap = Array.tabulate(ppd){_ => new Skyline[(G,V)](dominates = dominatesRel)}
+//
+//      while(iter.hasNext) {
+//        val (g,v) = iter.next()
+//
+//        val (sDist,tDist) = distFunc(ref, g)
+//        val distSO = STObject(sDist.minValue,tDist.minValue)
+//        val id = parti.getPartition(distSO) // assign each element to its partition,
+//        externalMap(id).insert((distSO, (g,v)))
+//      }
+//      externalMap.iterator.filter(_.nonEmpty).zipWithIndex.map{ case (s,i) => (i,s)}
+
+      val externalMap = SpatialRDD.createExternalSkylineMap[G,V](dominatesRel)
+      val values = iter.map{ case (g,v) =>
+        val (sDist,tDist) = distFunc(ref, g)
+        val distSO = STObject(sDist.minValue,tDist.minValue)
+        val id = parti.getPartition(distSO) // assign each element to its partition,
+
+        (id, (distSO,(g,v)))
+      }
+      /* and insert into an external map
+       * during insert, each bucket is created by key and the value is the skyline for this partition id
+       */
+      externalMap.insertAll(values)
+      externalMap.iterator
+
+
+
+      /* Now, in the map each bucket corresponds to an (theoretical) angular partition and the value is the Skyline
+       * This mapping exists for every physical partition, so in the next step, merge those partitions
+       *
+       * This can be done by reducing by key so that we merge all skyline with the same logical angular partition ID
+       */
+    }
+    .reduceByKey{ (skyline1, skyline2) => skyline1.merge(skyline2) }
+//    .flatMap(_._2.iterator)
+    .coalesce(1)
+    .mapPartitions{ iter =>
+//      val skyline = new Skyline[(G,V)](dominates = dominatesRel)
+//      iter.foreach(skyline.insert)
+//      skyline.iterator.map(_._2)
+
+      iter.map(_._2).reduce(_.merge(_)).iterator.map(_._2)
+    }
+  }
+
+
   // LIVE
 
   def liveIndex(order: Int): LiveIndexedSpatialRDDFunctions[G,V] = liveIndex(None, RTreeConfig(order))
@@ -317,6 +447,13 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       Iterator.single(tree)
     },
     preservesPartitioning = true) // preserve partitioning
+  }
+
+  def index(indexConfig: IndexConfig,config: Option[PartitionerConfig]): RDD[Index[(G,V)]] = config match {
+    case None =>
+      val noIdx: Option[SpatialPartitioner] = None
+      index(noIdx, indexConfig)
+    case Some(c) => index(c, indexConfig)
   }
 
   def index(partitionerConfig: PartitionerConfig, indexConfig: IndexConfig): RDD[Index[(G,V)]] =

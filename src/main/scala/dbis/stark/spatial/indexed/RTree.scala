@@ -106,7 +106,7 @@ class RTree[D: ClassTag ](
    * 
    * @return Returns a list containing all Data items in the tree
    */
-  def items = super.itemsTree()
+  def _items = super.itemsTree()
       .iterator()
       .flatMap{ l => (l: @unchecked) match {
         case d: Data[D] => Iterator.single(d)
@@ -114,7 +114,9 @@ class RTree[D: ClassTag ](
         } 
       }
 
-  def lastLevelNodes = boundablesAtLevel(depth()).asScala.map(_.asInstanceOf[AbstractNode])
+  override def items = _items.map(_.data)
+
+  def lastLevelNodes = boundablesAtLevel(depth()-1).asScala.map(_.asInstanceOf[AbstractNode])
 
   /**
    * If the tree was queried using the *RO methods you can use this method

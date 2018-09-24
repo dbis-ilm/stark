@@ -245,6 +245,55 @@ public class STRtreePlus<T> extends STRtree
     return kNearestNeighbors;
   }
 
+    /* return leaf? nodes 
+     */
+    public List<Envelope> queryBoundary()
+    {
+        build();
+        List<Envelope> boundaries = new ArrayList<>();
+        if (isEmpty()) {
+            //Assert.isTrue(root.getBounds() == null);
+            //If the root is empty, we stop traversing. This should not happen.
+            return boundaries;
+        }
+
+        queryBoundary(root, boundaries);
+
+        return boundaries;
+    }
+    /**
+     * This function is to traverse the children of the root.
+     * @param node
+     * @param boundaries
+     */
+    private void queryBoundary(AbstractNode node, List<Envelope> boundaries) {
+        List childBoundables = node.getChildBoundables();
+        boolean flagLeafnode=true;
+        for (Object childBoundable2 : childBoundables) {
+            Boundable childBoundable = (Boundable) childBoundable2;
+            if (childBoundable instanceof AbstractNode) {
+                //We find this is not a leaf node.
+                flagLeafnode = false;
+                break;
+
+            }
+        }
+        if(flagLeafnode)
+        {
+            boundaries.add((Envelope)node.getBounds());
+        }
+        else
+        {
+            for (Object childBoundable1 : childBoundables) {
+                Boundable childBoundable = (Boundable) childBoundable1;
+                if (childBoundable instanceof AbstractNode) {
+                    queryBoundary((AbstractNode) childBoundable, boundaries);
+                }
+
+            }
+        }
+    }
+
 }
 
 

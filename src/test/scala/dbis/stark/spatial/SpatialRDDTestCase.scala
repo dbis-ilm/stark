@@ -90,7 +90,43 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
     
-  } 
+  }
+
+  it should "find the correct nearest neighbors with aggregate" in {
+    val rdd = StarkTestUtils.createRDD(sc)
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnAgg(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "be faster with kNNAgg vs kNN" in {
+    var rdd = StarkTestUtils.createRDD(sc)
+    var i = 0
+    while(i < 500) {
+      rdd = rdd.union(StarkTestUtils.createRDD(sc))
+      i += 1
+    }
+
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+
+    var t0 = System.currentTimeMillis()
+    val knn = rdd.kNN(q, k = 100, Distance.seuclid).collect()
+    var t1 = System.currentTimeMillis()
+    println(s"knn:\t${t1 - t0}")
+
+    t0 = System.currentTimeMillis()
+    val knnAgg = rdd.knnAgg(q, k = 100, Distance.seuclid).collect()
+    t1 = System.currentTimeMillis()
+    println(s"knn Agg:\t${t1 - t0}")
+
+    knn should contain theSameElementsAs knnAgg
+  }
   
   
   it should "find correct self-join result for points with intersect" in {
@@ -101,7 +137,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.intersects _, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.intersects, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -128,7 +164,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.contains _, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.contains, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -153,7 +189,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid) _, oneToManyPartitioning = false)
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid), oneToManyPartitioning = false)
                                 .map(_._1._4.toText())
                                 .collect()
 
@@ -182,11 +218,11 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     
 
     val res = rdd.cluster(
-        keyExtractor = { case (_,(id, _, _,_)) => id } , // key extractor to extract point IDs from tuple //keyExtractor = _._2._1,
-        minPts = 10, 
-        epsilon = 5.0,  
-        maxPartitionCost = 500,
+        minPts = 10 , // key extractor to extract point IDs from tuple //keyExtractor = _._2._1,
+        epsilon = 5.0,
+        keyExtractor = { case (_,(id, _, _,_)) => id },
         includeNoise = true,
+        maxPartitionCost = 500,
         outfile = Some(f.toString))
     
     res.count() shouldBe rdd.count() 
@@ -302,6 +338,73 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
+  it should "compute the correct skyline with angular partitioning" in {
+
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(StarkTestUtils.makeTimeStamp(2013, 6, 1)))
+
+    val start = System.currentTimeMillis()
+    val s = rdd.filter(_._1 != q).skylineAngular(q, Distance.euclid, Skyline.centroidDominates, ppd = 10)
+    val skyline = s.collect()
+
+    val end = System.currentTimeMillis()
+    println(s"${end -start}ms")
+
+    //    println(skyline.mkString("\n"))
+
+    skyline should not be empty
+
+    // check that there is no point in the RDD that dominates any skyline point
+    skyline.foreach { skylinePoint =>
+      val refDist = Distance.euclid(q,skylinePoint._1)
+      val skylineRef = STObject(refDist._1.value, refDist._2.value)
+
+      val forAll = rdd.filter( _._1 != q )
+        .map{ case (l,_) => Distance.euclid(q,l)}
+        .filter{ case (sDist, tDist) =>
+          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
+        }
+        .collect()
+
+      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
+    }
+
+  }
+
+  it should "compute the correct skyline with logical angular partitioning" in {
+
+    val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(StarkTestUtils.makeTimeStamp(2013, 6, 1)))
+
+    val start = System.currentTimeMillis()
+    val s = rdd.filter(_._1 != q).skylineAngular2(q, Distance.euclid, Skyline.centroidDominates, ppd = 10)
+    val skyline = s.collect()
+
+    val end = System.currentTimeMillis()
+    println(s"${end -start}ms")
+
+    //    println(skyline.mkString("\n"))
+
+    skyline should not be empty
+
+    // check that there is no point in the RDD that dominates any skyline point
+    skyline.foreach { skylinePoint =>
+      val refDist = Distance.euclid(q,skylinePoint._1)
+      val skylineRef = STObject(refDist._1.value, refDist._2.value)
+
+      val forAll = rdd.filter( _._1 != q )
+        .map{ case (l,_) => Distance.euclid(q,l)}
+        .filter{ case (sDist, tDist) =>
+          Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
+        }
+        .collect()
+
+      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
+    }
+
+  }
+
+
   it should "compute the correct skyline" in {
 
     val rdd = StarkTestUtils.createRDD(sc).map{ case (so, (id, ts, desc, _)) => (STObject(so.getGeo, ts), (id, desc)) }
@@ -326,14 +429,14 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
       val refDist = Distance.euclid(q,skylinePoint._1)
       val skylineRef = STObject(refDist._1.value, refDist._2.value)
 
-      val forAll = rdd.filter( _._1 != q )
+      val dominated = rdd.filter( _._1 != q )
         .map{ case (l,_) => Distance.euclid(q,l)}
         .filter{ case (sDist, tDist) =>
           Skyline.centroidDominates(STObject(sDist.value, tDist.value), skylineRef)
         }
         .collect()
 
-      withClue(s"${skylinePoint._1} is dominated"){forAll shouldBe empty}
+      withClue(s"skyline point ${skylinePoint._1} is dominated"){dominated shouldBe empty}
     }
 
   }
@@ -346,8 +449,12 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val skyline = rdd.skyline(q, Distance.euclid, Skyline.centroidDominates,ppD=5).collect()
     val skylineAgg = rdd.skylineAgg(q, Distance.euclid, Skyline.centroidDominates).collect()
+    val skylineAngular = rdd.skylineAngular(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
+    val skylineAngular2 = rdd.skylineAngular2(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
 
-    skyline should contain theSameElementsAs skylineAgg
+    withClue("skyline vs agg"){skyline should contain theSameElementsAs skylineAgg}
+    withClue("skyline vs angular"){skyline should contain theSameElementsAs skylineAngular}
+    withClue("skyline vs angular2"){skyline should contain theSameElementsAs skylineAngular2}
   }
 
 

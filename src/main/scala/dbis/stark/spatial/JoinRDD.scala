@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import dbis.stark.spatial.partitioner.{OneToManyPartition, OneToOnePartition, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{OneToManyPartition, OneToOnePartition, GridPartitioner}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 
@@ -15,12 +15,12 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
   protected val numPartitionsInRight = right.getNumPartitions
 
   lazy val leftPartitioner = left.partitioner.flatMap {
-    case r: SpatialPartitioner => Some(r)
+    case r: GridPartitioner => Some(r)
     case _ => None
   }
 
   lazy val rightPartitioner = right.partitioner.flatMap {
-    case r: SpatialPartitioner => Some(r)
+    case r: GridPartitioner => Some(r)
     case _ => None
   }
 

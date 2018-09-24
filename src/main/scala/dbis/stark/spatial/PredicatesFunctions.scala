@@ -3,18 +3,23 @@ package dbis.stark.spatial
 import dbis.stark.{Distance, STObject}
 
 object JoinPredicate extends Enumeration {
+
   type JoinPredicate = Value
-  val INTERSECTS, CONTAINS, CONTAINEDBY = Value
+  val INTERSECTS, CONTAINS, CONTAINEDBY, COVERS, COVEREDBY = Value
   
   def predicateFunction(pred: JoinPredicate): (STObject, STObject) => Boolean = pred match {
     case INTERSECTS => PredicatesFunctions.intersects
     case CONTAINS => PredicatesFunctions.contains
     case CONTAINEDBY => PredicatesFunctions.containedby
+    case COVERS => PredicatesFunctions.covers
+    case COVEREDBY => PredicatesFunctions.coveredBy
   }
 }
 
 object PredicatesFunctions {
-  
+
+
+
   /**
    * Returns <code>true</code> if the two given spatial objects intersect
    * 
@@ -24,6 +29,9 @@ object PredicatesFunctions {
    * otherwise <code>false</code>
    */
   def intersects(g1: STObject, g2: STObject): Boolean = g1.intersects(g2)
+
+  def covers(g1: STObject, g2: STObject): Boolean = g1.covers(g2)
+  def coveredBy(g1: STObject, g2: STObject): Boolean = g1.coveredBy(g2)
   
   /**
    * Returns <code>true</code> if the left object contains the right object

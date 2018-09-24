@@ -4,7 +4,7 @@ import java.io.File
 
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.Index
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, PartitionerFactory}
 import dbis.stark.visualization.Visualization
 import dbis.stark.{Distance, STObject}
 import javax.imageio.ImageIO
@@ -37,6 +37,9 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
 
   def intersects(qry: G): RDD[(G,V)]
 
+  def covers(o: G): RDD[(G, V)]
+  def coveredby(o: G): RDD[(G, V)]
+
   /**
    * Find all elements that are contained by a given query geometry
    */
@@ -51,12 +54,12 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
   def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance): RDD[(G,V)]
       
   def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))]
-
+  def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))]
 
   def visualize(imageWidth: Int, imageHeight: Int,
                 path: String,
                 fileExt: String = "png",
-                range: (Double,Double,Double,Double) = SpatialPartitioner.getMinMax(rdd),
+                range: (Double,Double,Double,Double) = GridPartitioner.getMinMax(rdd),
                 flipImageVert: Boolean = false,
                 bgImagePath: String = null,
                 pointSize: Int = 1,
@@ -88,7 +91,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
    * @return Returns a RDD with the joined values
    */
   def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean): RDD[(V,V2)]
-  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[SpatialPartitioner], oneToManyPartitioning: Boolean): RDD[(V,V2)]
+  def join[V2 : ClassTag](other: RDD[(G, V2)], predicate: JoinPredicate.JoinPredicate, partitioner: Option[GridPartitioner], oneToManyPartitioning: Boolean): RDD[(V,V2)]
 
   def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)]
 

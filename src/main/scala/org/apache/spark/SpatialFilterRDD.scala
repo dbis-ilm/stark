@@ -2,7 +2,7 @@ package org.apache.spark
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
-import dbis.stark.spatial.partitioner.{SpatialPartition, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{SpatialPartition, GridPartitioner}
 import dbis.stark.spatial.{JoinPredicate, TemporalPartitioner, Utils}
 import dbis.stark.{Interval, STObject}
 import org.apache.spark.annotation.DeveloperApi
@@ -43,10 +43,9 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
   /**
     * Return the partitions that have to be processed.
     *
-    * We apply partition pruning in this step: If a [[dbis.stark.spatial.partitioner.SpatialPartitioner]]
+    * We apply partition pruning in this step: If a [[dbis.stark.spatial.partitioner.GridPartitioner]]
     * is present, we check if the partition can contain candidates. If not, it is not returned
     * here.
-    *
     *
     * @return The list of partitions of this RDD
     */
@@ -54,7 +53,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
     val parent = firstParent[(G,V)]
     partitioner.map{
       // check if this is a spatial partitioner
-      case sp: SpatialPartitioner if checkParties =>
+      case sp: GridPartitioner if checkParties =>
 
         val spatialParts = ListBuffer.empty[Partition]
 

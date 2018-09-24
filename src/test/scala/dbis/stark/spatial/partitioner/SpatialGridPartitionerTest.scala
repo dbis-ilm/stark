@@ -26,9 +26,9 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
 //      .filter { arr => !arr(1).contains("0 0")}
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMax = SpatialPartitioner.getMinMax(rdd)
+      val minMax = GridPartitioner.getMinMax(rdd)
 
-      val parti = new SpatialGridPartitioner(rdd, partitionsPerDimension = 3, false, minMax, dimensions = 2)
+      val parti = new SpatialGridPartitioner(rdd, partitionsPerDimension = 3, false, minMax, dimensions = 2, sampleFraction = 0)
 
 
 
@@ -60,7 +60,7 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
 
 //    val parted = rdd.partitionBy(parti)
 
-    val gridConfig = GridStrategy(5, pointsOnly = false)
+    val gridConfig = GridStrategy(5, pointsOnly = false, sampleFraction = 0)
 
     val parted = rdd.partitionBy(gridConfig)
     val parti = parted.partitioner match {

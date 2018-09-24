@@ -3,17 +3,15 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, Utils}
-import org.locationtech.jts.index.strtree.Boundable
 
 import scala.collection.JavaConverters._
 
 class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
                                         _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                         maxCost: Int, pointsOnly: Boolean)
-  extends SpatialPartitioner(_minX,_maxX,_minY, _maxY) {
+  extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
 
   require(maxCost > 0)
 
@@ -21,7 +19,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     this(samples, minMax._1, minMax._2, minMax._3, minMax._4, maxCost, pointsOnly)
 
   def this(samples: Seq[(G,V)], maxCost: Int, pointsOnly: Boolean = true) =
-    this(samples, maxCost, SpatialPartitioner.getMinMax(samples.iterator), pointsOnly)
+    this(samples, maxCost, GridPartitioner.getMinMax(samples.iterator), pointsOnly)
 
   protected[spatial] val partitions: Array[Cell] = {
 
@@ -34,10 +32,15 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       tree.insert(g.getGeo, dummy)
     }
 
-    val children = tree.getRoot.getChildBoundables.iterator().asScala
+    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
 
-    children.zipWithIndex.map{ case (child, idx) =>
-      val mbr = child.asInstanceOf[Boundable].getBounds.asInstanceOf[MBR]
+    //val children = tree.getRoot.getChildBoundables.iterator().asScala
+//    val children = tree.lastLevelNodes
+
+    val children = tree.queryBoundary().asScala
+
+    children.zipWithIndex.map{ case (mbr, idx) =>
+//      val mbr = child.getBounds.asInstanceOf[MBR]
       Cell(idx, Utils.fromEnvelope(mbr))
     }.toArray
   }
@@ -95,6 +98,8 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
 
 //      if(!pointsOnly)
         partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+    } else if(!pointsOnly) {
+      partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
 

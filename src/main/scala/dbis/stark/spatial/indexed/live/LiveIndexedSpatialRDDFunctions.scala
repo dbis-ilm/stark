@@ -2,10 +2,10 @@ package dbis.stark.spatial.indexed.live
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed._
-import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.partitioner.GridPartitioner
 import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.SpatialFilterRDD
+import org.apache.spark.{SpatialFilterRDD, SpatialRDD}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -15,13 +15,16 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                              indexConfig: IndexConfig
        ) extends SpatialRDDFunctions[G, V](self) with Serializable {
 
-  def intersects(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
+  override def intersects(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
 
-  def contains(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINS, Some(indexConfig))
+  override def contains(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINS, Some(indexConfig))
 
-  def containedby(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
+  override def covers(qry: G) = new SpatialFilterRDD[G,V](self, qry, JoinPredicate.COVERS, Some(indexConfig))
+  override def coveredby(qry: G) = new SpatialFilterRDD[G,V](self, qry, JoinPredicate.COVEREDBY, Some(indexConfig))
 
-  def withinDistance(
+  override def containedby(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINEDBY, Some(indexConfig))
+
+  override def withinDistance(
 		  qry: G,
 		  maxDist: Distance,
 		  distFunc: (STObject,STObject) => Distance
@@ -50,16 +53,16 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         }
 
 
-  def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
+  override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
     val r = self.mapPartitionsWithIndex({ (idx, iter) =>
-              val partitionCheck = self.partitioner.forall { p =>
-                p match {
-                  case sp: SpatialPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-                  case _ => true
-                }
-              }
-
-              if(partitionCheck) {
+//              val partitionCheck = self.partitioner.forall { p =>
+//                p match {
+//                  case sp: GridPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
+//                  case _ => true
+//                }
+//              }
+//
+//              if(partitionCheck) {
 
                 val tree = IndexFactory.get[G,(G,V)](indexConfig)
 
@@ -72,9 +75,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                 idxTree.build()
 
                 idxTree.kNN(qry, k, distFunc)
-              }
-              else
-                Iterator.empty
+//              }
+//              else
+//                Iterator.empty
 
             })
 
@@ -83,6 +86,34 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
           .take(k)
 
     self.sparkContext.parallelize(r)
+  }
+
+  override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
+    val knns = self.mapPartitions({iter =>
+      val tree = IndexFactory.get[G,(G,V)](indexConfig)
+
+      require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
+
+      val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
+
+      iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
+
+      idxTree.build()
+
+      val knnIter = idxTree.kNN(qry, k, distFunc)
+                            .map{ case (g,v) => (distFunc(g,qry),(g,v))}
+                            .toArray
+
+      val knn = new KNN[(G,V)](k)
+
+      knn.set(knnIter)
+      Iterator.single(knn)
+
+    }, true)
+        .reduce(_.merge(_))
+
+
+    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
   }
 
   /**
@@ -99,7 +130,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * and the parameter is the geometry of other
    * @return Returns an RDD containing the Join result
    */
-  def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = {
+  override def join[V2: ClassTag](other: RDD[(G,V2)], pred: (G,G) => Boolean, oneToManyPartitioning: Boolean) = {
     new SpatialJoinRDD(self, other, pred, oneToMany = oneToManyPartitioning)
   }
 
@@ -115,19 +146,39 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @param partitioner The partitioner to partition both RDDs with
    * @return Returns an RDD containing the Join result
    */
-  def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[SpatialPartitioner] = None, oneToManyPartitioning: Boolean = false) = {
+  override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false) = {
+//    if(SpatialRDD.isSpatialParti(self.partitioner) && self.partitioner == other.partitioner) {
+//      self.zipPartitions(other){ case (leftIter, rightIter) =>
+//
+//        if(leftIter.isEmpty || rightIter.isEmpty)
+//          Seq.empty[(V,V2)].iterator
+//        else {
+//          val predicateFunction = JoinPredicate.predicateFunction(pred)
+//
+//          val index = IndexFactory.get[G,V](indexConfig)
+//          leftIter.foreach{ case (g,v) => index.insert(g,v)}
+//
+//          rightIter.flatMap { case (rg, rv) =>
+//            index.query(rg)
+//              .filter { case (lg, _) => predicateFunction(lg, rg) }
+//              .map { case (_, lv) => (lv, rv) }
+//          }
+//        }
+//      }
+//    } else {
       new SpatialJoinRDD(
-          if(partitioner.isDefined) self.partitionBy(partitioner.get) else self,
-          if(partitioner.isDefined) other.partitionBy(partitioner.get) else other,
-          pred,
-        Some(indexConfig), oneToMany = oneToManyPartitioning)
+        if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
+        if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
+        pred,
+        Some(indexConfig), oneToMany = oneToMany)
+//    }
   }
 
-  def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {
+  override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = {
     new SpatialKnnJoinRDD(self, other, k, distFunc)
   }
-  
-  def cluster[KeyType](
+
+  override def cluster[KeyType](
 		  minPts: Int,
 		  epsilon: Double,
 		  keyExtractor: ((G,V)) => KeyType,

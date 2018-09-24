@@ -7,6 +7,7 @@ import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.partitioner.BSPartitioner
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.serializer.KryoSerializer
 
 
 object StarkTestUtils {
@@ -50,6 +51,8 @@ object StarkTestUtils {
 
   def createSparkContext(name: String, parallel: Int = 4) = {
     val conf = new SparkConf().setMaster(s"local[$parallel]").setAppName(name)
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     new SparkContext(conf)
   }
 

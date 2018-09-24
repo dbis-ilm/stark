@@ -1,10 +1,11 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.STObject
+import dbis.stark.{STObject, StarkKryoRegistrator}
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
 import org.apache.spark.SpatialRDD._
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.tagobjects.Slow
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -15,6 +16,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
 
   override def beforeAll() {
     val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2")
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
   }
 
@@ -86,7 +89,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMaxBlocks = SpatialPartitioner.getMinMax(rddblocks)
+    val minMaxBlocks = GridPartitioner.getMinMax(rddblocks)
     val sampleBlocks = rddblocks.sample(withReplacement = false, 0.1).collect()
     val partiBlocks = new RTreePartitioner(sampleBlocks, 10, minMaxBlocks, false)
 
@@ -94,7 +97,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMaxTaxi = SpatialPartitioner.getMinMax(rddtaxi)
+    val minMaxTaxi = GridPartitioner.getMinMax(rddtaxi)
     val partiTaxi = new RTreePartitioner(rddtaxi.sample(withReplacement = false, 0.1).collect(), 10, minMaxTaxi, false)
 
     val matches = for(t <- partiTaxi.partitions;
@@ -270,8 +273,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     val partedBlocks = rddBlocks.partitionBy(partiBlocksSample).cache()
 
     val start = System.currentTimeMillis()
-    val blocksTaxiJoin = partedBlocks.liveIndex(RTreeConfig(order = 5)).join(partedTaxi, JoinPredicate.INTERSECTS, oneToManyPartitioning = true)
-    val taxiBlocksJoin = partedTaxi.liveIndex(RTreeConfig(order = 5)).join(partedBlocks, JoinPredicate.INTERSECTS, oneToManyPartitioning = true)
+    val blocksTaxiJoin = partedBlocks.liveIndex(RTreeConfig(order = 5)).join(partedTaxi, JoinPredicate.INTERSECTS, oneToMany = true)
+    val taxiBlocksJoin = partedTaxi.liveIndex(RTreeConfig(order = 5)).join(partedBlocks, JoinPredicate.INTERSECTS, oneToMany = true)
 
     val blocksTaxiCnt = blocksTaxiJoin.sortByKey().collect()
     val taxiBlocksCnt = taxiBlocksJoin.sortByKey().collect()
@@ -312,7 +315,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     }
   }
 
-  it should "produce same join results with sampling as without" taggedAs (Sampling) in {
+  it should "produce same join results with sampling as without" taggedAs Sampling in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)

@@ -14,36 +14,38 @@ import PartitionStrategy._
 
 abstract class PartitionerConfig(val strategy: PartitionStrategy,
                                  pointsOnly: Boolean,
-                                 minmax: Option[(Double, Double, Double, Double)]
+                                 minmax: Option[(Double, Double, Double, Double)],
+                                 sampleFraction: Double = 0
                                 ) extends Serializable
 
 case class BSPStrategy(cellSize: Double,
                        maxCost: Double,
                        pointsOnly: Boolean = false,
                        minmax: Option[(Double, Double, Double, Double)] = None,
-                       sampleFactor: Double = 0
-                      ) extends PartitionerConfig(PartitionStrategy.BSP, pointsOnly, minmax)
+                       sampleFraction: Double = 0
+                      ) extends PartitionerConfig(PartitionStrategy.BSP, pointsOnly, minmax, sampleFraction)
 
 case class GridStrategy(partitionsPerDimensions: Int,
                         pointsOnly: Boolean = false,
-                        minmax: Option[(Double, Double, Double, Double)] = None
-                      ) extends PartitionerConfig(PartitionStrategy.GRID, pointsOnly, minmax)
+                        minmax: Option[(Double, Double, Double, Double)] = None,
+                        sampleFraction: Double
+                      ) extends PartitionerConfig(PartitionStrategy.GRID, pointsOnly, minmax, sampleFraction)
 
 case class RTreeStrategy(order: Int, pointsOnly: Boolean = false,
                          minmax: Option[(Double, Double, Double, Double)] = None,
-                         sampleFactor: Double = 0) extends PartitionerConfig(PartitionStrategy.RTREE, pointsOnly, minmax)
+                         sampleFraction: Double = 0) extends PartitionerConfig(PartitionStrategy.RTREE, pointsOnly, minmax,sampleFraction)
 
 
 object PartitionerFactory {
-  def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): SpatialPartitioner = strategy match {
+  def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): GridPartitioner = strategy match {
     case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor) => minmax match {
       case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly)
       case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor)
     }
 
-    case GridStrategy(partitionsPerDimensions, pointsOnly, minmax) => minmax match {
+    case GridStrategy(partitionsPerDimensions, pointsOnly, minmax, sampleFraction) => minmax match {
       case None => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly)
-      case Some(mm) => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2)
+      case Some(mm) => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction)
     }
 
     case RTreeStrategy(order, pointsOnly, minmax, sampleFactor) =>

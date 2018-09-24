@@ -53,7 +53,7 @@ class STSparkContext(private val sc: SparkContext) {
     if(partitionstoLoad.isEmpty)
       sc.emptyRDD[T]
     else
-      sc.objectFile(partitionstoLoad)
+      sc.objectFile[T](partitionstoLoad)
   }
 
   def tileFiles(folderPath: String, filePrefix: String, tileWidth: Int, tileHeight: Int, totalWidth: Int): RDD[Tile[Double]] = {

@@ -4,7 +4,7 @@ import dbis.stark.ScalarDistance._
 import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial.indexed.{IndexConfig, IntervalTreeConfig, QuadTreeConfig, RTreeConfig}
 import dbis.stark.spatial._
-import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
+import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner, TemporalRangePartitioner}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.expressions.UserDefinedFunction

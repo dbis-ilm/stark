@@ -1,4 +1,4 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.partitioner
 
 import dbis.stark.{Interval, STObject, TemporalExpression}
 import org.apache.spark.rdd.RDD
@@ -13,9 +13,7 @@ import scala.reflect.ClassTag
 object TemporalRangePartitioner {
 
   def getCellId(start: Long, cells: Array[Long], partitions: Int): Int = {
-    //println(cells.mkString(" "))
     for (i <- 1 until partitions) {
-      //println(cells(i)+">"+start)
       if (cells(i) > start) {
         return i - 1
       }
@@ -42,12 +40,10 @@ object TemporalRangePartitioner {
 }
 
 
-class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](
-                                                                       rdd: RDD[(G, V)],
-                                                                       partitions: Int,
-                                                                       autoRange: Boolean,
-                                                                       _minT: Long,
-                                                                       _maxT: Long, sampelsize: Double) extends TemporalPartitioner(_minT, _maxT) {
+class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G, V)],
+                                                                      partitions: Int, autoRange: Boolean,
+                                                                       _minT: Long, _maxT: Long, sampelsize: Double)
+  extends TemporalPartitioner(_minT, _maxT) {
 
 
 
@@ -59,7 +55,7 @@ class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](
       val sample = rdd.sample(withReplacement = false, sampelsize).map(x => x._1.getTemp.get.start)
       val sorted = sample.sortBy(k => k.value).collect()
 
-      println("autorange from Temporalpartitioner is on | sampelfaktor: " + sampelsize + " | sampelsize: " + sorted.length)
+//      println("autorange from Temporalpartitioner is on | sampelfaktor: " + sampelsize + " | sampelsize: " + sorted.length)
 
       val maxitems = Math.round(sorted.length / partitions)
 

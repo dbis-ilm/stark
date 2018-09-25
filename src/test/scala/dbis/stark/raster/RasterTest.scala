@@ -2,8 +2,8 @@ package dbis.stark.raster
 
 import java.nio.file.{Files, Paths}
 
-import dbis.stark.{STObject, TestUtils}
-import dbis.stark.TestUtils.makeTimeStamp
+import dbis.stark.{STObject, StarkTestUtils}
+import dbis.stark.StarkTestUtils.makeTimeStamp
 import dbis.stark.spatial.STSparkContext
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -12,7 +12,7 @@ class RasterTest extends FlatSpec with Matchers with BeforeAndAfterAll{
   private var sc: SparkContext = _
 
   override def beforeAll() {
-    sc = TestUtils.createSparkContext("spatialrddtestcase")
+    sc = StarkTestUtils.createSparkContext("spatialrddtestcase")
   }
 
   override def afterAll() {

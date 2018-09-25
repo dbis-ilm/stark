@@ -70,9 +70,22 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
                         indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(Tile[U],P)] =
     new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany)
 
+  def joinWithAggregate[P: ClassTag, R](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, aggregate: Tile[U] => R, indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(R,P)] =
+    new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany).map{ case (tile, p) => (aggregate(tile), p)}
+
   def join[P: ClassTag](other: RDD[Index[P]], pixelDefault: U, predicate: JoinPredicate, oneToMany: Boolean): RDD[(Tile[U],P)] = {
     RasterJoinIndexedVectorRDD(this, other, predicate, pixelDefault, oneToMany)
   }
+
+  def joinWithAggregate[P: ClassTag, R](other: RDD[Index[P]], pixelDefault: U, predicate: JoinPredicate, oneToMany: Boolean, aggregate: Tile[U] => R): RDD[(R,P)] = {
+    RasterJoinIndexedVectorRDD(this, other, predicate, pixelDefault, oneToMany).map{ case (tile, p) =>
+      (aggregate(tile), p)
+    }
+  }
+
+  def join[P: ClassTag, R: ClassTag](other: RasterRDD[P], predicate: JoinPredicate, func: (U,P) => R, oneToMany: Boolean) =
+    RasterJoinRDD(this, other, predicate, func, oneToMany)
+
 }
 
 

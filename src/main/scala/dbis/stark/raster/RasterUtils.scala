@@ -1,6 +1,5 @@
 package dbis.stark.raster
 
-import breeze.collection.mutable.SparseArray
 import dbis.stark.STObject.{GeoType, MBR}
 import org.locationtech.jts.geom.GeometryFactory
 
@@ -40,20 +39,25 @@ object RasterUtils {
     // convert back to tile
     val intersectionTile = mbrToTile[U](matchingTileMBR, default, tile.pixelWidth)
 
-    /**
-      * Helper method to apply intersection or containment operation
-      * @param pixelGeo The vector representation of a pixel
-      * @return True if the global filter matches (intersects/contains) with a pixel
-      */
-    @inline
-    /* Note, the underlying implementation of intersects and contains should do some
-     * optimizations such as MBR checks and rectangle optimizations. JTS does this.s
-     */
-    def matches(pixelGeo: GeoType): Boolean = if(isIntersects) {
-      geo.intersects(pixelGeo)
-    } else {
-      geo.contains(pixelGeo)
-    }
+//    /**
+//      * Helper method to apply intersection or containment operation
+//      * @param pixelGeo The vector representation of a pixel
+//      * @return True if the global filter matches (intersects/contains) with a pixel
+//      */
+//    @inline
+//    /* Note, the underlying implementation of intersects and contains should do some
+//     * optimizations such as MBR checks and rectangle optimizations. JTS does this.
+//     */
+//    def matches(pixelGeo: GeoType): Boolean = if(isIntersects) {
+//      geo.intersects(pixelGeo)
+//    } else {
+//      geo.contains(pixelGeo)
+//    }
+
+    val matchFunc = if(isIntersects)
+      geo.intersects _
+    else
+      geo.contains _
 
     // loop over all lines
     var j = 0
@@ -76,14 +80,14 @@ object RasterUtils {
          * or, if the current pixel is not within the requested filter region
          * return the default value
          */
-        val origValue = if(matches(pixelGeo)) {
+        val origValue = if(matchFunc(pixelGeo)) { //if(matches(pixelGeo)) {
 
           try {
             tile.value(origX, origY)
           } catch {
             case e: ArrayIndexOutOfBoundsException =>
               println(s"tile: $tile")
-              println(s"i=$i j=$j  ==> x=$origX y=$origY ==> pos=${tile.pos(origX, origY)}")
+              println(s"i=$i j=$j  ==> x=$origX y=$origY ==> pos=${tile.idxFromPos(origX, origY)}")
               sys.error(e.getMessage)
           }
         } else {
@@ -116,8 +120,11 @@ object RasterUtils {
     */
   @inline
   def tileToGeo(tile: Tile[_]): GeoType =
-    geoFactory.toGeometry(new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly))
+    geoFactory.toGeometry(tileToMBR(tile))
 
+  @inline
+  def tileToMBR(tile: Tile[_]): MBR =
+    new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly)
 
   def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Short = 1): Tile[U] =
     new Tile[U](mbr.getMinX,mbr.getMaxY,
@@ -125,5 +132,29 @@ object RasterUtils {
       pixelWidth,
       default
     )
+
+  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Short): Tile[U] = {
+    val width = (math.ceil(mbr.getWidth) / pixelWidth).toInt
+    val height = (math.ceil(mbr.getHeight) / pixelWidth).toInt
+    new Tile[U](mbr.getMinX,mbr.getMaxY,
+      width, height,
+      Array.tabulate(width*height){ idx =>
+
+        val (i,j) = (idx % width, idx / width)
+        val (posX, posY) = (mbr.getMinX + ((i % width) * pixelWidth), mbr.getMaxY - ((j / width) * pixelWidth))
+
+
+        computer(posX, posY)
+      },
+      pixelWidth
+    )
+  }
+
+
+  def intersects(left: Tile[_], right: Tile[_]): Boolean =
+    tileToMBR(left).intersects(tileToMBR(right))
+
+  def contains(left: Tile[_], right: Tile[_]): Boolean =
+    tileToMBR(left).contains(tileToMBR(right))
 
 }

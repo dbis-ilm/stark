@@ -70,9 +70,7 @@ class STSparkContext(private val sc: SparkContext) {
     for(f <- fileList) {
       if(f.getName.startsWith(filePrefix)) {
         val data = Source.fromFile(f)
-          .getLines()
-          .map(_.split(",").map(_.toDouble))
-          .flatten
+          .getLines().flatMap(_.split(",").map(_.toDouble))
           .toArray
 
         tileList ::= Tile[Double](uplx, uply + tileHeight, tileWidth, tileHeight, data)

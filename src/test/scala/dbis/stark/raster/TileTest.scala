@@ -68,8 +68,8 @@ class TileTest extends FlatSpec with Matchers {
   it should "compute correct position" in {
     val tile = Tile(ulx = 0, uly = 3,  3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0), pixelWidth = 1)
 
-    tile.pos(0.5, 0.5) shouldBe 6
-    tile.pos(0, 3) shouldBe 0
+    tile.idxFromPos(0.5, 0.5) shouldBe 6
+    tile.idxFromPos(0, 3) shouldBe 0
 
   }
 
@@ -77,9 +77,9 @@ class TileTest extends FlatSpec with Matchers {
 
     val tile = new Tile(ulx = 0, uly = 11,  16, 11)
 
-    tile.pos(0.5, 10.5) shouldBe 0
-    tile.pos(4.5, 6.5) shouldBe 68
-    tile.pos(14.5, 0.5) shouldBe 174
+    tile.idxFromPos(0.5, 10.5) shouldBe 0
+    tile.idxFromPos(4.5, 6.5) shouldBe 68
+    tile.idxFromPos(14.5, 0.5) shouldBe 174
 
   }
 
@@ -110,9 +110,9 @@ class TileTest extends FlatSpec with Matchers {
 
     val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
 
-    tile.pos(12.5, 7.5) shouldBe 16
-    tile.pos(16.5, 5.5) shouldBe 34
-    tile.pos(10.5, 9.5) shouldBe 0
+    tile.idxFromPos(12.5, 7.5) shouldBe 16
+    tile.idxFromPos(16.5, 5.5) shouldBe 34
+    tile.idxFromPos(10.5, 9.5) shouldBe 0
 
   }
 

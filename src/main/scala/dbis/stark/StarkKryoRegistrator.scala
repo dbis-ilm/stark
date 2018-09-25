@@ -17,6 +17,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Interval], temporalSerializer)
 
     val geometrySerializer = new GeometrySerializer()
+//    val geometrySerializer = new GeometryAsStringSerializer
 
 //    kryo.register(classOf[Geometry]) // use Kryo's default serializer for everything else -- does this work?
 
@@ -41,6 +42,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[IntervalDistance], distanceSerializer)
 
     kryo.register(classOf[KNN[_]], new KnnSerializer)
+//    kryo.register(classOf[KNN[_]])
 
     kryo.register(classOf[Skyline[_]], new SkylineSerializer)
 

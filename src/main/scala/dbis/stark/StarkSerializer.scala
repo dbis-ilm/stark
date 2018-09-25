@@ -6,6 +6,7 @@ import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.CellHistogram
 import dbis.stark.spatial._
 import org.locationtech.jts.geom._
+import org.locationtech.jts.io.{WKTReader, WKTWriter}
 
 import scala.collection.mutable.ListBuffer
 
@@ -39,26 +40,26 @@ class SkylineSerializer extends Serializer[Skyline[Any]] {
 }
 
 object DistanceSerializer {
-  private val scalar: Byte = 0x0
-  private val interval: Byte = 0x1
+  private val SCALARDIST: Byte = 0x0
+  private val INTERVALDIST: Byte = 0x1
 }
 
 class DistanceSerializer extends Serializer[Distance] {
   override def write(kryo: Kryo, output: Output, dist: Distance): Unit = dist match {
     case sd: ScalarDistance =>
-      output.writeByte(DistanceSerializer.scalar)
+      output.writeByte(DistanceSerializer.SCALARDIST)
       output.writeDouble(sd.value)
     case IntervalDistance(min,max) =>
-      output.writeByte(DistanceSerializer.interval)
+      output.writeByte(DistanceSerializer.INTERVALDIST)
       output.writeDouble(min)
       output.writeDouble(max)
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[Distance]): Distance = input.readByte() match {
-    case DistanceSerializer.scalar =>
+    case DistanceSerializer.SCALARDIST =>
       val v = input.readDouble()
       ScalarDistance(v)
-    case DistanceSerializer.interval =>
+    case DistanceSerializer.INTERVALDIST =>
       val min = input.readDouble()
       val max = input.readDouble()
       IntervalDistance(min, max)
@@ -74,10 +75,20 @@ class KnnSerializer extends Serializer[KNN[Any]] {
     output.writeInt(knn.posMin, true)
     output.writeInt(knn.m, true)
 
-    knn.iterator.foreach{ case (dist,v) =>
+    var firstNull = knn.nn.indexWhere(_ == null)
+    firstNull = if(firstNull < 0) knn.k else firstNull
+
+    output.writeInt(firstNull, true)
+
+    var i = 0
+    while(i < firstNull) {
+      val (dist,v) = knn.nn(i)
       kryo.writeObject(output, dist, distSerializer)
       kryo.writeClassAndObject(output, v)
+
+      i += 1
     }
+
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[KNN[Any]]): KNN[Any] = {
@@ -86,9 +97,13 @@ class KnnSerializer extends Serializer[KNN[Any]] {
     val posMin = input.readInt(true)
     val m = input.readInt(true)
 
+    var firstNull = input.readInt(true)
+    firstNull = if(firstNull < 0) k else firstNull
+
     val objs = new Array[(Distance,Any)](k)
+
     var i = 0
-    while(i <= m) {
+    while(i < firstNull) {
       val dist = kryo.readObject(input, classOf[Distance], distSerializer)
       val v = kryo.readClassAndObject(input).asInstanceOf[Any]
 
@@ -96,11 +111,14 @@ class KnnSerializer extends Serializer[KNN[Any]] {
       i += 1
     }
 
+
     val knn = new KNN[Any](k)
     knn.m = m
     knn.posMin = posMin
     knn.posMax = posMax
     knn.nn = objs
+
+//    println(s"\ndeserialied $knn")
 
     knn
   }
@@ -252,9 +270,45 @@ class EnvelopeSerializer extends Serializer[Envelope] {
 }
 
 object GeometrySerializer {
-  private val POINT: Byte = 0x0
-  private val POLYGON: Byte = 0x1
-  private val LINESTRING: Byte = 0x2
+  val POINT: Byte = 0x0
+  val POLYGON: Byte = 0x1
+  val LINESTRING: Byte = 0x2
+}
+
+class GeometryAsStringSerializer extends Serializer[Geometry] {
+  override def write(kryo: Kryo, output: Output, geom: Geometry) = {
+    val writer = new WKTWriter(2)
+    val offset = geom match {
+      case _:Point =>
+        output.writeByte(GeometrySerializer.POINT)
+        "point".length
+      case _:LineString =>
+        output.writeByte(GeometrySerializer.LINESTRING)
+        "linestring".length
+      case _:Polygon =>
+        output.writeByte(GeometrySerializer.POLYGON)
+        "polygon".length
+    }
+
+    val txt = writer.write(geom)
+    val toWrite = txt.substring(offset, txt.length - 1)
+    output.writeString(toWrite)
+  }
+
+  override def read(kryo: Kryo, input: Input, `type`: Class[Geometry]) = {
+    val reader = new WKTReader()
+
+    val geoType = input.readByte()
+    val str = input.readString()
+
+    val strType = geoType match {
+      case GeometrySerializer.POINT => "POINT("
+      case GeometrySerializer.LINESTRING => "LINESTRING("
+      case GeometrySerializer.POLYGON => "POLYGON("
+    }
+
+    reader.read(s"$strType$str)")
+  }
 }
 
 class GeometrySerializer extends Serializer[Geometry] {

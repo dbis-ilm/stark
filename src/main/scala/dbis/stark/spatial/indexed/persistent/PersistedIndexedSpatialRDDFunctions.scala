@@ -73,24 +73,55 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
   override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] = {
 
+//    val knns = self.mapPartitions({ trees =>
+//      trees.flatMap { tree =>
+//        require(tree.isInstanceOf[KnnIndex[_]], s"kNN function requires KnnIndex but got: ${tree.getClass}")
+//        val knnIter = tree.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)
+//          .map{ case (g,v) => (distFunc(g,qry), (g,v))}
+//          .toIndexedSeq
+//
+//        val knn = new KNN[(G,V)](k)
+//        knn.set(knnIter)
+//
+//        Iterator.single(knn)
+//
+//      }
+//    }, true)
+//        .reduce(_.merge(_))
+//
+//    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
+val knns = self.mapPartitions({ trees =>
+  trees.flatMap { tree =>
+    require(tree.isInstanceOf[KnnIndex[_]], s"kNN function requires KnnIndex but got: ${tree.getClass}")
+    tree.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)
+      .map{ case (g,v) => (distFunc(g,qry), (g,v))}
+  }
+}, true)
+
+    implicit val ord = new Ordering[(Distance,(G,V))] {
+      override def compare(x: (Distance,(G,V)), y: (Distance,(G,V))) = if(x._1 < y._1) -1 else if(x._1 > y._1) 1 else 0
+    }
+    val theKnn = knns.takeOrdered(k)(ord).toSeq
+
+    self.sparkContext.parallelize(theKnn).map{ case (d,(g,v)) => (g,(d,v))}
+  }
+
+
+  def knnAgg2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] = {
     val knns = self.mapPartitions({ trees =>
       trees.flatMap { tree =>
         require(tree.isInstanceOf[KnnIndex[_]], s"kNN function requires KnnIndex but got: ${tree.getClass}")
-        val knnIter = tree.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)
+        tree.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)
           .map{ case (g,v) => (distFunc(g,qry), (g,v))}
-          .toIndexedSeq
-
-        val knn = new KNN[(G,V)](k)
-        knn.set(knnIter)
-
-        Iterator.single(knn)
-
       }
     }, true)
-        .reduce(_.merge(_))
 
-    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
+    implicit val ord = new Ordering[(Distance,(G,V))] {
+      override def compare(x: (Distance,(G,V)), y: (Distance,(G,V))) = if(x._1 < y._1) -1 else if(x._1 > y._1) 1 else 0
+    }
+    val theKnn = knns.takeOrdered(k)(ord.reverse).toSeq
 
+    self.sparkContext.parallelize(theKnn).map{ case (d,(g,v)) => (g,(d,v))}
   }
 
   override def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =

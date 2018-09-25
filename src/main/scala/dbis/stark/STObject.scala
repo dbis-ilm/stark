@@ -5,7 +5,7 @@ package dbis.stark
 import STObject._
 import dbis.stark.spatial.Utils
 import org.locationtech.jts.geom._
-import org.locationtech.jts.io.WKTReader
+import org.locationtech.jts.io.{WKTReader, WKTWriter}
 
 /**
  * A STObject represents some spatial geometry. It can also have
@@ -126,6 +126,10 @@ case class STObject(
 
   def getGeo = g
   def getTemp = time
+
+  lazy val wkt = {
+    new WKTWriter().write(g)
+  }
   
 }
 

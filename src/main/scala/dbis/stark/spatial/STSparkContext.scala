@@ -38,22 +38,22 @@ class STSparkContext(private val sc: SparkContext) {
     * @param qry The query object used to decide which partition to load
     * @return Returns the [[org.apache.spark.rdd.RDD]]
     */
-  def textFile(path: String, qry: STObject): RDD[String] = {
+  def textFile(path: String, qry: STObject, minPartitions: Int = sc.defaultMinPartitions): RDD[String] = {
     val partitionsToLoad: String = getPartitionsToLoad(path, qry)
 
     if(partitionsToLoad.isEmpty)
       sc.emptyRDD[String]
     else
-      sc.textFile(partitionsToLoad)
+      sc.textFile(partitionsToLoad, minPartitions)
   }
 
-  def objectFile[T : ClassTag](path: String, qry: STObject): RDD[T] = {
+  def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int = sc.defaultMinPartitions): RDD[T] = {
     val partitionstoLoad = getPartitionsToLoad(path, qry)
 
     if(partitionstoLoad.isEmpty)
       sc.emptyRDD[T]
     else
-      sc.objectFile[T](partitionstoLoad)
+      sc.objectFile[T](partitionstoLoad, minPartitions)
   }
 
   def tileFiles(folderPath: String, filePrefix: String, tileWidth: Int, tileHeight: Int, totalWidth: Int): RDD[Tile[Double]] = {

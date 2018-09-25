@@ -5,6 +5,8 @@ import dbis.stark.Distance
 
 case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterable[(Distance, PayloadT)] {
 
+  override def toString() = s"""KNN(k=$k, m=$m, min=$posMin, max=$posMax, nn=${nn.mkString(",")}"""
+
   var nn = new Array[(Distance, PayloadT)](k)
   protected[stark] var posMax = -1
   private[stark] var posMin = -1
@@ -14,14 +16,17 @@ case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterab
   def min = nn(posMin)
   def max = nn(posMax)
   def full = m >= k
+  def empty = m < 0
 
   protected[spatial] def set(nns: IndexedSeq[(Distance, PayloadT)]) = {
-    require(nns.length == k, "provided list must have exactly length k")
+//    require(nns.length == k, "provided list must have exactly length k")
+
+//    println(s"before   set: $this")
 
     var i = 0
     var maxPos = -1
     var minPos = -1
-    while(i < k) {
+    while(i < nns.length) {
       nn(i) = nns(i)
       if(i == 0) {
         minPos = 0
@@ -34,9 +39,14 @@ case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterab
           minPos = i
       }
 
+      i += 1
     }
 
-    m = k
+    m = nns.length - 1
+    posMax = maxPos
+    posMin = minPos
+
+//    println(s"after set: $this")
   }
 
   def insert(tuple: (Distance,PayloadT)) = {
@@ -69,18 +79,28 @@ case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterab
     }
   }
 
-//  def clone(): KNN[PayloadT] = {
-//    val arr = Array.tabulate(k){ i =>
-//      nn(i)
-//    }
-//    new
-//  }
+  override def clone(): KNN[PayloadT] = {
+    val arr = new Array[(Distance, PayloadT)](k)
+    Array.copy(nn,0,arr,0,k)
+
+    val newKnn = new KNN[PayloadT](k)
+    newKnn.m = m
+    newKnn.posMax = posMax
+    newKnn.posMin = posMin
+    newKnn.nn = arr
+    newKnn
+  }
 
   def merge(other: KNN[PayloadT]): KNN[PayloadT] = {
-    if(full && other.min._1 > max._1)
-      this
+    if(empty)
+      other.clone()
+    else if(other.empty || (full && other.min._1 > max._1))
+      this.clone()
     else {
-      val knn = this //.clone()
+//    else if(other.empty || (full && other.min._1 > max._1))
+//      this.clone()
+//    else {
+      val knn = this.clone()
 
       other.iterator.foreach(knn.insert)
 
@@ -93,7 +113,8 @@ case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterab
     while(i < m+1) {
       if(nn(i)._1 > nn(posMax)._1)
         posMax = i
-      else if(nn(i)._1 < nn(posMin)._1)
+
+      if(nn(i)._1 < nn(posMin)._1)
         posMin = i
 
       i += 1

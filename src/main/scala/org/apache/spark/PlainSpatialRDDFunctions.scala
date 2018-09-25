@@ -25,32 +25,37 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                        self: RDD[(G,V)]
   ) extends SpatialRDDFunctions[G,V](self) with Serializable {
 
-  // FIXME: won't write anything if no partitioner is set!
-  // FIXME: writes the (STObject,Payload) tuple as text - need a formatter function!
-  def saveAsStarkTextFile(path: String): Unit = self.partitioner.foreach {
-    case sp: GridPartitioner =>
-      val wkts = self.partitions.indices.map{ i =>
-        Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
-      }
+  def saveAsStarkTextFile(path: String, formatter: ((G,V)) => String): Unit =
+    self.partitioner.flatMap{
+      case sp: GridPartitioner => Some(sp)
+      case _ => None
+    } match {
+      case Some(sp) =>
+        val wkts = self.partitions.indices.map{ i =>
+          Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+        }
 
-      self.saveAsTextFile(path)
-      self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+        self.map(formatter).saveAsTextFile(path)
+        self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+      case _ =>
+        self.saveAsTextFile(path)
+    }
 
-    // in case there is no or not a spatial partitioner, use normal save
-    case _ => self.saveAsTextFile(path)
-  }
 
-  def saveAsStarkObjectFile(path: String): Unit = self.partitioner.foreach {
-    case sp: GridPartitioner =>
+
+  def saveAsStarkObjectFile(path: String): Unit = self.partitioner.flatMap{
+    case sp: GridPartitioner => Some(sp)
+    case _ => None
+  } match {
+    case Some(sp) =>
       val wkts = self.partitions.indices.map{ i =>
         Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
       }
 
       self.saveAsObjectFile(path)
       self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
-
-    // in case there is no or not a spatial partitioner, use normal save
-    case _ => self.saveAsObjectFile(path)
+    case _ =>
+      self.saveAsObjectFile(path)
   }
 
   /**
@@ -77,7 +82,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = self.withScope{
-//    // compute k NN for each partition individually --> n * k results
+    // compute k NN for each partition individually --> n * k results
     val r = self.mapPartitions({iter => iter.map { case (g,v) =>
         val d = distFunc(g,qry)
         (g,(d,v)) // compute and return distance

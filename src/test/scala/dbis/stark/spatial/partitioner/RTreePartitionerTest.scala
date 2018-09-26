@@ -379,8 +379,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     withClue("compared with no partitioning") { joinResSamCnt shouldBe countNoPart}
     withClue("different join results"){joinResSamCnt should equal(joinResPlainCnt)}
 
-    println(s"sampled join: ${end - start} ms")
-    println(s"plain join: ${end2 - start2} ms")
+    println(s"sampled join: ${end - start} ms: $joinResSamCnt")
+    println(s"plain join: ${end2 - start2} ms: $joinResPlainCnt")
 
     //    joinResSam should contain theSameElementsAs joinResPlain
   }

@@ -116,21 +116,31 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
 
   it should "correctly join with single point and polygon" in {
 
-    val pointsRDD = sc.parallelize(Seq(
-      (STObject("POINT (77.64656066894531  23.10247055501927)"),1)))
+    val thePoint = STObject("POINT (77.64656066894531  23.10247055501927)")
+    val thePolygon = STObject("POLYGON ((77.2723388671875 23.332168306311473, 77.8436279296875 23.332168306311473, " +
+      "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
+      "77.2723388671875 23.332168306311473))")
 
-    val polygonsRDD = sc.parallelize(Seq(
-      (STObject("POLYGON ((77.2723388671875 23.332168306311473, 77.8436279296875 23.332168306311473, " +
-        "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
-        "77.2723388671875 23.332168306311473))"),1)))
+    withClue("premis: polygon contains point does not hold") { thePolygon contains thePoint}
+
+    val pointsRDD = sc.parallelize(Seq((thePoint,1)))
+
+    val polygonsRDD = sc.parallelize(Seq((thePolygon,1)))
 
 
 
-    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 5, pointsOnly = true)
+    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 1, pointsOnly = true)
     val pointsPart = pointsRDD.partitionBy(pointsGrid)
 
-    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 5, pointsOnly = false)
+//    val pointPartitionId = pointsGrid.getPartition(thePoint)
+//    println(pointsGrid.partitions(pointPartitionId)._1)
+
+    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 1, pointsOnly = false)
     val polygonsPart = polygonsRDD.partitionBy(polygonsGrid)
+
+//    val polyPartitionId = polygonsGrid.getPartition(thePolygon)
+//    println(polygonsGrid.partitions(polyPartitionId)._1)
+
 
     val joined = polygonsPart.join(pointsPart, JoinPredicate.CONTAINS)
 
@@ -147,10 +157,10 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 5, pointsOnly = true)
+    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 1, pointsOnly = true)
     val pointsPart = pointsRDD.partitionBy(pointsGrid)
 
-    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 5, pointsOnly = false)
+    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 1, pointsOnly = false)
     val polygonsPart = polygonsRDD.partitionBy(polygonsGrid)
 
     val joined = pointsPart.join(polygonsPart, JoinPredicate.CONTAINEDBY)
@@ -168,10 +178,10 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 5, pointsOnly = true)
+    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 1, pointsOnly = true)
     val pointsPart = pointsRDD.partitionBy(pointsGrid)
 
-    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 5, pointsOnly = false)
+    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 1, pointsOnly = false)
     val polygonsPart = polygonsRDD.partitionBy(polygonsGrid)
 
     val joined = pointsPart.join(polygonsPart, JoinPredicate.INTERSECTS)
@@ -189,10 +199,10 @@ class SpatialGridPartitionerTest extends FlatSpec with Matchers with BeforeAndAf
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 5, pointsOnly = true)
+    val pointsGrid = new SpatialGridPartitioner(pointsRDD, partitionsPerDimension = 1, pointsOnly = true)
     val pointsPart = pointsRDD.partitionBy(pointsGrid)
 
-    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 5, pointsOnly = false)
+    val polygonsGrid = new SpatialGridPartitioner(polygonsRDD,partitionsPerDimension = 1, pointsOnly = false)
     val polygonsPart = polygonsRDD.partitionBy(polygonsGrid)
 
     val joined = polygonsPart.join(pointsPart, JoinPredicate.INTERSECTS)

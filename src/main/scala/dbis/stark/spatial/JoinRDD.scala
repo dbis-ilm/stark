@@ -91,7 +91,6 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
     val parts = ListBuffer.empty[Partition]
 
     if (leftPartitioner.isDefined && leftPartitioner == rightPartitioner) {
-
       left.partitions.iterator.zip(right.partitions.iterator).foreach { case (l, r) =>
         if (oneToMany)
           parts += OneToManyPartition(l.index, left, right, l.index, Seq(r.index))

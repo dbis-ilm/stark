@@ -45,7 +45,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
   protected[this] val yLength: Double = math.abs(maxY - minY) / partitionsPerDimension
 
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
-  private val partitions: Array[(Cell,Int)] = {
+  private[partitioner] val partitions: Array[(Cell,Int)] = {
     if(pointsOnly) {
       GridPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
     } else {

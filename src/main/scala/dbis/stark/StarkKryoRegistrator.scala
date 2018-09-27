@@ -10,6 +10,8 @@ import org.locationtech.jts.geom._
 class StarkKryoRegistrator extends KryoRegistrator {
 
   override def registerClasses(kryo: Kryo): Unit = {
+    kryo.setReferences(true)
+//    kryo.setCopyReferences(true)
 
     val temporalSerializer = new TemporalSerializer()
 

@@ -456,12 +456,14 @@ class StarkSerializer extends Serializer[(STObject, Any)] {
   val soSerializer = new STObjectSerializer
 
   override def write(kryo: Kryo, output: Output, obj: (STObject, Any)): Unit = {
+
     kryo.writeObject(output, obj._1, soSerializer)
     kryo.writeClassAndObject(output, obj._2)
   }
 
   override def read(kryo: Kryo, input: Input, dType: Class[(STObject,Any)]): (STObject,Any) = {
     val so = kryo.readObject(input, classOf[STObject], soSerializer)
+    kryo.reference(so)
     val payload = kryo.readClassAndObject(input)
 
     (so, payload)

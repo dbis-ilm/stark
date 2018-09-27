@@ -1,11 +1,11 @@
 package dbis.stark.spatial.indexed.live
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.partitioner.GridPartitioner
-import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.{SpatialFilterRDD, SpatialRDD}
+import org.apache.spark.SpatialFilterRDD
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -55,32 +55,16 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
     val r = self.mapPartitionsWithIndex({ (idx, iter) =>
-//              val partitionCheck = self.partitioner.forall { p =>
-//                p match {
-//                  case sp: GridPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-//                  case _ => true
-//                }
-//              }
-//
-//              if(partitionCheck) {
 
                 val tree = IndexFactory.get[G,(G,V)](indexConfig)
-
                 require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
 
                 val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
-
                 iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
 
                 idxTree.build()
-
                 idxTree.kNN(qry, k, distFunc)
-//              }
-//              else
-//                Iterator.empty
-
             })
-
           .map { case (g,v) => (g, (distFunc(g,qry), v)) }
           .sortBy(_._2._1, ascending = true)
           .take(k)
@@ -115,6 +99,8 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
   }
+
+  override def knnTake(qry: G, k: Int, distFunc: (STObject, STObject) => Distance) = kNN(qry, k, distFunc)
 
   /**
    * Perform a spatial join using the given predicate function.

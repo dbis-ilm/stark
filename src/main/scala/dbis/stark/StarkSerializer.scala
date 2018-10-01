@@ -426,6 +426,41 @@ class TemporalSerializer extends Serializer[TemporalExpression] {
   }
 }
 
+//class DistSeqSerializer extends Serializer[List[(Distance, (STObject, Any))]] {
+//
+//  val distanceSerializer = new DistanceSerializer
+//  val soSerializer = new STObjectSerializer
+//
+//  override def write(kryo: Kryo, output: Output, seq: List[(Distance, (STObject, Any))]) = {
+//    println("write seq")
+//    output.writeInt(seq.length, true)
+//    seq.foreach{ case (d, (g,v)) =>
+//      kryo.writeObject(output, d, distanceSerializer)
+//      kryo.writeObject(output, g, soSerializer)
+//      kryo.writeClassAndObject(output, v)
+//    }
+//  }
+//
+//  override def read(kryo: Kryo, input: Input, `type`: Class[List[(Distance, (STObject, Any))]]) = {
+//    println("read seq")
+//    val n = input.readInt(true)
+//
+//    val l = ListBuffer.empty[(Distance, (STObject, Any))]
+//    var i = 0
+//    while(i < n) {
+//      val dist = kryo.readObject(input, classOf[Distance], distanceSerializer)
+//      val so = kryo.readObject(input, classOf[STObject], soSerializer)
+//      val v = kryo.readClassAndObject(input).asInstanceOf[Any]
+//
+//      l += ((dist, (so,v)))
+//
+//      i += 1
+//    }
+//
+//    l.toList
+//  }
+//}
+
 class STObjectSerializer extends Serializer[STObject] {
 
   val geometrySerializer = new GeometrySerializer()

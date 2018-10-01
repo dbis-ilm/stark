@@ -39,17 +39,17 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 //  "The BSP partitioner"
   it  should "find correct min/max values" in {
-    
-    val rdd = createRDD()    
-    
+
+    val rdd = createRDD()
+
     val parti = new BSPartitioner(rdd, 1, 1, pointsOnly = true)
-    
+
     withClue("wrong minX value") { parti.minX shouldBe 2 }
     withClue("wrong minX value") { parti.minY shouldBe 2 }
     withClue("wrong minX value") { parti.maxX shouldBe 4 + parti.sideLength } // max values are set to +1 to have "right open" intervals
     withClue("wrong minX value") { parti.maxY shouldBe 4 + parti.sideLength } // max values are set to +1 to have "right open" intervals
   }
-  
+
   it  should "have the correct min/max in real world scenario" in {
 
     val rdd = StarkTestUtils.createRDD(sc)
@@ -678,7 +678,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val pPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
 
     val start = System.currentTimeMillis()
-    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 5)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None)//.collect()
+    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 5)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None, oneToMany = true)//.collect()
     val joinResSamCnt = joinResSam.count()
     val end = System.currentTimeMillis()
 
@@ -686,7 +686,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joinResSamCnt shouldBe > (0L)
 
     val start2 = System.currentTimeMillis()
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 5)).join(pPartedNoSample, JoinPredicate.CONTAINEDBY, None)//.collect()
+    val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 5)).join(pPartedNoSample, JoinPredicate.CONTAINEDBY, None, oneToMany = true)//.collect()
     val joinResPlainCnt = joinResPlain.count()
     val end2 = System.currentTimeMillis()
 
@@ -804,21 +804,21 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 
     val noStart = System.currentTimeMillis()
-    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, RTreeConfig(order = 5)).join(rddTaxi, JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, RTreeConfig(order = 5)).join(rddTaxi, JoinPredicate.CONTAINS, None, oneToMany = true).sortByKey().collect()
     val noEnd = System.currentTimeMillis()
 
-    println(s"no partitioning: ${noEnd - noStart} ms")
+    println(s"no partitioning: ${noEnd - noStart} ms : ${joinResNoPart.length}")
 
 
     val taxiPartiNoSample = new BSPartitioner(rddTaxi, sideLength = 0.3, maxCostPerPartition = 100, pointsOnly = true)
     val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100, pointsOnly = false)
 
     val withStart = System.currentTimeMillis()
-    val joinResPlain = rddBlocks.partitionBy(blockPartiNoSample).liveIndex(RTreeConfig(order = 5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val joinResPlain = rddBlocks.partitionBy(blockPartiNoSample).liveIndex(RTreeConfig(order = 5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None, oneToMany = true).sortByKey().collect()
     val withEnd = System.currentTimeMillis()
-    println(s"with BSP partitioning: ${withEnd - withStart} ms")
+    println(s"with BSP partitioning: ${withEnd - withStart} ms : ${joinResPlain.length}")
 
-    joinResPlain.length shouldBe > (0)
+    joinResPlain.length shouldBe joinResNoPart.length
 
     withClue("join part no sample does not have same results as no partitioning") { joinResPlain should contain theSameElementsAs joinResNoPart }
   }

@@ -108,7 +108,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "be faster with kNNAgg vs kNN" in {
     var rdd = StarkTestUtils.createRDD(sc)
     var i = 0
-    while(i < 500) {
+    while(i < 100) {
       rdd = rdd.union(StarkTestUtils.createRDD(sc))
       i += 1
     }
@@ -116,16 +116,22 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val q: STObject = "POINT (53.483437 -2.2040706)"
 
     var t0 = System.currentTimeMillis()
-    val knn = rdd.kNN(q, k = 100, Distance.seuclid).collect()
+    val knn = rdd.map{case (so, _) => (so,1)}.kNN(q, k = 100, Distance.seuclid).collect()
     var t1 = System.currentTimeMillis()
     println(s"knn:\t${t1 - t0}")
 
     t0 = System.currentTimeMillis()
-    val knnAgg = rdd.knnAgg(q, k = 100, Distance.seuclid).collect()
+    val knnAgg = rdd.map{case (so, _) => (so,1)}.knnAgg(q, k = 100, Distance.seuclid).collect()
     t1 = System.currentTimeMillis()
     println(s"knn Agg:\t${t1 - t0}")
 
-    knn should contain theSameElementsAs knnAgg
+    t0 = System.currentTimeMillis()
+    val knnTake = rdd.map{case (so, _) => (so,1)}.knnTake(q, k = 100, Distance.seuclid).collect()
+    t1 = System.currentTimeMillis()
+    println(s"knn Take:\t${t1 - t0}")
+
+    withClue("knn vs agg"){knn should contain theSameElementsAs knnAgg}
+    withClue("knn vs take"){knn should contain theSameElementsAs knnTake}
   }
   
   

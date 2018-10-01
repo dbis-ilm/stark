@@ -10,6 +10,8 @@ import org.locationtech.jts.geom._
 class StarkKryoRegistrator extends KryoRegistrator {
 
   override def registerClasses(kryo: Kryo): Unit = {
+    kryo.setReferences(true)
+//    kryo.setCopyReferences(true)
 
     val temporalSerializer = new TemporalSerializer()
 
@@ -30,6 +32,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
 
     kryo.register(classOf[(STObject,Any)], new StarkSerializer)
 
+//    kryo.register(classOf[List[(Distance,(STObject, Any))]], new DistSeqSerializer)
 
     kryo.register(classOf[NPoint], new NPointSerializer())
     kryo.register(classOf[NRectRange], new NRectSerializer())

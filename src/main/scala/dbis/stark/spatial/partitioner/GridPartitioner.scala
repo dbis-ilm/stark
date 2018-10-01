@@ -121,9 +121,12 @@ object GridPartitioner {
       val p = Utils.getCenter(pt._1.getGeo)
       val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
-      histo1.buckets(cellId)._2 + 1
-      if(!pointsOnly)
-        histo1.buckets(cellId)._1.extent.extend(Utils.fromGeo(pt._1.getGeo))
+      histo1.buckets(cellId) = (histo1.buckets(cellId)._1, histo1.buckets(cellId)._2 + 1)
+      if(!pointsOnly) {
+        histo1.buckets(cellId)._1.extendBy(Utils.fromGeo(pt._1.getGeo))
+//        histo1.buckets(cellId)._1.extent.extend(
+      }
+//        histo1.buckets(cellId) = (), histo1.buckets(cellId)._2)
       histo1
     }
 
@@ -135,6 +138,7 @@ object GridPartitioner {
         val newCnt = cnt1 + cnt2
         (newCell, newCnt)
       }.toArray
+
 
       CellHistogram(newBuckets)
     }

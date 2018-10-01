@@ -189,11 +189,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
       (minPartitionId, true)
     }
 
-    if(outside) {
-      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc, GridPartitioner.EPS)
-
-      if(!pointsOnly)
-        bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+    if(outside || (!pointsOnly && sampleFraction > 0)) {
+      bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
     partitionId

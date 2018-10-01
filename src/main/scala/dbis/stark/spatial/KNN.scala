@@ -81,6 +81,7 @@ case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterab
 
   override def clone(): KNN[PayloadT] = {
     val arr = new Array[(Distance, PayloadT)](k)
+
     Array.copy(nn,0,arr,0,k)
 
     val newKnn = new KNN[PayloadT](k)

@@ -1,35 +1,20 @@
 package org.apache.spark.sql.spatial
 
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
+
 import dbis.stark.STObject
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
+import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 import org.apache.spark.sql.types._
-import org.locationtech.jts.geom.Geometry
 
 
 @SQLUserDefinedType(udt = classOf[STObjectUDT])
 private[sql] class STObjectUDT extends UserDefinedType[STObject] {
-  override def typeName = "STObject"
+  override def typeName = "STObjectUDT"
 
-  override final def sqlType: StructType = _sqlType
+  override def deserialize(datum: Any): STObject = StarkSerializer.deserialize(datum)
 
-  override def serialize(obj: STObject): InternalRow = {
-    val row = new GenericInternalRow(1)
-    row.update(0, obj.getGeo)
-    row
-  }
-
-  override def deserialize(datum: Any): STObject = {
-    datum match {
-      case row: InternalRow =>
-        require(row.numFields == 1,
-          s"STObject.deserialize given row with length ${row.numFields} but requires length == 1")
-        val geo = row.get(0, BinaryType).asInstanceOf[Geometry]
-        val res = new STObject(geo, None) // TODO (de-)serialize time too
-        res
-    }
-  }
+  override def serialize(obj: STObject) = StarkSerializer.serialize(obj)
 
   override def pyUDT: String = "pyspark.stark.STObjectUDT"
 
@@ -37,10 +22,12 @@ private[sql] class STObjectUDT extends UserDefinedType[STObject] {
 
   private[spark] override def asNullable: STObjectUDT = this
 
-  private[this] val _sqlType = {
-    StructType(Seq(
-      StructField("geo", BinaryType, nullable = false)))
-  }
+  private[this] val _sqlType =
+//    StructType(Seq(
+//      StructField("geo", ArrayType, nullable = false),
+    ArrayType(ByteType, containsNull = false)
+
+  override final def sqlType= _sqlType
 }
 
 case object STObjectUDT extends STObjectUDT {

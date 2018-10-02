@@ -23,11 +23,13 @@ import org.locationtech.jts.io.{WKTReader, WKTWriter}
  * @param time The optional time component 
  */
 case class STObject(
-   private val g: GeoType,
+   g: GeoType,
    time: Option[TemporalExpression]) extends BaseExpression[STObject] {
 
+//  private def this() = this(null, None)
+
   def area = g.getArea
-  def length = time.map(_.length)
+  def length = time.flatMap(_.length)
 
   def intersectsSpatial(t: STObject) = g.intersects(t.g)
   def intersectsTemporal(t: STObject) = time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.intersects(t.time.get))

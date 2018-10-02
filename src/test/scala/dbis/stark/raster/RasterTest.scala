@@ -12,7 +12,7 @@ class RasterTest extends FlatSpec with Matchers with BeforeAndAfterAll{
   private var sc: SparkContext = _
 
   override def beforeAll() {
-    sc = StarkTestUtils.createSparkContext("spatialrddtestcase")
+    sc = StarkTestUtils.createSparkContext("spatialrasterrddtestcase")
   }
 
   override def afterAll() {
@@ -21,15 +21,15 @@ class RasterTest extends FlatSpec with Matchers with BeforeAndAfterAll{
   }
 
   it should "load files into a tile RDD" in {
-    val spc = new STSparkContext(sc)
-
-    val rdd = spc.tileFiles("C:/Users/Timo/Desktop/CreateTile/Tiles", "prefix", 60, 60, 720)
-
-//    for(t <- rdd) {
-//      println(t)
-//    }
-
-    val tl = rdd.map(_.data.length).sum().toInt
-    println(s"Total tile data size: $tl")
+//    val spc = new STSparkContext(sc)
+//
+//    val rdd = spc.tileFiles("C:/Users/Timo/Desktop/CreateTile/Tiles"/*, "prefix", 60, 60, 720*/)
+//
+////    for(t <- rdd) {
+////      println(t)
+////    }
+//
+//    val tl = rdd.map(_.data.length).sum().toInt
+//    println(s"Total tile data size: $tl")
   }
 }

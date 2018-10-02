@@ -69,6 +69,20 @@ public class Visualization implements Serializable {
         return drawRaster(rdd, env, outputPath);
     }
 
+    public boolean visualizeInt(JavaSparkContext sparkContext, JavaRDD<Tile<Integer>> rdd, int imageWidth, int imageHeight, Envelope envelope, String outputPath) {
+        this.imageWidth = imageWidth;
+        this.imageHeight = imageHeight;
+
+        Broadcast<Envelope> env = sparkContext.broadcast(envelope);
+
+        this.flipImageVert = false;
+
+        this.scaleX = this.imageWidth / envelope.getWidth();
+        this.scaleY = this.imageHeight / envelope.getHeight();
+
+        return drawRasterInt(rdd, env, outputPath);
+    }
+
     private <G extends STObject,T> boolean draw(JavaRDD<Tuple2<G, T>> rdd, Broadcast<Envelope> env, String outputPath, String outputType, String bgImagePath, int pointSize) {
         BufferedImage finalImage = rdd.mapPartitions(iter -> {
             BufferedImage imagePartition = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
@@ -148,6 +162,47 @@ public class Visualization implements Serializable {
             return new ImageSerializableWrapper(combinedImage);
         })
         .image;
+
+        return saveImageAsLocalFile(theImage, outputPath, "png");
+    }
+
+    private boolean drawRasterInt(JavaRDD<Tile<Integer>> rdd, Broadcast<Envelope> envelope, String outputPath) {
+
+        BufferedImage theImage = rdd.mapPartitions( iter -> {
+            BufferedImage img = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = img.createGraphics();
+            Iterable<Tile<Integer>> iterable = () -> iter;
+
+            StreamSupport.stream(iterable.spliterator(), false)
+                    .forEach(tile -> {
+
+                        for (int x = 0; x < tile.width(); x++) {
+                            for (int y = 0; y < tile.height(); y++) {
+
+                                int v = tile.valueArray(x,y); //.data[x * tile.width + y]
+                                g.setColor(new Color(v));
+//                                if (v == 99999.0)
+//                                    g.setColor(Color.black);
+//                                else {
+//                                    int idx = (int) (v + 25.0) * 255 / 70;
+//                                    g.setColor(colorMap[idx]);
+//                                }
+
+                                g.drawRect(x, y, 1, 1);
+                            }
+                        }
+
+                    });
+
+            return Collections.singletonList(new ImageSerializableWrapper(img)).iterator();
+        }).reduce((img1, img2) -> {
+            BufferedImage combinedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics graphics = combinedImage.getGraphics();
+            graphics.drawImage(img1.image, 0, 0, null);
+            graphics.drawImage(img2.image, 0, 0, null);
+            return new ImageSerializableWrapper(combinedImage);
+        })
+                .image;
 
         return saveImageAsLocalFile(theImage, outputPath, "png");
     }

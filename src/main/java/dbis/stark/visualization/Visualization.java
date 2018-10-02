@@ -55,7 +55,7 @@ public class Visualization implements Serializable {
         return draw(rdd, env, outputPath, outputType, bgImagePath, pointSize);
     }
 
-    public boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tile<Integer>> rdd, int imageWidth, int imageHeight, Envelope envelope, String outputPath) {
+    public boolean visualize(JavaSparkContext sparkContext, JavaRDD<Tile<Double>> rdd, int imageWidth, int imageHeight, Envelope envelope, String outputPath) {
         this.imageWidth = imageWidth;
         this.imageHeight = imageHeight;
 
@@ -112,12 +112,12 @@ public class Visualization implements Serializable {
         return saveImageAsLocalFile(finalImage, outputPath, outputType);
     }
 
-    private boolean drawRaster(JavaRDD<Tile<Integer>> rdd, Broadcast<Envelope> envelope, String outputPath) {
+    private boolean drawRaster(JavaRDD<Tile<Double>> rdd, Broadcast<Envelope> envelope, String outputPath) {
 
         BufferedImage theImage = rdd.mapPartitions( iter -> {
             BufferedImage img = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = img.createGraphics();
-            Iterable<Tile<Integer>> iterable = () -> iter;
+            Iterable<Tile<Double>> iterable = () -> iter;
 
             StreamSupport.stream(iterable.spliterator(), false)
                 .forEach(tile -> {
@@ -125,22 +125,15 @@ public class Visualization implements Serializable {
                     for (int x = 0; x < tile.width(); x++) {
                         for (int y = 0; y < tile.height(); y++) {
 
-                            g.setColor(new Color(tile.value(x,y)));
+                            double v = tile.valueArray(x,y); //.data[x * tile.width + y]
+                            if (v == 99999.0)
+                                g.setColor(Color.black);
+                            else {
+                                int idx = (int) (v + 25.0) * 255 / 70;
+                                g.setColor(colorMap[idx]);
+                            }
 
-//                            Coordinate c = new Coordinate(tile.ulx() + x, tile.uly() + y);
-
-//                            Tuple2<Integer, Integer> pos = getImageCoordinates(c, envelope.getValue());
-
-                            Integer imgX = (int)(tile.ulx() + x);
-                            Integer imgY = (int)(tile.uly() - (tile.height() - y));
-                            Tuple2<Integer, Integer> pos = new Tuple2<>(imgX, imgY);
-
-
-//                            System.out.printf("%d , %d  has img coords: %s\n", x,y, pos.toString());
-
-                            if(pos != null)
-                                drawPoint(g, pos, 5);
-
+                            g.drawRect(x, y, 1, 1);
                         }
                     }
 
@@ -267,4 +260,263 @@ public class Visualization implements Serializable {
             return this.image;
         }
     }
+
+    private  Color[] colorMap = {
+        new Color(196, 247, 245),
+        new Color(184, 242, 243),
+        new Color(170, 236, 241),
+        new Color(154, 230, 238),
+        new Color(139, 223, 235),
+        new Color(121, 216, 231),
+        new Color(103, 209, 229),
+        new Color(85, 200, 226),
+        new Color(67, 192, 222),
+        new Color(50, 185, 219),
+        new Color(34, 177, 216),
+        new Color(20, 170, 213),
+        new Color(10, 164, 212),
+        new Color(2, 159, 210),
+        new Color(2, 156, 210),
+        new Color(2, 153, 210),
+        new Color(2, 151, 210),
+        new Color(2, 149, 210),
+        new Color(2, 147, 210),
+        new Color(2, 144, 210),
+        new Color(2, 142, 210),
+        new Color(2, 140, 210),
+        new Color(2, 138, 210),
+        new Color(2, 137, 210),
+        new Color(2, 134, 210),
+        new Color(2, 132, 210),
+        new Color(2, 131, 210),
+        new Color(2, 129, 210),
+        new Color(2, 128, 210),
+        new Color(2, 125, 210),
+        new Color(2, 123, 210),
+        new Color(2, 122, 210),
+        new Color(2, 120, 210),
+        new Color(2, 118, 210),
+        new Color(2, 116, 210),
+        new Color(2, 114, 210),
+        new Color(2, 113, 210),
+        new Color(2, 111, 210),
+        new Color(2, 108, 210),
+        new Color(2, 106, 210),
+        new Color(2, 104, 209),
+        new Color(2, 102, 208),
+        new Color(2, 101, 208),
+        new Color(2, 99, 207),
+        new Color(3, 97, 205),
+        new Color(2, 95, 204),
+        new Color(2, 93, 202),
+        new Color(2, 92, 201),
+        new Color(2, 89, 200),
+        new Color(2, 87, 197),
+        new Color(2, 85, 196),
+        new Color(2, 83, 194),
+        new Color(2, 81, 192),
+        new Color(2, 80, 190),
+        new Color(2, 77, 189),
+        new Color(2, 76, 187),
+        new Color(2, 73, 185),
+        new Color(2, 72, 183),
+        new Color(2, 69, 181),
+        new Color(2, 67, 179),
+        new Color(2, 65, 178),
+        new Color(2, 63, 175),
+        new Color(2, 61, 174),
+        new Color(2, 59, 172),
+        new Color(2, 57, 169),
+        new Color(2, 55, 168),
+        new Color(2, 53, 167),
+        new Color(3, 52, 165),
+        new Color(4, 50, 163),
+        new Color(6, 49, 161),
+        new Color(6, 46, 160),
+        new Color(8, 45, 159),
+        new Color(10, 44, 158),
+        new Color(12, 41, 156),
+        new Color(14, 40, 155),
+        new Color(16, 39, 154),
+        new Color(18, 38, 153),
+        new Color(21, 36, 153),
+        new Color(23, 35, 152),
+        new Color(26, 34, 151),
+        new Color(29, 33, 152),
+        new Color(32, 32, 151),
+        new Color(35, 31, 151),
+        new Color(39, 29, 151),
+        new Color(43, 29, 151),
+        new Color(47, 28, 151),
+        new Color(50, 27, 151),
+        new Color(54, 25, 151),
+        new Color(59, 25, 152),
+        new Color(62, 24, 152),
+        new Color(67, 22, 152),
+        new Color(71, 22, 152),
+        new Color(75, 21, 152),
+        new Color(80, 20, 153),
+        new Color(84, 20, 153),
+        new Color(89, 19, 154),
+        new Color(94, 18, 153),
+        new Color(98, 17, 154),
+        new Color(102, 16, 154),
+        new Color(107, 16, 154),
+        new Color(111, 15, 154),
+        new Color(115, 14, 154),
+        new Color(120, 14, 154),
+        new Color(124, 13, 154),
+        new Color(129, 12, 154),
+        new Color(133, 11, 153),
+        new Color(137, 11, 153),
+        new Color(141, 9, 152),
+        new Color(145, 10, 152),
+        new Color(148, 9, 151),
+        new Color(152, 8, 151),
+        new Color(156, 8, 149),
+        new Color(159, 7, 149),
+        new Color(162, 7, 147),
+        new Color(166, 6, 145),
+        new Color(168, 6, 144),
+        new Color(171, 5, 142),
+        new Color(173, 4, 140),
+        new Color(176, 4, 139),
+        new Color(177, 3, 137),
+        new Color(179, 3, 134),
+        new Color(182, 2, 131),
+        new Color(183, 1, 129),
+        new Color(185, 1, 127),
+        new Color(187, 0, 123),
+        new Color(189, 0, 121),
+        new Color(190, 0, 117),
+        new Color(191, 0, 114),
+        new Color(193, 0, 111),
+        new Color(195, 0, 107),
+        new Color(196, 0, 104),
+        new Color(197, 0, 100),
+        new Color(199, 0, 97),
+        new Color(200, 0, 94),
+        new Color(201, 0, 89),
+        new Color(202, 0, 86),
+        new Color(203, 0, 82),
+        new Color(205, 0, 78),
+        new Color(205, 0, 74),
+        new Color(206, 0, 70),
+        new Color(208, 0, 66),
+        new Color(209, 0, 63),
+        new Color(210, 0, 59),
+        new Color(211, 0, 55),
+        new Color(211, 0, 52),
+        new Color(212, 0, 48),
+        new Color(213, 0, 44),
+        new Color(214, 0, 41),
+        new Color(215, 0, 38),
+        new Color(216, 0, 34),
+        new Color(217, 0, 31),
+        new Color(217, 0, 28),
+        new Color(218, 0, 24),
+        new Color(219, 0, 21),
+        new Color(220, 0, 18),
+        new Color(220, 0, 16),
+        new Color(221, 0, 12),
+        new Color(222, 0, 10),
+        new Color(223, 0, 8),
+        new Color(223, 0, 6),
+        new Color(224, 0, 4),
+        new Color(225, 0, 2),
+        new Color(226, 0, 0),
+        new Color(226, 1, 0),
+        new Color(227, 3, 0),
+        new Color(228, 5, 0),
+        new Color(228, 6, 0),
+        new Color(228, 8, 0),
+        new Color(229, 11, 0),
+        new Color(230, 13, 0),
+        new Color(230, 15, 0),
+        new Color(231, 17, 0),
+        new Color(231, 20, 0),
+        new Color(231, 22, 0),
+        new Color(232, 25, 0),
+        new Color(233, 28, 0),
+        new Color(232, 31, 0),
+        new Color(233, 33, 0),
+        new Color(233, 37, 0),
+        new Color(234, 40, 0),
+        new Color(235, 43, 0),
+        new Color(234, 46, 0),
+        new Color(235, 49, 0),
+        new Color(235, 52, 0),
+        new Color(235, 55, 0),
+        new Color(236, 59, 0),
+        new Color(237, 62, 0),
+        new Color(237, 66, 0),
+        new Color(237, 70, 0),
+        new Color(238, 73, 0),
+        new Color(238, 76, 0),
+        new Color(238, 80, 0),
+        new Color(239, 84, 0),
+        new Color(239, 88, 0),
+        new Color(239, 91, 0),
+        new Color(240, 95, 0),
+        new Color(239, 99, 0),
+        new Color(240, 102, 0),
+        new Color(240, 105, 0),
+        new Color(240, 110, 0),
+        new Color(241, 114, 0),
+        new Color(241, 117, 0),
+        new Color(241, 121, 0),
+        new Color(242, 125, 0),
+        new Color(242, 129, 0),
+        new Color(242, 132, 0),
+        new Color(243, 136, 0),
+        new Color(242, 139, 0),
+        new Color(243, 142, 0),
+        new Color(243, 146, 0),
+        new Color(243, 150, 0),
+        new Color(244, 153, 0),
+        new Color(244, 157, 0),
+        new Color(243, 160, 0),
+        new Color(244, 164, 0),
+        new Color(244, 167, 0),
+        new Color(244, 170, 0),
+        new Color(245, 173, 0),
+        new Color(245, 176, 0),
+        new Color(246, 180, 0),
+        new Color(245, 183, 0),
+        new Color(245, 185, 0),
+        new Color(246, 189, 0),
+        new Color(246, 191, 0),
+        new Color(246, 193, 0),
+        new Color(247, 196, 0),
+        new Color(247, 199, 0),
+        new Color(247, 202, 0),
+        new Color(247, 204, 0),
+        new Color(247, 206, 0),
+        new Color(247, 209, 0),
+        new Color(247, 211, 0),
+        new Color(247, 212, 0),
+        new Color(248, 214, 0),
+        new Color(247, 216, 0),
+        new Color(248, 220, 2),
+        new Color(249, 224, 5),
+        new Color(249, 227, 7),
+        new Color(249, 230, 11),
+        new Color(250, 230, 15),
+        new Color(250, 230, 19),
+        new Color(250, 230, 24),
+        new Color(250, 230, 29),
+        new Color(250, 230, 33),
+        new Color(250, 230, 38),
+        new Color(250, 230, 44),
+        new Color(250, 230, 48),
+        new Color(250, 230, 53),
+        new Color(250, 230, 59),
+        new Color(250, 230, 64),
+        new Color(250, 230, 68),
+        new Color(250, 230, 73),
+        new Color(250, 230, 77),
+        new Color(250, 230, 82),
+        new Color(250, 230, 86),
+        new Color(0, 0, 0)
+    };
 }

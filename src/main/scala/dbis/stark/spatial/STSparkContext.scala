@@ -1,16 +1,14 @@
 package dbis.stark.spatial
 
-import java.io.File
 import java.nio.file.Paths
 
 import dbis.stark.raster.Tile
 import dbis.stark.{Instant, Interval, STObject}
-import org.apache.spark.SpatialRDD._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkContext
+import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
 
-import scala.io.Source
 import scala.reflect.ClassTag
 
 
@@ -56,34 +54,52 @@ class STSparkContext(private val sc: SparkContext) {
       sc.objectFile[T](partitionstoLoad, minPartitions)
   }
 
-  def tileFiles(folderPath: String, filePrefix: String, tileWidth: Int, tileHeight: Int, totalWidth: Int): RDD[Tile[Double]] = {
-    val dir = new File(folderPath)
-    var fileList = List[File]()
-    if(dir.exists() && dir.isDirectory) {
-      fileList = dir.listFiles.filter(_.isFile).toList
+  def tileFiles(file: String): RDD[Tile[Double]] = {
+
+    sc.textFile(file).map{ line =>
+      val arr = line.split(',')
+      val ulx = arr(0).toDouble
+      val uly = arr(1).toDouble
+
+      val tWidth = arr(2).toInt
+      val tHeight = arr(3).toInt
+
+      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
+
+      val data = new Array[Double](arr.length - 4)
+
+      Array.copy(arr, 4, data, 0, arr.length - 4)
+
+      Tile(ulx, uly, tWidth, tHeight, data)
     }
 
-    var uplx = 0
-    var uply = 0
-    var tileList = List[Tile[Double]]()
-
-    for(f <- fileList) {
-      if(f.getName.startsWith(filePrefix)) {
-        val data = Source.fromFile(f)
-          .getLines().flatMap(_.split(",").map(_.toDouble))
-          .toArray
-
-        tileList ::= Tile[Double](uplx, uply + tileHeight, tileWidth, tileHeight, data)
-        if(uplx + tileWidth >= totalWidth) {//for now tiles will be loaded row by row
-          uplx = 0
-          uply += tileHeight
-        } else {
-          uplx += tileWidth
-        }
-      }
-    }
-
-    sc.parallelize(tileList)
+//    val dir = new File(folderPath)
+//    var fileList = List[File]()
+//    if(dir.exists() && dir.isDirectory) {
+//      fileList = dir.listFiles.filter(_.isFile).toList
+//    }
+//
+//    var uplx = 0
+//    var uply = 0
+//    var tileList = List[Tile[Double]]()
+//
+//    for(f <- fileList) {
+//      if(f.getName.startsWith(filePrefix)) {
+//        val data = Source.fromFile(f)
+//          .getLines().flatMap(_.split(",").map(_.toDouble))
+//          .toArray
+//
+//        tileList ::= Tile[Double](uplx, uply + tileHeight, tileWidth, tileHeight, data)
+//        if(uplx + tileWidth >= totalWidth) {//for now tiles will be loaded row by row
+//          uplx = 0
+//          uply += tileHeight
+//        } else {
+//          uplx += tileWidth
+//        }
+//      }
+//    }
+//
+//    sc.parallelize(tileList)
   }
 
   private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {

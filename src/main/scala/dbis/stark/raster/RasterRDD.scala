@@ -86,6 +86,13 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
   def join[P: ClassTag, R: ClassTag](other: RasterRDD[P], predicate: JoinPredicate, func: (U,P) => R, oneToMany: Boolean) =
     RasterJoinRDD(this, other, predicate, func, oneToMany)
 
+
+  override def saveAsTextFile(path: String) = {
+    this.map{ t =>
+      s"${t.ulx},${t.uly},${t.width},${t.height},${t.data.mkString(",")}"
+    }.saveAsTextFile(path)
+  }
+
 }
 
 

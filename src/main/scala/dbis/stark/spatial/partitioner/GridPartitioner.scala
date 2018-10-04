@@ -12,6 +12,9 @@ import scala.collection.JavaConverters._
 case class CellHistogram(buckets: Array[(Cell, Int)])
 
 trait SpatialPartitioner extends Partitioner {
+
+  def isEmpty(id: Int): Boolean
+
   def printPartitions(fName: java.nio.file.Path): Unit
 
   def printPartitions(fName: String): Unit =

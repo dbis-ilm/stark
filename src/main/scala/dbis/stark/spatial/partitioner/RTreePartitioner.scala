@@ -45,6 +45,8 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     }.toArray
   }
 
+  private val empties = Array.fill(partitions.length)(true)
+
 
   override def partitionBounds(idx: Int) = partitions(idx)
 
@@ -54,6 +56,8 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     writeToFile(partitions.map(_.range.wkt).zipWithIndex.map{ case (wkt, idx) => s"$idx;$wkt"}, fName)
 
   override def numPartitions = partitions.length
+
+  override def isEmpty(id: Int): Boolean = empties(id)
 
   override def getPartition(key: Any) = {
     val g = key.asInstanceOf[STObject]
@@ -102,6 +106,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
+    empties(partitionId) = false
 
     partitionId
 

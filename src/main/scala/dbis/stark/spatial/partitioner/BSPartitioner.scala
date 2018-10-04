@@ -136,7 +136,11 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
   override def partitionBounds(idx: Int): Cell = bsp.partitions(idx)
   override def partitionExtent(idx: Int): NRectRange = bsp.partitions(idx).extent
-  
+
+  private val empties = Array.fill(bsp.partitions.length)(true)
+
+  override def isEmpty(id: Int): Boolean = empties(id)
+
   override def printPartitions(fName: java.nio.file.Path) {
     val list2 = bsp.partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList
     super.writeToFile(list2, fName)
@@ -192,6 +196,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     if(outside || (!pointsOnly && sampleFraction > 0)) {
       bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
+
+    empties(partitionId) = false
 
     partitionId
   }

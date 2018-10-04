@@ -10,7 +10,7 @@ import org.locationtech.jts.geom._
 class StarkKryoRegistrator extends KryoRegistrator {
 
   override def registerClasses(kryo: Kryo): Unit = {
-    kryo.setReferences(true)
+//    kryo.setReferences(true)
 //    kryo.setCopyReferences(true)
 
     val temporalSerializer = new TemporalSerializer()
@@ -18,19 +18,24 @@ class StarkKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Instant], temporalSerializer)
     kryo.register(classOf[Interval], temporalSerializer)
 
-    val geometrySerializer = new GeometrySerializer()
+//    val geometrySerializer = new GeometrySerializer()
 //    val geometrySerializer = new GeometryAsStringSerializer
 
 //    kryo.register(classOf[Geometry]) // use Kryo's default serializer for everything else -- does this work?
 
-    kryo.register(classOf[Point], geometrySerializer)
-    kryo.register(classOf[Polygon], geometrySerializer)
-    kryo.register(classOf[LineString], geometrySerializer)
+//    kryo.register(classOf[Point], geometrySerializer)
+//    kryo.register(classOf[Polygon], geometrySerializer)
+//    kryo.register(classOf[LineString], geometrySerializer)
+
+    kryo.register(classOf[Point], new PointSerializer)
+    kryo.register(classOf[LineString], new LineStringSerializer)
+    kryo.register(classOf[Polygon], new PolygonSerializer)
+
     kryo.register(classOf[Envelope], new EnvelopeSerializer())
 
     kryo.register(classOf[STObject], new STObjectSerializer())
 
-    kryo.register(classOf[(STObject,Any)], new StarkSerializer)
+    kryo.register(classOf[(STObject,Int)], new StarkSerializer)
 
 //    kryo.register(classOf[List[(Distance,(STObject, Any))]], new DistSeqSerializer)
 

@@ -427,6 +427,38 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
   }
 
+//  def skylinePrune(ref: STObject,
+//                   distFunc: (STObject, STObject) => (Distance, Distance),
+//                   dominatesRel: (STObject, STObject) => Boolean,
+//                   ppd: Int): RDD[(G,V)] = if(self.partitioner.nonEmpty && self.partitioner.get.isInstanceOf[GridPartitioner]) {
+//
+//
+//
+//    new RDD[(G,V)](self) {
+//
+//      private val sParti = self.partitioner.get.asInstanceOf[GridPartitioner]
+//
+//      override val partitioner = self.partitioner
+//
+//      def dominates(p1: Int, p2: Int): Boolean = {
+//        val one = sParti.partitionBounds(p1)
+//        val two = sParti.partitionBounds(p2)
+//
+//        one.
+//      }
+//
+//      override protected def getPartitions: Array[Partition] = {
+//
+//      }
+//
+//
+//      override def compute(split: Partition, context: TaskContext): Iterator[(G, V)] = ???
+//    }
+//  } else
+//    skyline(ref, distFunc, dominatesRel, ppd)
+
+
+
 
   // LIVE
 

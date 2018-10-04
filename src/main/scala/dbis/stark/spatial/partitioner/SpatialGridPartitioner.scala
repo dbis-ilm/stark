@@ -28,6 +28,8 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
 
   require(dimensions == 2, "Only 2 dimensions supported currently")
 
+  private val empties = Array.fill(partitionsPerDimension * partitionsPerDimension)(true)
+
   def this(rdd: RDD[(G,V)],
            partitionsPerDimension: Int,
            pointsOnly: Boolean,
@@ -66,6 +68,8 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
 
   override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
 
+  override def isEmpty(id: Int): Boolean = empties(id)
+
   /**
    * Compute the partition for an input key.
    * In fact, this is a Geometry for which we use its centroid for
@@ -82,6 +86,8 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
     val id = GridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 
     require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
+
+    empties(id) = false
 
     id
   }

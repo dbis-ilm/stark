@@ -269,12 +269,12 @@ class EnvelopeSerializer extends Serializer[Envelope] {
   }
 }
 
-//object GeometrySerializer {
-//  val POINT: Byte = 0x0
-//  val POLYGON: Byte = 0x1
-//  val LINESTRING: Byte = 0x2
-//}
-//
+object GeometrySerializer {
+  val POINT: Byte = 0
+  val POLYGON: Byte = 1
+  val LINESTRING: Byte = 2
+}
+
 //class GeometryAsStringSerializer extends Serializer[Geometry] {
 //  override def write(kryo: Kryo, output: Output, geom: Geometry) = {
 //    val writer = new WKTWriter(2)
@@ -416,80 +416,80 @@ class PolygonSerializer extends Serializer[Polygon] {
   }
 }
 
-//class GeometrySerializer extends Serializer[Geometry] {
-//
-//  private val geometryFactory = new GeometryFactory()
-//
-//  private def writePoint(x: Double, y: Double, output: Output): Unit = {
-//    output.writeDouble(x)
-//    output.writeDouble(y)
-//  }
-//
-//  private def writeLineString(l: LineString, output: Output) = {
-//    val nPoints = l.getNumPoints
-//    output.writeInt(nPoints, true)
-//    var i = 0
-//    while(i < nPoints) {
-//      val p = l.getPointN(i)
-//      writePoint(p.getX, p.getY, output)
-//      i += 1
-//    }
-//  }
-//
-//  private def readPoint(input: Input): Point = {
-//    val c = readPointInternal(input)
-//    geometryFactory.createPoint(c)
-//  }
-//
-//  private def readPointInternal(input: Input): Coordinate = {
-//    val x = input.readDouble()
-//    val y = input.readDouble()
-//    new Coordinate(x,y)
-//  }
-//
-//
-//  override def write(kryo: Kryo, output: Output, obj: Geometry): Unit = obj match {
-//    case p: Point =>
-//      output.writeByte(GeometrySerializer.POINT)
-//      writePoint(p.getX, p.getY, output)
-//    case l: LineString =>
-//      output.writeByte(GeometrySerializer.LINESTRING)
-//      writeLineString(l, output)
-//    case p: Polygon =>
-//      output.writeByte(GeometrySerializer.POLYGON)
-//      val extRing = p.getExteriorRing
-//      writeLineString(extRing, output)
-//  }
-//
-//  override def read(kryo: Kryo, input: Input, dType: Class[Geometry]): Geometry = input.readByte() match {
-//    case GeometrySerializer.POINT =>
-//      readPoint(input)
-//
-//    case GeometrySerializer.LINESTRING =>
-//      val nPoints = input.readInt(true)
-//      val points = new Array[Coordinate](nPoints)
-//      var i = 0
-//      while(i < nPoints) {
-//        val c = readPointInternal(input)
-//        points(i) = c
-//        i += 1
-//      }
-//
-//      geometryFactory.createLineString(points)
-//
-//    case GeometrySerializer.POLYGON =>
-//      val nPoints = input.readInt(true)
-//      val points = new Array[Coordinate](nPoints)
-//      var i = 0
-//      while(i < nPoints) {
-//        val c = readPointInternal(input)
-//        points(i) = c
-//        i += 1
-//      }
-//
-//      geometryFactory.createPolygon(points)
-//  }
-//}
+class GeometrySerializer extends Serializer[Geometry] {
+
+  private val geometryFactory = new GeometryFactory()
+
+  private def writePoint(x: Double, y: Double, output: Output): Unit = {
+    output.writeDouble(x)
+    output.writeDouble(y)
+  }
+
+  private def writeLineString(l: LineString, output: Output) = {
+    val nPoints = l.getNumPoints
+    output.writeInt(nPoints, true)
+    var i = 0
+    while(i < nPoints) {
+      val p = l.getPointN(i)
+      writePoint(p.getX, p.getY, output)
+      i += 1
+    }
+  }
+
+  private def readPoint(input: Input): Point = {
+    val c = readPointInternal(input)
+    geometryFactory.createPoint(c)
+  }
+
+  private def readPointInternal(input: Input): Coordinate = {
+    val x = input.readDouble()
+    val y = input.readDouble()
+    new Coordinate(x,y)
+  }
+
+
+  override def write(kryo: Kryo, output: Output, obj: Geometry): Unit = obj match {
+    case p: Point =>
+      output.writeByte(GeometrySerializer.POINT)
+      writePoint(p.getX, p.getY, output)
+    case l: LineString =>
+      output.writeByte(GeometrySerializer.LINESTRING)
+      writeLineString(l, output)
+    case p: Polygon =>
+      output.writeByte(GeometrySerializer.POLYGON)
+      val extRing = p.getExteriorRing
+      writeLineString(extRing, output)
+  }
+
+  override def read(kryo: Kryo, input: Input, dType: Class[Geometry]): Geometry = input.readByte() match {
+    case GeometrySerializer.POINT =>
+      readPoint(input)
+
+    case GeometrySerializer.LINESTRING =>
+      val nPoints = input.readInt(true)
+      val points = new Array[Coordinate](nPoints)
+      var i = 0
+      while(i < nPoints) {
+        val c = readPointInternal(input)
+        points(i) = c
+        i += 1
+      }
+
+      geometryFactory.createLineString(points)
+
+    case GeometrySerializer.POLYGON =>
+      val nPoints = input.readInt(true)
+      val points = new Array[Coordinate](nPoints)
+      var i = 0
+      while(i < nPoints) {
+        val c = readPointInternal(input)
+        points(i) = c
+        i += 1
+      }
+
+      geometryFactory.createPolygon(points)
+  }
+}
 
 object TemporalSerializer {
   private val INSTANT: Byte = 0x0
@@ -568,7 +568,7 @@ class TemporalSerializer extends Serializer[TemporalExpression] {
 
 class STObjectSerializer extends Serializer[STObject] {
 
-//  val geometrySerializer = new GeometrySerializer()
+  val geometrySerializer = new GeometrySerializer()
   val temporalSerializer = new TemporalSerializer
   override def write(kryo: Kryo, output: Output, obj: STObject): Unit = {
     kryo.writeObject(output, obj.getGeo)
@@ -579,7 +579,7 @@ class STObjectSerializer extends Serializer[STObject] {
   }
 
   override def read(kryo: Kryo, input: Input, dType: Class[STObject]): STObject = {
-    val geo = kryo.readObject(input, classOf[Geometry])
+    val geo = kryo.readObject(input, classOf[Geometry], geometrySerializer)
 
     val time = if(input.readBoolean()) {
       val t = kryo.readObject(input, classOf[TemporalExpression], temporalSerializer)
@@ -591,22 +591,22 @@ class STObjectSerializer extends Serializer[STObject] {
   }
 }
 
-class StarkSerializer extends Serializer[(STObject, Int)] {
+class StarkSerializer extends Serializer[(STObject, Any)] {
 
   val soSerializer = new STObjectSerializer
 
-  override def write(kryo: Kryo, output: Output, obj: (STObject, Int)): Unit = {
+  override def write(kryo: Kryo, output: Output, obj: (STObject, Any)): Unit = {
 
     kryo.writeObject(output, obj._1, soSerializer)
-//    kryo.writeClassAndObject(output, obj._2)
-    output.writeInt(obj._2)
+    kryo.writeClassAndObject(output, obj._2)
+//    output.writeInt(obj._2)
   }
 
-  override def read(kryo: Kryo, input: Input, dType: Class[(STObject,Int)]): (STObject,Int) = {
+  override def read(kryo: Kryo, input: Input, dType: Class[(STObject,Any)]): (STObject,Any) = {
     val so = kryo.readObject(input, classOf[STObject], soSerializer)
     kryo.reference(so)
-//    val payload = kryo.readClassAndObject(input)
-    val payload = input.readInt()
+    val payload = kryo.readClassAndObject(input)
+//    val payload = input.readInt()
 
     (so, payload)
   }

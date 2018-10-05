@@ -96,6 +96,8 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
     val strings = (0 until numPartitions).iterator.map(i => partitionExtent(i).wkt).toIterable
     writeToFile(strings, fName)
   }
+
+  override def isEmpty(id: Int): Boolean = ???
 }
 
 object RasterGridPartitioner {

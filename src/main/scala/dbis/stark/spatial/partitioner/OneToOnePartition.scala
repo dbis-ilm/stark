@@ -43,9 +43,9 @@ protected[stark] case class OneToManyPartition(idx: Int, @transient private val 
 
   override def index = idx
 
-  var leftPartition = left.partitions(leftIndex)
+  var leftPartition: Partition = left.partitions(leftIndex)
 
-  var rightPartitions = rightIndex.map(i => right.partitions(i))
+  var rightPartitions: Seq[Partition] = rightIndex.map(i => right.partitions(i))
 
   @throws(classOf[IOException])
   private def writeObject(oos: ObjectOutputStream): Unit = {

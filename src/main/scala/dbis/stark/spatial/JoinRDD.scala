@@ -27,10 +27,12 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
   protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext): Iterator[RES]
   protected def computeWithOneToMany(partition: OneToManyPartition, context: TaskContext): Iterator[RES]
 
-  override final def compute(s: Partition, context: TaskContext): Iterator[RES] = new InterruptibleIterator(context, s match {
+  override final def compute(s: Partition, context: TaskContext): Iterator[RES] = {
+    new InterruptibleIterator(context, s match {
+
     case oto: OneToOnePartition => computeWithOneToOnePartition(oto, context)
     case otm: OneToManyPartition => computeWithOneToMany(otm, context)
-  })
+  })}
 
   override def getPreferredLocations(split: Partition): Seq[String] = split match {
     case otm: OneToManyPartition =>
@@ -87,11 +89,9 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
 //  }
 
   override def getPartitions: Array[Partition] = {
-
     val parts = ListBuffer.empty[Partition]
 
     if (leftPartitioner.isDefined && leftPartitioner == rightPartitioner) {
-      println("zipping")
       left.partitions.iterator.zip(right.partitions.iterator).foreach { case (l, r) =>
         if (oneToMany)
           parts += OneToManyPartition(l.index, left, right, l.index, Seq(r.index))

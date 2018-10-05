@@ -98,4 +98,6 @@ class AngularPartitioner(
   override def printPartitions(fName: Path): Unit = {
 
   }
+
+  override def isEmpty(id: Int): Boolean = ???
 }

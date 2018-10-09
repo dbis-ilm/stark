@@ -18,21 +18,18 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
   val o = Ordering.fromLessThan[(G,(Distance,V))](_._2._1 < _._2._1)
 
-  override def contains(qry: G) = self.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } }
+  override def contains(qry: G) = //self.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } }
+    new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINS )
 
-  override def containedby(qry: G) = self.flatMap{ tree => tree.query(qry).filter{ c => c._1.containedBy(qry)} }
+  override def containedby(qry: G) = //self.flatMap{ tree => tree.query(qry).filter{ c => c._1.containedBy(qry)} }
+    new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINEDBY )
 
-  override def intersects(qry: G) = self.flatMap { tree =>
-    tree.query(qry).filter{ c => c._1.intersects(qry)}
-  }
+  override def intersects(qry: G) =
+    new SpatialIndexedRDD(self, qry, JoinPredicate.INTERSECTS )
 
-  override def covers(qry: G) = self.flatMap{ tree =>
-    tree.query(qry).filter{ c => c._1.covers(qry)}
-  }
+  override def covers(qry: G) = new SpatialIndexedRDD(self, qry, JoinPredicate.COVERS )
 
-  override def coveredby(qry: G) = self.flatMap{ tree =>
-    tree.query(qry).filter{ c => c._1.coveredBy(qry)}
-  }
+  override def coveredby(qry: G) = new SpatialIndexedRDD(self, qry, JoinPredicate.COVEREDBY )
 
   override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToMany: Boolean) =
     new PersistentIndexedSpatialJoinRDD(self, other, pred, oneToMany)

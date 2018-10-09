@@ -159,21 +159,21 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 
 
     var t0 = System.currentTimeMillis()
-    val knn = theRDD.knnAgg2(q, k, Distance.seuclid).collect()
+    val knn = theRDD.knnAggIter(q, k, Distance.seuclid).size
     var t1 = System.currentTimeMillis()
     println(s"knn:\t${t1 - t0}")
 
 
     t0 = System.currentTimeMillis()
-    val knn2 = theRDD.knn2(q, k, Distance.seuclid).collect()
+    val knn2 = theRDD.knn2(q, k, Distance.seuclid).size
     t1 = System.currentTimeMillis()
     println(s"knn2:\t${t1 - t0}")
 
 //    withClue("knn vs agg"){knn should contain theSameElementsAs knn2}
 
-    knn2.length shouldBe knn.length
+    knn2 shouldBe knn
 
-    knn2.map(_.toString()).sorted.mkString("\n") shouldBe knn.map(_.toString()).sorted.mkString("\n")
+//    knn2.map(_.toString()).sorted.mkString("\n") shouldBe knn.map(_.toString()).sorted.mkString("\n")
   }
 
 

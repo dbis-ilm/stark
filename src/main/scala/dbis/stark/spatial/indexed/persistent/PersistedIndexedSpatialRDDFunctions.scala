@@ -78,7 +78,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     self.sparkContext.parallelize(nn)
   }
 
-  override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] = {
+  def knnAggIter(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance, V))] = {
 
     val knns = self.mapPartitions({ trees =>
       trees.flatMap { tree =>
@@ -96,8 +96,11 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     }, true)
         .reduce(_.merge(_))
 
-    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
+    knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}
   }
+
+  override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] =
+    self.sparkContext.parallelize(knnAggIter(qry,k,distFunc).toSeq)
 
   override def knnTake(qry: G, k: Int, distFunc: (STObject, STObject) => Distance) = {
     val knns = self.mapPartitions({ trees =>
@@ -116,7 +119,8 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     self.sparkContext.parallelize(theKnn).map{ case ((g,v),d) => (g,(d,v))}
   }
 
-  def knnAgg2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] = {
+
+  def knnAgg2Iter(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance, V))] = {
     val knns = self.mapPartitions({ trees =>
       trees.flatMap { tree =>
         require(tree.isInstanceOf[KnnIndex[_]], s"kNN function requires KnnIndex but got: ${tree.getClass}")
@@ -126,18 +130,22 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     }, true)
 
 
-    val theKnn = knns.takeOrdered(k)(ord).toSeq
-
-    self.sparkContext.parallelize(theKnn).map{ case ((g,v),d) => (g,(d,v))}
+    knns.takeOrdered(k)(ord).iterator.map{ case ((g,v),d) => (g,(d,v))}
   }
 
-  def knn2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance, V))] = self.partitioner match {
+  def knnAgg2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance, V))] =
+    self.sparkContext.parallelize(knnAgg2Iter(qry,k,distFunc).toSeq)
+
+  def knn2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G,(Distance, V))] = self.partitioner match {
     case Some(p: GridPartitioner) =>
 
       val partitionOfQry = p.getPartition(qry)
 
       def blubb(context: TaskContext, iter: Iterator[Index[(G,V)]]) = {
-        iter.flatMap{ index => index.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)}.toArray
+        if(iter.nonEmpty && context.partitionId() == partitionOfQry)
+          iter.flatMap{ index => index.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)}.toArray
+        else
+          Array.empty[((G,V),Distance)]
       }
 
       val knnsInPart = self.sparkContext.runJob(self, blubb _,Seq(partitionOfQry)).flatten
@@ -152,12 +160,15 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
 
 //      val maxDist = knnsInPart.maxBy(_._2)._2.minValue
-      var maxDist = knnsInPart.toStream.sortBy(_._2).tail.head._2.minValue
+      val maxDist = if(knnsInPart.isEmpty) 0
+      else if(knnsInPart.length == 1) knnsInPart.head._2.minValue
+      else knnsInPart.toStream.maxBy(_._2)._2.minValue //tail.head._2.minValue
+
       if(maxDist <= 0.0) {
         // for maxDist == 0 the box would be a point and not find any addtitional kNNs
         // we maybe should iteratively increase the box size
-        println("fallback to knnAgg")
-        knnAgg(qry, k, distFunc)
+//        println("fallback to knnAgg")
+        knnAgg2Iter(qry, k, distFunc)
       }
       else {
 
@@ -166,12 +177,17 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
         val env = Utils.makeGeo(new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist))
 
-        val knns = this.intersects(STObject(env).asInstanceOf[G]).map { case (g, v) => (g, (distFunc(qry, g), v)) }.takeOrdered(k)(o.reverse)
+        val knns = this.containedby(STObject(env).asInstanceOf[G]).map { case (g, v) => (g, (distFunc(qry, g), v)) }.takeOrdered(k)(o.reverse)
 
-        self.sparkContext.parallelize(knns)
+        val result = (knns ++ knnsInPart.map{case ((g,v),d) => (g,(d,v))}).sorted(o).take(k)
+
+//        self.sparkContext.parallelize(knns)
+        result.iterator
       }
 
-    case _ => kNN(qry,k,distFunc)
+    case _ =>
+      println("no partitioner set")
+      knnAgg2Iter(qry,k,distFunc)
   }
 
   override def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =

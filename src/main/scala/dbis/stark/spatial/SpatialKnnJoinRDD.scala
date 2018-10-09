@@ -64,7 +64,7 @@ class SpatialKnnJoinRDD[G <: STObject : ClassTag, V : ClassTag, V2: ClassTag ](
           left.iterator(rp, context).flatMap {
             case (lg, lv) =>
               val leftIter = InfiniteSingleIterator(lv)
-              val kNNs = index.kNN(lg, k, distFunc)
+              val kNNs = index.kNN(lg, k, distFunc).map{ case (v,_) => v}
               leftIter.zip(kNNs)
             case b =>
               println(b)

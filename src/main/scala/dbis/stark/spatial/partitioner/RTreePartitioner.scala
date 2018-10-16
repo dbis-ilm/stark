@@ -32,7 +32,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       tree.insert(g.getGeo, dummy)
     }
 
-    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
+//    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
 
     //val children = tree.getRoot.getChildBoundables.iterator().asScala
 //    val children = tree.lastLevelNodes
@@ -45,8 +45,6 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     }.toArray
   }
 
-  private val empties = Array.fill(partitions.length)(true)
-
 
   override def partitionBounds(idx: Int) = partitions(idx)
 
@@ -57,9 +55,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
 
   override def numPartitions = partitions.length
 
-  override def isEmpty(id: Int): Boolean = empties(id)
-
-  override def getPartition(key: Any) = {
+  override def getPartitionId(key: Any) = {
     val g = key.asInstanceOf[STObject]
 
     val env = Utils.fromEnvelope(g.getGeo.getEnvelopeInternal)
@@ -106,13 +102,23 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
-    empties(partitionId) = false
-
     partitionId
-
 
 //    partitions.find{ case Cell(_,_,extent) => extent.contains(pc)}.map(_.id).getOrElse{
 //      throw new IllegalStateException(s"Could not find any partition for $g")
 //    }
   }
+
+
+//  def canEqual(other: Any): Boolean = other.isInstanceOf[RTreePartitioner]
+
+//  override def equals(other: Any): Boolean = other match {
+//    case that: RTreePartitioner[_,_] => true
+//    case _ => false
+//  }
+//
+//  override def hashCode(): Int = {
+//    val state = Seq(partitions)
+//    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+//  }
 }

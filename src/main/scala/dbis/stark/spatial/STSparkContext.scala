@@ -1,11 +1,12 @@
 package dbis.stark.spatial
 
+import java.nio.ByteBuffer
 import java.nio.file.Paths
 
-import dbis.stark.raster.Tile
+import dbis.stark.raster.{RasterRDD, Tile}
 import dbis.stark.{Instant, Interval, STObject}
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkContext
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
 
@@ -20,12 +21,13 @@ object STSparkContext {
 /**
   * A spatio-temporal aware context
   *
-  * @param sc The original [[org.apache.spark.SparkContext]]
   */
-class STSparkContext(private val sc: SparkContext) {
+class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
+
+  def this() = this(new SparkConf())
 
   // a representation of the filesystem
-  private val dfs = org.apache.hadoop.fs.FileSystem.get(sc.hadoopConfiguration)
+  private val dfs = org.apache.hadoop.fs.FileSystem.get(hadoopConfiguration)
 
   /**
     * Load a text file and decide which partitions to load based on the given query object
@@ -36,27 +38,35 @@ class STSparkContext(private val sc: SparkContext) {
     * @param qry The query object used to decide which partition to load
     * @return Returns the [[org.apache.spark.rdd.RDD]]
     */
-  def textFile(path: String, qry: STObject, minPartitions: Int = sc.defaultMinPartitions): RDD[String] = {
+  def textFile(path: String, qry: STObject, minPartitions: Int): RDD[String] = {
     val partitionsToLoad: String = getPartitionsToLoad(path, qry)
 
     if(partitionsToLoad.isEmpty)
-      sc.emptyRDD[String]
+      this.emptyRDD[String]
     else
-      sc.textFile(partitionsToLoad, minPartitions)
+      super.textFile(partitionsToLoad, minPartitions)
   }
 
-  def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int = sc.defaultMinPartitions): RDD[T] = {
+  def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int): RDD[T] = {
+
     val partitionstoLoad = getPartitionsToLoad(path, qry)
 
     if(partitionstoLoad.isEmpty)
-      sc.emptyRDD[T]
+      emptyRDD[T]
     else
-      sc.objectFile[T](partitionstoLoad, minPartitions)
+      super.objectFile[T](partitionstoLoad, minPartitions)
   }
 
-  def tileFiles(file: String): RDD[Tile[Double]] = {
+  def tileFile(file: String, partitions: Int, qry: Option[STObject]): RasterRDD[Double] = {
 
-    sc.textFile(file).map{ line =>
+    val raw = qry match {
+      case None =>
+        super.textFile(file, partitions)
+      case Some(so) =>
+        this.textFile(file, so, partitions)
+    }
+
+    raw.map{ line =>
       val arr = line.split(',')
       val ulx = arr(0).toDouble
       val uly = arr(1).toDouble
@@ -64,13 +74,20 @@ class STSparkContext(private val sc: SparkContext) {
       val tWidth = arr(2).toInt
       val tHeight = arr(3).toInt
 
-      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
+      val pixelWidth = arr(4).toDouble
+//      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
 
-      val data = new Array[Double](arr.length - 4)
+      val data = new Array[Double](arr.length - 5)
 
-      Array.copy(arr, 4, data, 0, arr.length - 4)
+//      Array.copy(arr, 4, data, 0, arr.length - 4)
 
-      Tile(ulx, uly, tWidth, tHeight, data)
+      var i = 0
+      while(i < data.length) {
+        data(i) = arr(i+5).toDouble
+        i += 1
+      }
+
+      Tile(ulx, uly, tWidth, tHeight, data, pixelWidth = pixelWidth)
     }
 
 //    val dir = new File(folderPath)
@@ -102,14 +119,41 @@ class STSparkContext(private val sc: SparkContext) {
 //    sc.parallelize(tileList)
   }
 
+  def objectTiles(file: String, partitions: Int = 1024, query: Option[STObject] = None): RasterRDD[Double] = {
+    val byteRDD = query match {
+      case None =>
+        super.objectFile[(STObject, Array[Byte])](file, partitions)
+      case Some(so) =>
+        this.objectFile[(STObject, Array[Byte])](file,so,partitions)
+    }
+
+    byteRDD.map{ case (_, arr) =>
+      val buf = ByteBuffer.wrap(arr)
+      val ulx = buf.getDouble
+      val uly = buf.getDouble
+      val width = buf.getInt
+      val height = buf.getInt
+      val pw = buf.getDouble
+
+      val numValues = buf.getInt
+      val values = new Array[Double](numValues)
+      var i = 0
+      while(i < numValues) {
+        values(i) = buf.getDouble
+        i += 1
+      }
+
+      Tile(ulx, uly, width, height, values, pw)
+    }
+  }
+
   private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {
     val p = Paths.get(path)
-
     // the path to the info file
     val infoFile = p.resolve(STSparkContext.PARTITIONINFO_FILE).toString
 
     val partitionsToLoad = if (dfs.isDirectory(new Path(path)) && dfs.exists(new Path(infoFile))) {
-      sc.textFile(infoFile) // load info file
+      super.textFile(infoFile) // load info file
         .map(_.split(STSparkContext.PARTITIONINFO_DELIM))
         .map { arr =>
           val stobj = {

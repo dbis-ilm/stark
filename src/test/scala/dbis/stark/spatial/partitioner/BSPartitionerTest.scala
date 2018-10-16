@@ -145,11 +145,11 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     parti.printPartitions("/tmp/idtest_partitions")
 
-//    val partIds = Array(0,0,1,2,3)
+    val partIds = Array(0,0,1,2,3)
 
     val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect()
 
-    parts should contain inOrderOnly(0,2,6)
+    parts should contain theSameElementsInOrderAs partIds
 
 
 //    rdd.collect().foreach{ case (g,id) =>

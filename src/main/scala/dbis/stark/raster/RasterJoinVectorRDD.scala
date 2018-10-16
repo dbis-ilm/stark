@@ -20,7 +20,7 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (_left: RasterRDD[U],
   extends JoinRDD[Tile[U], (STObject, P), (Tile[U],P)](_left, _right, oneToMany, true) { //RDD[(Tile[U],P)](left.context, Nil) {
 
   private val isIntersects = predicate == JoinPredicate.INTERSECTS
-  private val predicateFunc = JoinPredicate.predicateFunction(predicate)
+  private val predicateFunc = JoinPredicate.spatialPredicateFunction(predicate)
 
 
   override protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext) = {
@@ -62,17 +62,20 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (_left: RasterRDD[U],
   }
 
   override protected def computeWithOneToMany(partition: OneToManyPartition, context: TaskContext) = {
+//    List.empty[(Tile[U],P)].iterator
     if(indexConfig.isEmpty) {
 
       left.iterator(partition.leftPartition, context).flatMap{ t =>
         val tileGeom = RasterUtils.tileToGeo(t)
+
         partition.rightPartitions.iterator.flatMap{ rp =>
           right.iterator(rp, context).filter { case (rg, _) =>
-            predicateFunc(tileGeom, rg)
+            predicateFunc(STObject(tileGeom), rg)
           }.map { case (rg, rv) =>
             // get only covered/intersected pixels
             val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects, pixelDefault)
             (matchingTilePart, rv)
+//            (t,rv)
           }
         }
       }
@@ -89,11 +92,15 @@ class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (_left: RasterRDD[U],
       partition.rightPartitions.iterator.flatMap { rp =>
         right.iterator(rp,context).flatMap{ case (rg, rv) =>
           // put all tiles into the tree
-          index.query(rg).map{t =>
-            val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects, pixelDefault)
-            (matchingTilePart, rv)}
+          index.query(rg).map { t =>
+//              val matchingTilePart = RasterUtils.getPixels(t, rg.getGeo, isIntersects, pixelDefault)
+//              (matchingTilePart, rv)
+            (t, rv)
+          }
         }
       }
+
+//      List.empty[(Tile[U], P)].iterator
 
     }
   }

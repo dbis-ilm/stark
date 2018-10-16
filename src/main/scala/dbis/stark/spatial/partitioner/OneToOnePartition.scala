@@ -54,4 +54,6 @@ protected[stark] case class OneToManyPartition(idx: Int, @transient private val 
     rightPartitions = rightIndex.map(i => right.partitions(i))
     oos.defaultWriteObject()
   }
+
+  override def toString = s"OneToMany(idx=$idx, left: $leftIndex rights: ${rightIndex.mkString(";")} )"
 }

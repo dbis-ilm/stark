@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import org.locationtech.jts.geom.{Envelope, GeometryFactory, Point}
+import org.locationtech.jts.geom.{Coordinate, Envelope, GeometryFactory, Point}
 import dbis.stark.STObject.{GeoType, MBR}
 
 object Utils {
@@ -36,7 +36,11 @@ object Utils {
         println(s"distincts: ${distincts.mkString(";")}")
       }
     }
-
     center
+  }
+
+  def createPoint(x: Double, y:Double): Point = {
+    val geometryFactory = new GeometryFactory()
+    geometryFactory.createPoint(new Coordinate(x,y))
   }
 }

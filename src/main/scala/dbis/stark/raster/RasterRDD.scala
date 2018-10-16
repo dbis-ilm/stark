@@ -1,11 +1,14 @@
 package dbis.stark.raster
 
+import java.nio.ByteBuffer
+
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{Index, IndexConfig}
+import dbis.stark.spatial.partitioner.GridStrategy
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, Partitioner, TaskContext}
+import org.apache.spark.{Partition, Partitioner, PlainSpatialRDDFunctions, TaskContext}
 
 import scala.reflect.ClassTag
 
@@ -89,8 +92,37 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
 
   override def saveAsTextFile(path: String) = {
     this.map{ t =>
-      s"${t.ulx},${t.uly},${t.width},${t.height},${t.data.mkString(",")}"
+      s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}"
     }.saveAsTextFile(path)
+  }
+
+  def saveAsObjectFile(path: String, partitions: Int = 8): Unit = {
+    val DOUBLE = 8
+    val INT = 4
+
+    val parti = GridStrategy(partitions, pointsOnly = true, minmax = None, sampleFraction = 0)
+
+    val mapped = this.map{t =>
+
+      val buf = ByteBuffer.allocate(DOUBLE + DOUBLE + INT + INT + DOUBLE + INT + t.data.length*DOUBLE)
+      buf.putDouble(t.ulx)
+      buf.putDouble(t.uly)
+      buf.putInt(t.width)
+      buf.putInt(t.height)
+      buf.putDouble(t.pixelWidth)
+      buf.putInt(t.data.length)
+      var i = 0
+      while(i < t.data.length) {
+        buf.putDouble(t.data(i).asInstanceOf[Double])
+        i += 1
+      }
+
+      (STObject(RasterUtils.tileToGeo(t)), buf.array())
+    }
+
+    val parted = new PlainSpatialRDDFunctions(mapped).partitionBy(parti)
+
+    new PlainSpatialRDDFunctions(parted).saveAsStarkObjectFile(path)
   }
 
 }

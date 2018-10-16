@@ -3,6 +3,7 @@ package org.apache.spark
 import java.nio.file.Paths
 
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
+import dbis.stark.raster.{RasterRDD, Tile}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
@@ -509,4 +510,33 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     index(Some(PartitionerFactory.get(partitionerConfig, self)), indexConfig)
 
 
+  def rasterize(tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double, partitions: Int): RasterRDD[V] = {
+    val parti = GridStrategy(tileWidth, pointsOnly = true, Some((-180,180,-90,90)), sampleFraction = 0)
+
+    val parted = self.partitionBy(PartitionerFactory.get(parti,self))
+
+    val tileHeight = tileWidth
+
+    val width = 14400
+    val height = 7200
+
+    val numXTiles = width / tileWidth
+    val numYTiles = height / tileHeight
+
+
+    val tileLengthX = tileWidth * pixelWidth
+    val tileLengthY = tileHeight * pixelWidth
+
+    parted.mapPartitionsWithIndex((tileNum, iter) => {
+      val arr = iter.map(_._2).toArray
+
+      val xTile = tileNum % numXTiles
+      val yTile = tileNum / numYTiles
+
+      val ulx = -180 + xTile * tileLengthX
+      val uly = 90 - yTile * tileLengthY
+
+      Iterator.single(Tile(ulx, uly, tileWidth, tileWidth, arr, pixelWidth))
+    }, preservesPartitioning = true).coalesce(partitions)
+  }
 }

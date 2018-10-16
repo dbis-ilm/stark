@@ -83,7 +83,7 @@ class AngularPartitioner(
 
   override def numPartitions: Int = ppD
 
-  override def getPartition(key: Any): Int = {
+  override def getPartitionId(key: Any): Int = {
     val so = key.asInstanceOf[STObject]
     val g = SphereCoordinate(so)
 
@@ -99,5 +99,4 @@ class AngularPartitioner(
 
   }
 
-  override def isEmpty(id: Int): Boolean = ???
 }

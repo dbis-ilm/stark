@@ -29,8 +29,6 @@ object RasterUtils {
     */
   def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U): Tile[U] = {
 
-    org.apache.spark.mllib.linalg.SparseVector
-
     // make the raster tile a vector rectangle
     val tileGeo = tileToGeo(tile)
     // get the MBR of the intersection of the tile and the given geo
@@ -124,16 +122,16 @@ object RasterUtils {
 
   @inline
   def tileToMBR(tile: Tile[_]): MBR =
-    new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly)
+    new MBR(tile.ulx, tile.ulx + (tile.width * tile.pixelWidth), tile.uly - (tile.height * tile.pixelWidth), tile.uly)
 
-  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Short = 1): Tile[U] =
+  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Double = 1): Tile[U] =
     new Tile[U](mbr.getMinX,mbr.getMaxY,
       math.ceil(mbr.getWidth).toInt, math.ceil(mbr.getHeight).toInt,
       pixelWidth,
       default
     )
 
-  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Short): Tile[U] = {
+  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Double): Tile[U] = {
     val width = (math.ceil(mbr.getWidth) / pixelWidth).toInt
     val height = (math.ceil(mbr.getHeight) / pixelWidth).toInt
     new Tile[U](mbr.getMinX,mbr.getMaxY,

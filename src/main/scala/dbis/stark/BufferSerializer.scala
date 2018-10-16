@@ -67,15 +67,18 @@ class STObjectSerializerBuffer extends Serializer[STObject] {
   }
 }
 
-class PairSerializerBuffer extends Serializer[(STObject, Any)] {
-  override def write(kryo: Kryo, output: Output, pair: (STObject, Any)): Unit = {
-    kryo.writeObject(output, pair._1, new STObjectSerializerBuffer)
-    kryo.writeClassAndObject(output, pair._2)
+class PairSerializerBuffer extends Serializer[(STObject, Byte)] {
+  val soSerializer = new STObjectSerializer
+  override def write(kryo: Kryo, output: Output, pair: (STObject, Byte)): Unit = {
+    kryo.writeObject(output, pair._1, soSerializer)
+//    kryo.writeClassAndObject(output, pair._2)
+    output.writeByte(pair._2)
   }
 
-  override def read(kryo: Kryo, input: Input, `type`: Class[(STObject, Any)]): (STObject, Any) = {
-    val so = kryo.readObject(input, classOf[STObject])
-    val payload = kryo.readClassAndObject(input)
+  override def read(kryo: Kryo, input: Input, `type`: Class[(STObject, Byte)]): (STObject, Byte) = {
+    val so = kryo.readObject(input, classOf[STObject],soSerializer)
+//    val payload = kryo.readClassAndObject(input)
+    val payload = input.readByte()
     (so, payload)
   }
 }

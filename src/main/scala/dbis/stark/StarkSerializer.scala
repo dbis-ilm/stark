@@ -3,7 +3,7 @@ package dbis.stark
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.partitioner.CellHistogram
+import dbis.stark.spatial.partitioner.{CellHistogram, OneToManyPartition}
 import dbis.stark.spatial._
 import org.locationtech.jts.geom._
 import org.locationtech.jts.io.{WKTReader, WKTWriter}
@@ -273,6 +273,7 @@ object GeometrySerializer {
   val POINT: Byte = 0
   val POLYGON: Byte = 1
   val LINESTRING: Byte = 2
+  val MULTIPOLYGON: Byte = 3
 }
 
 //class GeometryAsStringSerializer extends Serializer[Geometry] {
@@ -459,6 +460,29 @@ class GeometrySerializer extends Serializer[Geometry] {
       output.writeByte(GeometrySerializer.POLYGON)
       val extRing = p.getExteriorRing
       writeLineString(extRing, output)
+    case mp: MultiPolygon =>
+      output.writeByte(GeometrySerializer.MULTIPOLYGON)
+      output.writeInt(mp.getNumGeometries,true)
+      var i = 0
+      while(i < mp.getNumGeometries) {
+        val polyExt = mp.getGeometryN(i).asInstanceOf[Polygon].getExteriorRing
+        writeLineString(polyExt, output)
+
+        i += 1
+      }
+  }
+
+  private def readPoints(input: Input): Array[Coordinate] = {
+    val nPoints = input.readInt(true)
+    val points = new Array[Coordinate](nPoints)
+    var i = 0
+    while(i < nPoints) {
+      val c = readPointInternal(input)
+      points(i) = c
+      i += 1
+    }
+
+    points
   }
 
   override def read(kryo: Kryo, input: Input, dType: Class[Geometry]): Geometry = input.readByte() match {
@@ -466,28 +490,19 @@ class GeometrySerializer extends Serializer[Geometry] {
       readPoint(input)
 
     case GeometrySerializer.LINESTRING =>
-      val nPoints = input.readInt(true)
-      val points = new Array[Coordinate](nPoints)
-      var i = 0
-      while(i < nPoints) {
-        val c = readPointInternal(input)
-        points(i) = c
-        i += 1
-      }
-
-      geometryFactory.createLineString(points)
+      geometryFactory.createLineString(readPoints(input))
 
     case GeometrySerializer.POLYGON =>
-      val nPoints = input.readInt(true)
-      val points = new Array[Coordinate](nPoints)
+      geometryFactory.createPolygon(readPoints(input))
+    case GeometrySerializer.MULTIPOLYGON =>
+      val num = input.readInt(true)
       var i = 0
-      while(i < nPoints) {
-        val c = readPointInternal(input)
-        points(i) = c
+      val polies = new Array[Polygon](num)
+      while(i < num) {
+        polies(i) = geometryFactory.createPolygon(readPoints(input))
         i += 1
       }
-
-      geometryFactory.createPolygon(points)
+      geometryFactory.createMultiPolygon(polies)
   }
 }
 

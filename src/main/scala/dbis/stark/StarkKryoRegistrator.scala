@@ -23,6 +23,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Point], geometrySerializer)
     kryo.register(classOf[Polygon], geometrySerializer)
     kryo.register(classOf[LineString], geometrySerializer)
+    kryo.register(classOf[MultiPolygon], geometrySerializer)
 //
 //    kryo.register(classOf[Point], new PointSerializer)
 //    kryo.register(classOf[LineString], new LineStringSerializer)
@@ -31,9 +32,11 @@ class StarkKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Envelope], new EnvelopeSerializer())
     kryo.register(classOf[STObject], new STObjectSerializer)
 
+
+
     kryo.register(classOf[OneToManyPartition], new OneToMayPartitionSerializerBuffer)
 //
-    kryo.register(classOf[(STObject,Int)], new StarkSerializer)
+//    kryo.register(classOf[(STObject,Int)], new StarkSerializer)
 //
 ////    kryo.register(classOf[List[(Distance,(STObject, Any))]], new DistSeqSerializer)
 //
@@ -56,7 +59,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
 
 //    kryo.register(classOf[STObject], new STObjectSerializerBuffer)
 //    kryo.register(classOf[ScalarDistance], new ScalarDistanceSerializerBuffer)
-//    kryo.register(classOf[(STObject, Any)], new PairSerializerBuffer)
+    kryo.register(classOf[(STObject, Byte)], new PairSerializerBuffer)
 
   }
 }

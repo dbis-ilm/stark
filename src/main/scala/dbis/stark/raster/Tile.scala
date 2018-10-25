@@ -1,9 +1,6 @@
 package dbis.stark.raster
 
-import dbis.stark.STObject.MBR
-
-import scala.reflect.ClassTag
-import scala.reflect._
+import scala.reflect.{ClassTag, _}
 
 /**
  * Tile represents a data type for 2D raster data.

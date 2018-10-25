@@ -1,4 +1,4 @@
-package dbis.stark.spatial
+package dbis.stark.spatial.partitioner
 
 /**
   * Created by Jacob on 20.02.17.
@@ -27,9 +27,7 @@ object TemporalPartitioner {
   }
 }
 
-abstract class TemporalPartitioner(
-                                    private val _minT: Long, private val _maxT: Long
-                                    ) extends Partitioner {
+abstract class TemporalPartitioner(private val _minT: Long, private val _maxT: Long) extends Partitioner {
 
   def minT = _minT
 

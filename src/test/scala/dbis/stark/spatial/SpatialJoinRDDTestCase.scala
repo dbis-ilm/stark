@@ -1,5 +1,6 @@
 package dbis.stark.spatial
 
+
 import dbis.stark.{STObject, StarkTestUtils}
 import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}

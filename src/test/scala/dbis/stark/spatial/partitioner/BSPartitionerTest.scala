@@ -2,12 +2,14 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Paths
 
-import dbis.stark.{Fix, STObject, StarkTestUtils}
+import dbis.stark.{Fix,STObject, StarkKryoRegistrator, StarkTestUtils}
+import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.tagobjects.Slow
@@ -21,6 +23,8 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   
   override def beforeAll() {
     val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2")
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
   }
   
@@ -147,7 +151,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect()
 
-    parts should contain inOrderOnly(0,2,6)
+    parts should contain theSameElementsInOrderAs partIds
 
 
 //    rdd.collect().foreach{ case (g,id) =>
@@ -693,6 +697,10 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     joinResPlainCnt shouldBe > (0L)
     joinResSamCnt should equal(joinResPlainCnt)
 
+
+
+
+
     println(s"sampled join: ${end - start} ms")
     println(s"plain join: ${end2 - start2} ms")
 
@@ -792,23 +800,29 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "produce same join results with sampling as without short" taggedAs (Sampling, Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}.cache()//.sample(withReplacement = false, 0.5)
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}.cache()//.sample(withReplacement = false, 0.5)
 
 
-    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, RTreeConfig(order = 5)).join(rddTaxi, JoinPredicate.CONTAINS, None).sortByKey().collect()
+    val noStart = System.currentTimeMillis()
+    val joinResNoPart = new LiveIndexedSpatialRDDFunctions(rddBlocks, RTreeConfig(order = 5)).join(rddTaxi, JoinPredicate.CONTAINS, None, oneToMany = true).sortByKey().collect()
+    val noEnd = System.currentTimeMillis()
+
+    println(s"no partitioning: ${noEnd - noStart} ms : ${joinResNoPart.length}")
 
 
     val taxiPartiNoSample = new BSPartitioner(rddTaxi, sideLength = 0.3, maxCostPerPartition = 100, pointsOnly = true)
-
-
     val blockPartiNoSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100, pointsOnly = false)
 
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(rddBlocks.partitionBy(blockPartiNoSample), RTreeConfig(order = 5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None).sortByKey().collect()
-    joinResPlain.length shouldBe > (0)
+    val withStart = System.currentTimeMillis()
+    val joinResPlain = rddBlocks.partitionBy(blockPartiNoSample).liveIndex(RTreeConfig(order = 5)).join(rddTaxi.partitionBy(taxiPartiNoSample), JoinPredicate.CONTAINS, None, oneToMany = true).sortByKey().collect()
+    val withEnd = System.currentTimeMillis()
+    println(s"with BSP partitioning: ${withEnd - withStart} ms : ${joinResPlain.length}")
+
+    joinResPlain.length shouldBe joinResNoPart.length
 
     withClue("join part no sample does not have same results as no partitioning") { joinResPlain should contain theSameElementsAs joinResNoPart }
   }

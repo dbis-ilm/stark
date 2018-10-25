@@ -2,11 +2,12 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.{fromWKT, getInternal, makeSTObject}
 import dbis.stark._
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.partitioner.{BSPartitioner, SpatialGridPartitioner}
+import dbis.stark.spatial.indexed.{RTree, RTreeConfig}
+import dbis.stark.spatial.partitioner.{BSPartitioner, GridStrategy, RTreeStrategy, SpatialGridPartitioner}
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -17,6 +18,8 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   
   override def beforeAll() {
     val conf = new SparkConf().setMaster("local").setAppName("indexedspatialrddtestcase").set("spark.ui.showConsoleProgress", "false")
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
   }
   
@@ -125,12 +128,56 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
-	  
-	  foundGeoms.length shouldBe 6
-	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+    StarkTestUtils.timing("normal with grid") {
+      val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
+
+      foundGeoms.length shouldBe 6
+      foundGeoms.foreach { case (g, _) => g shouldBe q }
+    }
   }
-  
+
+  it should "be faster with kNN2 vs kNN" in {
+    var rdd = StarkTestUtils.createRDD(sc)
+    var i = 0
+    while(i < 100) {
+      rdd = rdd.union(StarkTestUtils.createRDD(sc))
+      i += 1
+    }
+
+    val k = 50
+
+    val indexConf  = RTreeConfig(order = 10)
+//    val partConf = RTreeStrategy(order = 10, pointsOnly = true, minmax = None, sampleFraction = 0)
+    val partConf = GridStrategy(partitionsPerDimensions = 10, pointsOnly = true, minmax = None, sampleFraction = 0)
+
+    val theRDD = rdd.map{case (so, _) => (so,1)}.index(partConf, indexConf).cache()
+
+    println(theRDD.count())
+//    val q: STObject = "POINT (53.483437 -2.2040706)"
+        val q: STObject = "POINT (-2.2040706 53.483437 )"
+
+
+    var t0 = System.currentTimeMillis()
+    val knn = theRDD.knnAggIter(q, k, Distance.seuclid).size
+    var t1 = System.currentTimeMillis()
+    println(s"knn:\t${t1 - t0}")
+
+
+    t0 = System.currentTimeMillis()
+    val knn2 = theRDD.knn2(q, k, Distance.seuclid).size
+    t1 = System.currentTimeMillis()
+    println(s"knn2:\t${t1 - t0}")
+
+//    withClue("knn vs agg"){knn should contain theSameElementsAs knn2}
+
+    knn2 shouldBe knn
+
+//    knn2.map(_.toString()).sorted.mkString("\n") shouldBe knn.map(_.toString()).sorted.mkString("\n")
+  }
+
+
+
   it should "find the correct nearest neighbors with BSP" in { 
     val rddRaw = StarkTestUtils.createRDD(sc)
     val rdd = rddRaw.index(new BSPartitioner(rddRaw,  1, 100, pointsOnly = false), order= 5) // 0.5
@@ -140,18 +187,20 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
 	  val q: STObject = "POINT (53.483437 -2.2040706)"
-	  val foundGeoms = rdd.kNN(q, k, Distance.seuclid).collect()
-	  
-	  val tree = new RTree[(String, Long, String, STObject)](5)
+
+    StarkTestUtils.timing("normal with bsp") {
+      val foundGeoms = rdd.kNN(q, k, Distance.seuclid).collect()
+      foundGeoms.length shouldBe k
+      foundGeoms.foreach{ case (g,_) => withClue("found geoms did not match") {g shouldBe q}}
+    }
+
+    val tree = new RTree[(String, Long, String, STObject)](5)
     rddRaw.collect().foreach{ case (so, v) => tree.insert(so, v) }
-	  tree.build()
-	  
+    tree.build()
+
     val refGeoms = tree.kNN(q, k, Distance.seuclid).toList
     refGeoms.size shouldBe k
-    refGeoms.foreach{ case (_,_,_,g) => withClue("reference geoms did not match") {g shouldBe q }}
-	  
-	  foundGeoms.length shouldBe k
-	  foundGeoms.foreach{ case (g,_) => withClue("found geoms did not match") {g shouldBe q}}
+    refGeoms.foreach{ case ((_,_,_,g),_) => withClue("reference geoms did not match") {g shouldBe q }}
   }
   
   it should "compute the correct (quasi) self-join result for points with intersects" in {

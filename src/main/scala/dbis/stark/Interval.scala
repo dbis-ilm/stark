@@ -1,4 +1,5 @@
 package dbis.stark
+import java.nio.ByteBuffer
 
 /**
  * Represents an interval in time with a start and an optional end
@@ -10,10 +11,24 @@ case class Interval(
     private val _start: Instant, 
     private val _end: Option[Instant]
   ) extends TemporalExpression {
-  
-//  require(_end.isEmpty || _start < _end.get, "Right Open Interval criteria not met! _start must be smaller than _end")
+
+  //  require(_end.isEmpty || _start < _end.get, "Right Open Interval criteria not met! _start must be smaller than _end")
   require(_end.isEmpty || _start <= _end.get, "Start must be <= End")
-  
+
+  override def determineByteSize: Int = BufferSerializer.BYTE_SIZE + BufferSerializer.LONG_SIZE + BufferSerializer.BYTE_SIZE + (if(_end.isDefined) BufferSerializer.LONG_SIZE else 0)
+
+  override def serialize(buffer: ByteBuffer): Unit = {
+    buffer.put(Interval.INTERVAL_TYPE)
+    buffer.putLong(_start.value)
+    if(_end.isDefined) {
+      buffer.put(Interval.HAS_END)
+      buffer.putLong(_end.get.value)
+    } else {
+      buffer.put(Interval.NO_END)
+    }
+  }
+
+
   def intersects(t: TemporalExpression): Boolean = 
     (start <= t.start && (end.isEmpty || (end.isDefined && end.get >= t.start))) ||
     (t.start <= start && (t.end.isEmpty || (t.end.isDefined && t.end.get >= start)))
@@ -48,11 +63,16 @@ case class Interval(
 }
 
 object Interval {
-  
+
+  protected[stark] val INTERVAL_TYPE: Byte = 2
+
+  protected[stark] val NO_END: Byte = 0
+  protected[stark] val HAS_END: Byte = 1
+
   def apply(o: Interval): Interval= Interval(Instant(o.start), Instant(o.end))
   
   def apply(start: Long, end: Long): Interval = Interval(Instant(start), Some(Instant(end)))
   
   def apply(start: Instant, end: Instant): Interval = Interval(start, Some(end))
-  
+
 }

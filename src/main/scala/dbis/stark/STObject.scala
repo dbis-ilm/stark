@@ -1,11 +1,12 @@
 package dbis.stark
 
-//import com.vividsolutions.jts.geom.{Envelope, Geometry, Point}
-//import com.vividsolutions.jts.io.WKTReader
-import STObject._
+import java.nio.ByteBuffer
+
+import com.esotericsoftware.kryo.io.Input
+import dbis.stark.STObject._
 import dbis.stark.spatial.Utils
 import org.locationtech.jts.geom._
-import org.locationtech.jts.io.WKTReader
+import org.locationtech.jts.io.{WKTReader, WKTWriter}
 
 /**
  * A STObject represents some spatial geometry. It can also have
@@ -23,11 +24,13 @@ import org.locationtech.jts.io.WKTReader
  * @param time The optional time component 
  */
 case class STObject(
-   private val g: GeoType,
-   time: Option[TemporalExpression]) extends BaseExpression[STObject] {
+   g: GeoType,
+   time: Option[TemporalExpression]) extends BaseExpression[STObject] with StarkSerializable {
+
+//  private def this() = this(null, None)
 
   def area = g.getArea
-  def length = time.map(_.length)
+  def length = time.flatMap(_.length)
 
   def intersectsSpatial(t: STObject) = g.intersects(t.g)
   def intersectsTemporal(t: STObject) = time.isEmpty && t.time.isEmpty || (time.isDefined && t.time.isDefined && time.get.intersects(t.time.get))
@@ -126,13 +129,92 @@ case class STObject(
 
   def getGeo = g
   def getTemp = time
-  
+
+  lazy val wkt = {
+    new WKTWriter().write(g)
+  }
+
+
+  override def determineByteSize: Int = {
+
+    val geoSize = BufferSerializer.BYTE_SIZE + (g match {
+      case _:Point =>
+        2 * BufferSerializer.DOUBLE_SIZE
+      case l:LineString =>
+        l.getNumPoints * 2 * BufferSerializer.DOUBLE_SIZE + BufferSerializer.INT_SIZE
+
+      case p: Polygon =>
+        p.getExteriorRing.getNumPoints * 2 * BufferSerializer.DOUBLE_SIZE + BufferSerializer.INT_SIZE
+    })
+
+    val timeSize = time match {
+      case None =>
+        BufferSerializer.BYTE_SIZE
+      case Some(i) =>
+        i.determineByteSize
+    }
+
+    geoSize + timeSize
+  }
+
+  override def serialize(buffer: ByteBuffer): Unit = {
+    g match {
+      case p: Point =>
+        buffer.put(STObject.POINT)
+        val coord = p.getCoordinate
+        buffer.putDouble(coord.x)
+        buffer.putDouble(coord.y)
+      case l: LineString =>
+        buffer.put(STObject.LINESTRING)
+
+        val lineCoords = l.getCoordinates
+
+        buffer.putInt(lineCoords.length)
+        var i = 0
+        while(i < lineCoords.length) {
+          val p = lineCoords(i)
+          buffer.putDouble(p.x)
+          buffer.putDouble(p.y)
+          i += 1
+        }
+      case p: Polygon =>
+        buffer.put(STObject.POLYGON)
+
+        val lineCoords = p.getExteriorRing.getCoordinates
+
+        buffer.putInt(lineCoords.length)
+        var i = 0
+        while(i < lineCoords.length) {
+          val p = lineCoords(i)
+          buffer.putDouble(p.x)
+          buffer.putDouble(p.y)
+          i += 1
+        }
+    }
+
+    time match {
+      case None =>
+        buffer.put(STObject.NONE)
+      case Some(i) =>
+        i.serialize(buffer)
+    }
+
+  }
+
+
 }
 
 object STObject {
 
   type GeoType = Geometry
   type MBR = Envelope
+
+  protected[stark] val POINT: Byte = 0
+  protected[stark] val LINESTRING: Byte = 1
+  protected[stark] val POLYGON: Byte = 2
+
+  protected[stark] val NONE: Byte = 0
+  protected[stark] val HAS_TIME: Byte = 1
 
   def apply(wkt: String): STObject = this(new WKTReader().read(wkt))
   def apply(wkt: String, ts: Long): STObject = STObject(new WKTReader().read(wkt), ts)
@@ -165,5 +247,84 @@ object STObject {
 	implicit def fromWKT(s: String): STObject = STObject(s)
 
   implicit def asString(s: STObject): String = s.toString
+
+  private def readPoint(implicit input: Input): Point = {
+    val x = BufferSerializer.getDouble(input)
+    val y = BufferSerializer.getDouble(input)
+
+    new GeometryFactory().createPoint(new Coordinate(x,y))
+  }
+
+  private def readLineString(implicit input: Input): LineString = {
+    val num = BufferSerializer.getInt
+
+    var i = 0
+
+    val coords = new Array[Coordinate](num)
+    while(i < num) {
+
+      val x = BufferSerializer.getDouble
+      val y = BufferSerializer.getDouble
+
+      coords(i) = new Coordinate(x,y)
+
+      i += 1
+    }
+
+    new GeometryFactory().createLineString(coords)
+  }
+
+  def readPolygon(implicit input: Input): Polygon = {
+    val num = BufferSerializer.getInt
+
+    var i = 0
+
+    val coords = new Array[Coordinate](num)
+    while(i < num) {
+
+      val x = BufferSerializer.getDouble
+      val y = BufferSerializer.getDouble
+
+      coords(i) = new Coordinate(x,y)
+
+      i += 1
+    }
+
+    new GeometryFactory().createPolygon(coords)
+  }
+
+  def deserialize(implicit input: Input): STObject = {
+    val g = BufferSerializer.getByte match {
+      case POINT =>
+        readPoint
+      case LINESTRING =>
+        readLineString
+      case POLYGON =>
+        readPolygon
+    }
+
+    val timeID = BufferSerializer.getByte
+    val t = timeID match {
+      case NONE =>
+        None
+      case Instant.INSTANT_TYPE =>
+        val l = BufferSerializer.getLong
+        Some(Instant(l))
+      case Interval.INTERVAL_TYPE =>
+        val start = Instant(BufferSerializer.getLong)
+        val end = BufferSerializer.getByte match {
+          case Interval.HAS_END =>
+            Some(Instant(BufferSerializer.getLong))
+          case _ => None
+        }
+
+        Some(Interval(start, end))
+
+      case _ => error(s"unknown time id: $timeID")
+    }
+
+
+    STObject(g, t)
+  }
   
 }

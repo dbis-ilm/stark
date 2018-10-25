@@ -1,13 +1,12 @@
 package dbis.stark.raster
 
-import scala.reflect.ClassTag
-import scala.reflect._
+import scala.reflect.{ClassTag, _}
 
 /**
  * Tile represents a data type for 2D raster data.
  *
  */
-case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int, data: Array[U], pixelWidth: Short = 1) extends Serializable {
+case class Tile[@specialized(Int, Double, Byte) U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int, data: Array[U], pixelWidth: Double = 1) extends Serializable {
 
   /**
    * Contructor for tile with given data.
@@ -17,7 +16,7 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   def this(ulx: Double, uly: Double, width: Int, height: Int) =
     this(ulx, uly, width, height, Array.fill[U](width * height)(null.asInstanceOf[U]))
 
-  def this(ulx: Double, uly: Double, width: Int, height: Int, pixelWidth: Short, default: U) =
+  def this(ulx: Double, uly: Double, width: Int, height: Int, pixelWidth: Double, default: U) =
     this(ulx, uly, width, height, Array.fill[U](width * height)(default), pixelWidth)
 
   /**
@@ -26,11 +25,13 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   def this(width: Int, height: Int) = this(0, height, width, height)
 
 
+  lazy val center = (ulx + (width*pixelWidth)/2 , uly - (height*pixelWidth)/2)
+
   /**
    * Set a raster point at a given position to a value.
    */
   def set(x: Double, y: Double, v: U): Unit =
-    data(pos(x,y)) = v
+    data(idxFromPos(x,y)) = v
 
   def set(i: Int, v: U) = data(i) = v
 
@@ -39,7 +40,7 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   /**
    * Return the value at the given position of the raster.
    */
-  def value(x: Double, y: Double): U = data(pos(x,y))
+  def value(x: Double, y: Double): U = data(idxFromPos(x,y))
 
   @inline
   private[raster] def column(x: Double): Int = math.abs(x - ulx).toInt
@@ -47,8 +48,23 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   private[raster] def row(y: Double): Int = (uly - y).toInt
 
   @inline
-  private[raster] def pos(x: Double, y: Double): Int =
+  private[raster] def idxFromPos(x: Double, y: Double): Int =
     row(y) * width + column(x)
+
+
+  @inline
+  private[raster] def posFromColRow(i: Int, j: Int): (Double, Double) = {
+    val col = ulx + ((i % width) * pixelWidth)
+    val row = uly - ((j / width) * pixelWidth)
+
+    (col, row)
+  }
+
+
+  @inline
+  def colRow(idx: Int): (Int, Int) = {
+    (idx % width, idx / width)
+  }
 
 
   def value(i: Int): U = data(i)
@@ -58,7 +74,7 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
   /**
    * Apply a function to each raster point and return the new resulting tile.
    */
-  def map[T : ClassTag](f: U => T): Tile[T] = Tile(ulx, uly, width, height, data.map(f))
+  def map[T : ClassTag](f: U => T): Tile[T] = Tile(ulx, uly, width, height, data.map(f),pixelWidth)
 
   /**
    * Count the number of points with the given value.
@@ -88,6 +104,12 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
 
     b.toString()
   }
+
+  def intersects(t: Tile[_]): Boolean = RasterUtils.intersects(this, t)
+
+  def contains(t: Tile[_]): Boolean = RasterUtils.contains(this, t)
+
+  lazy val wkt = RasterUtils.tileToGeo(this)
 }
 
 //object Tile {

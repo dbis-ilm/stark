@@ -1,10 +1,11 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.STObject
+import dbis.stark.{STObject, StarkKryoRegistrator}
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
 import org.apache.spark.SpatialRDD._
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.tagobjects.Slow
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -15,6 +16,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
 
   override def beforeAll() {
     val conf = new SparkConf().setMaster(s"local[${Runtime.getRuntime.availableProcessors()}]").setAppName("paritioner_test2")
+    conf.set("spark.serializer", classOf[KryoSerializer].getName)
+    conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
   }
 
@@ -376,8 +379,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     withClue("compared with no partitioning") { joinResSamCnt shouldBe countNoPart}
     withClue("different join results"){joinResSamCnt should equal(joinResPlainCnt)}
 
-    println(s"sampled join: ${end - start} ms")
-    println(s"plain join: ${end2 - start2} ms")
+    println(s"sampled join: ${end - start} ms: $joinResSamCnt")
+    println(s"plain join: ${end2 - start2} ms: $joinResPlainCnt")
 
     //    joinResSam should contain theSameElementsAs joinResPlain
   }

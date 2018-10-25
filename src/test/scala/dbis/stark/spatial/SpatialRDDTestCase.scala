@@ -90,7 +90,49 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}
     
-  } 
+  }
+
+  it should "find the correct nearest neighbors with aggregate" in {
+    val rdd = StarkTestUtils.createRDD(sc)
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnAgg(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "be faster with kNNAgg vs kNN" in {
+    var rdd = StarkTestUtils.createRDD(sc)
+    var i = 0
+    while(i < 100) {
+      rdd = rdd.union(StarkTestUtils.createRDD(sc))
+      i += 1
+    }
+
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+
+    var t0 = System.currentTimeMillis()
+    val knn = rdd.map{case (so, _) => (so,1)}.kNN(q, k = 100, Distance.seuclid).collect()
+    var t1 = System.currentTimeMillis()
+    println(s"knn:\t${t1 - t0}")
+
+    t0 = System.currentTimeMillis()
+    val knnAgg = rdd.map{case (so, _) => (so,1)}.knnAgg(q, k = 100, Distance.seuclid).collect()
+    t1 = System.currentTimeMillis()
+    println(s"knn Agg:\t${t1 - t0}")
+
+    t0 = System.currentTimeMillis()
+    val knnTake = rdd.map{case (so, _) => (so,1)}.knnTake(q, k = 100, Distance.seuclid).collect()
+    t1 = System.currentTimeMillis()
+    println(s"knn Take:\t${t1 - t0}")
+
+    withClue("knn vs agg"){knn should contain theSameElementsAs knnAgg}
+    withClue("knn vs take"){knn should contain theSameElementsAs knnTake}
+  }
   
   
   it should "find correct self-join result for points with intersect" in {
@@ -101,7 +143,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.intersects _, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.intersects, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -128,7 +170,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.contains _, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.contains, oneToManyPartitioning = false).map(_._1._4.toText()).collect()
 
     /* We compare the spatial join result to a normal join performed by traditional Spark
      * an the String representation of the STObject. Since we need a pair RDD, we use the
@@ -153,7 +195,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
      * and then map the result to the STObject element (which is the same for left and right input)
      * This is done for comparison later
      */
-    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid) _, oneToManyPartitioning = false)
+    val spatialJoinResult = rdd1.join(rdd1, PredicatesFunctions.withinDistance(ScalarDistance(0), Distance.seuclid), oneToManyPartitioning = false)
                                 .map(_._1._4.toText())
                                 .collect()
 

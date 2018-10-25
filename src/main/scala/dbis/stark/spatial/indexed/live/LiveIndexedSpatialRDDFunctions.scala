@@ -1,11 +1,11 @@
 package dbis.stark.spatial.indexed.live
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
 import dbis.stark.spatial.partitioner.GridPartitioner
-import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.{SpatialFilterRDD, SpatialRDD}
+import org.apache.spark.SpatialFilterRDD
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -54,39 +54,57 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
-    val r = self.mapPartitionsWithIndex({ (idx, iter) =>
-              val partitionCheck = self.partitioner.forall { p =>
-                p match {
-                  case sp: GridPartitioner => Utils.toEnvelope(sp.partitionBounds(idx).extent).intersects(qry.getGeo.getEnvelopeInternal)
-                  case _ => true
-                }
-              }
 
-              if(partitionCheck) {
+    implicit val ord = new Ordering[((G,V),Distance)] {
+      override def compare(x: ((G,V),Distance), y: ((G,V),Distance)) = if(x._2 < y._2) -1 else if(x._2 > y._2) 1 else 0
+    }
+
+    val r = self.mapPartitionsWithIndex({ (_, iter) =>
 
                 val tree = IndexFactory.get[G,(G,V)](indexConfig)
-
                 require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
 
                 val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
-
                 iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
 
                 idxTree.build()
-
                 idxTree.kNN(qry, k, distFunc)
-              }
-              else
-                Iterator.empty
-
             })
+        .takeOrdered(k)(ord)
 
-          .map { case (g,v) => (g, (distFunc(g,qry), v)) }
-          .sortBy(_._2._1, ascending = true)
-          .take(k)
-
-    self.sparkContext.parallelize(r)
+    self.sparkContext.parallelize(r).map{ case ((g,v),d) => (g,(d,v))}
   }
+
+  override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
+    val knns = self.mapPartitions({iter =>
+      val tree = IndexFactory.get[G,(G,V)](indexConfig)
+
+      require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
+
+      val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
+
+      iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
+
+      idxTree.build()
+
+      val knnIter = idxTree.kNN(qry, k, distFunc)
+//                            .map{ case (g,v) => (distFunc(g,qry),(g,v))}
+                            .map(_.swap)
+                            .toArray
+
+      val knn = new KNN[(G,V)](k)
+
+      knn.set(knnIter)
+      Iterator.single(knn)
+
+    }, true)
+        .reduce(_.merge(_))
+
+
+    self.sparkContext.parallelize(knns.iterator.map{ case (d,(g,v)) => (g,(d,v))}.toSeq)
+  }
+
+  override def knnTake(qry: G, k: Int, distFunc: (STObject, STObject) => Distance) = kNN(qry, k, distFunc)
 
   /**
    * Perform a spatial join using the given predicate function.

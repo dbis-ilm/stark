@@ -1,11 +1,14 @@
 package dbis.stark.raster
 
+import java.nio.ByteBuffer
+
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{Index, IndexConfig}
+import dbis.stark.spatial.partitioner.GridStrategy
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, Partitioner, TaskContext}
+import org.apache.spark.{Partition, Partitioner, PlainSpatialRDDFunctions, TaskContext}
 
 import scala.reflect.ClassTag
 
@@ -70,13 +73,63 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
                         indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(Tile[U],P)] =
     new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany)
 
+  def joinWithAggregate[P: ClassTag, R](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, aggregate: Tile[U] => R, indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(R,P)] =
+    new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany).map{ case (tile, p) => (aggregate(tile), p)}
+
   def join[P: ClassTag](other: RDD[Index[P]], pixelDefault: U, predicate: JoinPredicate, oneToMany: Boolean): RDD[(Tile[U],P)] = {
     RasterJoinIndexedVectorRDD(this, other, predicate, pixelDefault, oneToMany)
   }
+
+  def joinWithAggregate[P: ClassTag, R](other: RDD[Index[P]], pixelDefault: U, predicate: JoinPredicate, oneToMany: Boolean, aggregate: Tile[U] => R): RDD[(R,P)] = {
+    RasterJoinIndexedVectorRDD(this, other, predicate, pixelDefault, oneToMany).map{ case (tile, p) =>
+      (aggregate(tile), p)
+    }
+  }
+
+  def join[P: ClassTag, R: ClassTag](other: RasterRDD[P], predicate: JoinPredicate, func: (U,P) => R, oneToMany: Boolean) =
+    RasterJoinRDD(this, other, predicate, func, oneToMany)
+
+
+  override def saveAsTextFile(path: String) = {
+    this.map{ t =>
+      s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}"
+    }.saveAsTextFile(path)
+  }
+
+  def saveAsObjectFile(path: String, partitions: Int = 8): Unit = {
+    val DOUBLE = 8
+    val INT = 4
+
+    val parti = GridStrategy(partitions, pointsOnly = true, minmax = None, sampleFraction = 0)
+
+    val mapped = this.map{t =>
+
+      val buf = ByteBuffer.allocate(DOUBLE + DOUBLE + INT + INT + DOUBLE + INT + t.data.length*DOUBLE)
+      buf.putDouble(t.ulx)
+      buf.putDouble(t.uly)
+      buf.putInt(t.width)
+      buf.putInt(t.height)
+      buf.putDouble(t.pixelWidth)
+      buf.putInt(t.data.length)
+      var i = 0
+      while(i < t.data.length) {
+        buf.putDouble(t.data(i).asInstanceOf[Double])
+        i += 1
+      }
+
+      (STObject(RasterUtils.tileToGeo(t)), buf.array())
+    }
+
+    val parted = new PlainSpatialRDDFunctions(mapped).partitionBy(parti)
+
+    new PlainSpatialRDDFunctions(parted).saveAsStarkObjectFile(path)
+  }
+
 }
 
 
 object  RasterRDD {
   implicit def toRasterRDD[U : ClassTag](rdd: RDD[Tile[U]]) = new RasterRDD[U](rdd)
-  implicit def toDrawable(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctions(rdd)
+  implicit def toDrawableDouble(rdd: RDD[Tile[Double]]) = new DrawableRasterRDDFunctionsDouble(rdd)
+  implicit def toDrawableInt(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctionsInt(rdd)
 }

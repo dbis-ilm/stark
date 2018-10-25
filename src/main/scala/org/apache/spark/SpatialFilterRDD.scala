@@ -2,8 +2,8 @@ package org.apache.spark
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
-import dbis.stark.spatial.partitioner.{SpatialPartition, GridPartitioner}
-import dbis.stark.spatial.{JoinPredicate, TemporalPartitioner, Utils}
+import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialPartition, TemporalPartitioner}
+import dbis.stark.spatial.{JoinPredicate, Utils}
 import dbis.stark.{Interval, STObject}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD

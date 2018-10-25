@@ -9,8 +9,24 @@ import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConverters._
 
+case class CellHistogram(buckets: Array[(Cell, Int)])
 
 trait SpatialPartitioner extends Partitioner {
+
+  private final lazy val empties = Array.fill(numPartitions)(true)
+
+  @inline
+  final def isEmpty(id: Int): Boolean = empties(id)
+
+  @inline
+  def getPartitionId(key: Any): Int
+
+  override final def getPartition(key: Any) = {
+    val id = getPartitionId(key)
+    empties(id) = false
+    id
+  }
+
   def printPartitions(fName: java.nio.file.Path): Unit
 
   def printPartitions(fName: String): Unit =
@@ -96,7 +112,8 @@ object GridPartitioner {
     * Compute the bounds of a cell with the given ID
     * @param id The ID of the cell to compute the bounds for
     */
-  protected[spatial] def getCellBounds(id: Int, xCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): NRectRange = {
+  @inline
+  protected[stark] def getCellBounds(id: Int, xCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): NRectRange = {
 
     val dy = id / xCells
     val dx = id % xCells
@@ -115,16 +132,17 @@ object GridPartitioner {
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
                                        xLength: Double, yLength:Double): Array[(Cell,Int)] = {
 
-    case class CellHistogram(buckets: Array[(Cell, Int)])
-
     def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
 
       val p = Utils.getCenter(pt._1.getGeo)
       val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
-      histo1.buckets(cellId)._2 + 1
-      if(!pointsOnly)
-        histo1.buckets(cellId)._1.extent.extend(Utils.fromGeo(pt._1.getGeo))
+      histo1.buckets(cellId) = (histo1.buckets(cellId)._1, histo1.buckets(cellId)._2 + 1)
+      if(!pointsOnly) {
+        histo1.buckets(cellId)._1.extendBy(Utils.fromGeo(pt._1.getGeo))
+//        histo1.buckets(cellId)._1.extent.extend(
+      }
+//        histo1.buckets(cellId) = (), histo1.buckets(cellId)._2)
       histo1
     }
 
@@ -136,6 +154,7 @@ object GridPartitioner {
         val newCnt = cnt1 + cnt2
         (newCell, newCnt)
       }.toArray
+
 
       CellHistogram(newBuckets)
     }

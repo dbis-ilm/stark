@@ -3,10 +3,8 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, Utils}
-import org.locationtech.jts.index.strtree.Boundable
 
 import scala.collection.JavaConverters._
 
@@ -34,13 +32,15 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       tree.insert(g.getGeo, dummy)
     }
 
-    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
+//    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
 
     //val children = tree.getRoot.getChildBoundables.iterator().asScala
-    val children = tree.lastLevelNodes
+//    val children = tree.lastLevelNodes
 
-    children.zipWithIndex.map{ case (child, idx) =>
-      val mbr = child.getBounds.asInstanceOf[MBR]
+    val children = tree.queryBoundary().asScala
+
+    children.zipWithIndex.map{ case (mbr, idx) =>
+//      val mbr = child.getBounds.asInstanceOf[MBR]
       Cell(idx, Utils.fromEnvelope(mbr))
     }.toArray
   }
@@ -55,7 +55,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
 
   override def numPartitions = partitions.length
 
-  override def getPartition(key: Any) = {
+  override def getPartitionId(key: Any) = {
     val g = key.asInstanceOf[STObject]
 
     val env = Utils.fromEnvelope(g.getGeo.getEnvelopeInternal)
@@ -98,14 +98,27 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
 
 //      if(!pointsOnly)
         partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+    } else if(!pointsOnly) {
+      partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
 
-
     partitionId
-
 
 //    partitions.find{ case Cell(_,_,extent) => extent.contains(pc)}.map(_.id).getOrElse{
 //      throw new IllegalStateException(s"Could not find any partition for $g")
 //    }
   }
+
+
+//  def canEqual(other: Any): Boolean = other.isInstanceOf[RTreePartitioner]
+
+//  override def equals(other: Any): Boolean = other match {
+//    case that: RTreePartitioner[_,_] => true
+//    case _ => false
+//  }
+//
+//  override def hashCode(): Int = {
+//    val state = Seq(partitions)
+//    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+//  }
 }

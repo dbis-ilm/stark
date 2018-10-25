@@ -1,4 +1,5 @@
 package dbis.stark
+import java.nio.ByteBuffer
 
 /**
  * An instant represents a point in time.
@@ -9,9 +10,8 @@ package dbis.stark
 case class Instant(
     private val _l: Long
   ) extends TemporalExpression {
-  
-  
-  def value = _l
+
+  val value = _l
   
   def start = this
   def end = Some(this)
@@ -35,12 +35,21 @@ case class Instant(
   
   override def >=(o: TemporalExpression): Boolean = o <= this
   
-  def -(o: Instant): Double = math.abs(o.value - value) 
+  def -(o: Instant): Double = math.abs(o.value - value)
+
+  override def determineByteSize: Int = BufferSerializer.BYTE_SIZE + BufferSerializer.LONG_SIZE
+
+  override def serialize(buffer: ByteBuffer): Unit = {
+    buffer.put(Instant.INSTANT_TYPE)
+    buffer.putLong(_l)
+  }
 }
 
   
 
 object Instant {
+
+  protected[stark] val INSTANT_TYPE: Byte = 1
 
   def apply(o: Instant): Instant = Instant(o.value)
   

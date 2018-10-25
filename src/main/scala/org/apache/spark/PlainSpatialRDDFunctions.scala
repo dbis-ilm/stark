@@ -3,6 +3,7 @@ package org.apache.spark
 import java.nio.file.Paths
 
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
+import dbis.stark.raster.{RasterRDD, Tile}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
@@ -25,21 +26,38 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                        self: RDD[(G,V)]
   ) extends SpatialRDDFunctions[G,V](self) with Serializable {
 
+  def saveAsStarkTextFile(path: String, formatter: ((G,V)) => String): Unit =
+    self.partitioner.flatMap{
+      case sp: GridPartitioner => Some(sp)
+      case _ => None
+    } match {
+      case Some(sp) =>
+        val wkts = self.partitions.indices.map{ i =>
+          Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+        }
 
-  def saveAsStarkTextFile(path: String): Unit = self.partitioner.foreach {
-    case sp: GridPartitioner =>
+        self.map(formatter).saveAsTextFile(path)
+        self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+      case _ =>
+        self.saveAsTextFile(path)
+    }
+
+
+
+  def saveAsStarkObjectFile(path: String): Unit = self.partitioner.flatMap{
+    case sp: GridPartitioner => Some(sp)
+    case _ => None
+  } match {
+    case Some(sp) =>
       val wkts = self.partitions.indices.map{ i =>
         Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
       }
 
-      self.saveAsTextFile(path)
+      self.saveAsObjectFile(path)
       self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
-
-    // in case there is no or not a spatial partitioner, use normal save
-    case _ => self.saveAsTextFile(path)
+    case _ =>
+      self.saveAsObjectFile(path)
   }
-
-
 
   /**
    * Find all elements that intersect with a given query geometry
@@ -65,29 +83,64 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = self.withScope{
-//    // compute k NN for each partition individually --> n * k results
-//    val r = rdd.mapPartitions({iter => iter.map { case (g,v) =>
-//        val d = distFunc(g,qry)
-//        (g,(d,v)) // compute and return distance
-//      }
-//      .toList
-//      .sortWith(_._2._1 < _._2._1) // on distance
-//      .take(k) // take only the fist k
-//      .toIterator // remove the iterator
-//    })
-//
-//    // sort all n lists and sort by distance, then take only the first k elements
-//    val arr = r.sortBy(_._2._1, ascending = true).take(k)
-//
-//    // return as an RDD
-//    rdd.sparkContext.parallelize(arr)
+    // compute k NN for each partition individually --> n * k results
+    val knn = self.mapPartitions({iter => iter.map { case (g,v) =>
+        val d = distFunc(g,qry)
+        (g,(d,v)) // compute and return distance
+      }
+      .toList
+      .sortWith(_._2._1 < _._2._1) // on distance
+      .take(k) // take only the fist k
+      .toIterator // remove the iterator
+    }).sortBy(_._2._1, ascending = true)
+      .take(k)
 
-    val knn = self.map{ case(g,v) => (distFunc(qry,g), (g,v)) } // compute distances and make it key
-                  .sortByKey(ascending = true) // sort by distance
-                  .take(k) // take only the first k elements
-                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
 
-    self.sparkContext.parallelize(knn) // return as RDD
+//    val knn = self.map{ case(g,v) =>
+//        (distFunc(qry,g), (g,v))
+//    }// compute distances and make it key
+//                  .sortByKey(ascending = true) // sort by distance
+//                  .take(k) // take only the first k elements
+//                  .map{ case (d,(g,v)) => (g, (d,v))}  // project to desired format
+//
+
+
+    self.sparkContext.parallelize(knn)
+  }
+
+  override def knnTake(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance,V))] = {
+    implicit val ord = new Ordering[(G,(Distance,V))] {
+      override def compare(x: (G,(Distance,V)), y: (G,(Distance,V))) = if(x._2._1 < y._2._1) -1 else if(x._2._1 > y._2._1) 1 else 0
+    }
+    val knn = self.mapPartitions { iter =>
+      iter.map { case (g, v) =>
+        val d = distFunc(g,qry)
+        (g,(d,v)) // compute and return distance
+      }
+    }.takeOrdered(k)
+
+    self.sparkContext.parallelize(knn)
+  }
+
+
+  override def knnAgg(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance,V))] = {
+    type Data = (G,V)
+    def combine(knn: KNN[Data], tuple: Data) = {
+      val dist = distFunc(ref, tuple._1)
+      knn.insert((dist,tuple))
+      knn
+    }
+
+    def merge(knn1: KNN[Data], knn2: KNN[Data]) = {
+      knn1.merge(knn2)
+    }
+
+    val empty = new KNN[Data](k)
+
+    val knn = self.aggregate(empty)(combine, merge)
+
+    self.sparkContext.parallelize(knn.iterator.map{ case (dist,(g,v)) => (g,(dist,v)) }.toSeq)
+
   }
 
 
@@ -375,6 +428,38 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
   }
 
+//  def skylinePrune(ref: STObject,
+//                   distFunc: (STObject, STObject) => (Distance, Distance),
+//                   dominatesRel: (STObject, STObject) => Boolean,
+//                   ppd: Int): RDD[(G,V)] = if(self.partitioner.nonEmpty && self.partitioner.get.isInstanceOf[GridPartitioner]) {
+//
+//
+//
+//    new RDD[(G,V)](self) {
+//
+//      private val sParti = self.partitioner.get.asInstanceOf[GridPartitioner]
+//
+//      override val partitioner = self.partitioner
+//
+//      def dominates(p1: Int, p2: Int): Boolean = {
+//        val one = sParti.partitionBounds(p1)
+//        val two = sParti.partitionBounds(p2)
+//
+//        one.
+//      }
+//
+//      override protected def getPartitions: Array[Partition] = {
+//
+//      }
+//
+//
+//      override def compute(split: Partition, context: TaskContext): Iterator[(G, V)] = ???
+//    }
+//  } else
+//    skyline(ref, distFunc, dominatesRel, ppd)
+
+
+
 
   // LIVE
 
@@ -414,8 +499,44 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     preservesPartitioning = true) // preserve partitioning
   }
 
+  def index(indexConfig: IndexConfig,config: Option[PartitionerConfig]): RDD[Index[(G,V)]] = config match {
+    case None =>
+      val noIdx: Option[SpatialPartitioner] = None
+      index(noIdx, indexConfig)
+    case Some(c) => index(c, indexConfig)
+  }
+
   def index(partitionerConfig: PartitionerConfig, indexConfig: IndexConfig): RDD[Index[(G,V)]] =
     index(Some(PartitionerFactory.get(partitionerConfig, self)), indexConfig)
 
 
+  def rasterize(tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double, partitions: Int): RasterRDD[V] = {
+    val parti = GridStrategy(tileWidth, pointsOnly = true, Some((-180,180,-90,90)), sampleFraction = 0)
+
+    val parted = self.partitionBy(PartitionerFactory.get(parti,self))
+
+    val tileHeight = tileWidth
+
+    val width = 14400
+    val height = 7200
+
+    val numXTiles = width / tileWidth
+    val numYTiles = height / tileHeight
+
+
+    val tileLengthX = tileWidth * pixelWidth
+    val tileLengthY = tileHeight * pixelWidth
+
+    parted.mapPartitionsWithIndex((tileNum, iter) => {
+      val arr = iter.map(_._2).toArray
+
+      val xTile = tileNum % numXTiles
+      val yTile = tileNum / numYTiles
+
+      val ulx = -180 + xTile * tileLengthX
+      val uly = 90 - yTile * tileLengthY
+
+      Iterator.single(Tile(ulx, uly, tileWidth, tileWidth, arr, pixelWidth))
+    }, preservesPartitioning = true).coalesce(partitions)
+  }
 }

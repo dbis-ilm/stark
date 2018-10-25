@@ -45,13 +45,13 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val tiles = for {
       w <- 0 until width
-      h <- 0 until height
+      h <- (1 until height+1).reverse
 
     } yield Tile(w * width,h * height,width,height, Array.fill(width * height){  (w * width + h * height).toByte})
 
     val tileRDD = sc.parallelize(tiles)
 
-    val gridPartitioner = new RasterGridPartitioner(9,9, 0, 101, 0, 101)
+    val gridPartitioner = new RasterGridPartitioner(9,9, 0, 101, 0, 101 )
 
     val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POLYGON((11 11, 89 11, 89 89, 11 89, 11 11))"), Byte.MinValue).cache()
 
@@ -66,15 +66,19 @@ class RasterFilterVectorRDDTest extends FlatSpec with Matchers with BeforeAndAft
 
     val tiles = for {
       w <- 0 until width
-      h <- 0 until height
+      h <- (1 until height+1).reverse
 
     } yield Tile(w * width,h * height,width,height, Array.fill(width * height){  (w * width + h * height).toByte})
 
+//    println(tiles.map(_.wkt).mkString("\n"))
+
     val tileRDD = sc.parallelize(tiles)
 
-    val gridPartitioner = new RasterGridPartitioner(9,9, 0, 100, 0, 100)
+    val gridPartitioner = new RasterGridPartitioner(4,4, 0, 100, 0, 100)
 
-    val filterRes = tileRDD.partitionBy(gridPartitioner).filter(STObject("POINT(51 51)"), Byte.MinValue)
+    val parted = tileRDD.partitionBy(gridPartitioner)
+
+    val filterRes = parted.filter(STObject("POINT(51 51)"), Byte.MinValue)
 
     val num = filterRes.count()
 

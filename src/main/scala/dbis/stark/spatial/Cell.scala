@@ -27,7 +27,7 @@ case class Cell(var id: Int, var range: NRectRange, var extent: NRectRange) exte
 
 object Cell {
   
-  def apply(r: NRectRange): Cell = Cell(-1, r,r)
-  def apply(id: Int, r: NRectRange): Cell = Cell(id, r,r)
+  def apply(r: NRectRange): Cell = Cell(-1, r,r.clone())
+  def apply(id: Int, r: NRectRange): Cell = Cell(id, r,r.clone())
   def apply(r: NRectRange, e: NRectRange):Cell = Cell(-1, r, e)
 }

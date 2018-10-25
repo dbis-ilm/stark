@@ -3,18 +3,26 @@ package dbis.stark.spatial.partitioner
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.collection.mutable
+
 class BSPBinaryAsyncTest extends FlatSpec with Matchers {
+
+  def makeHisto(x: Int, y: Int) = {
+    val buckets = mutable.Map.empty[Int, (Cell, Int)]
+
+    var i = -1
+    for(y <- 0 to 3;
+        x <- 0 to 3) {
+      i += 1
+      buckets += i -> (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
+    }
+
+    CellHistogram(buckets)
+  }
 
   "A BSP async" should "compute correct cells in range covering complete space" in {
 
-    var i = -1
-    val histoSeq = for(y <- 0 to 3;
-        x <- 0 to 3) yield {
-      i += 1
-      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
-    }
-
-    val histo = Array(histoSeq: _*)
+    val histo = makeHisto(3,3)
 
     val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
 
@@ -27,14 +35,7 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
 
   ignore should "compute correct cells in range covering greater space" in {
 
-    var i = -1
-    val histoSeq = for(y <- 0 to 3;
-                       x <- 0 to 3) yield {
-      i += 1
-      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
-    }
-
-    val histo = Array(histoSeq: _*)
+    val histo = makeHisto(3,3)
 
     val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
 
@@ -49,14 +50,7 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
 
   it should "compute correct cells in range covering a single cell" in {
 
-    var i = -1
-    val histoSeq = for(y <- 0 to 3;
-                       x <- 0 to 3) yield {
-      i += 1
-      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
-    }
-
-    val histo = Array(histoSeq: _*)
+    val histo = makeHisto(3,3)
 
     val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
 
@@ -71,14 +65,7 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
 
   it should "compute correct cells in range covering multiple cells" in {
 
-    var i = -1
-    val histoSeq = for(y <- 0 to 3;
-                       x <- 0 to 3) yield {
-      i += 1
-      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
-    }
-
-    val histo = Array(histoSeq: _*)
+    val histo = makeHisto(3,3)
 
     val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
 
@@ -91,14 +78,7 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
   }
 
   it should "get the correct extent even for points" in {
-    var i = -1
-    val histoSeq = for(y <- 0 to 3;
-                       x <- 0 to 3) yield {
-      i += 1
-      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
-    }
-
-    val histo = Array(histoSeq: _*)
+    val histo = makeHisto(3,3)
 
     val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
 
@@ -115,23 +95,16 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers {
   }
 
   it should "estimate costs correctly" in {
-    var i = -1
-    val histoSeq = for(y <- 0 to 3;
-                       x <- 0 to 3) yield {
-      i += 1
-      (Cell(i, NRectRange(NPoint(x, y), NPoint(x+1, y+1))), 1)
-    }
+    val histo = makeHisto(3,3)
 
-    val histo = Array(histoSeq: _*)
-
-    println(histo.mkString("\n"))
+    println(histo.buckets.values.mkString("\n"))
 
     val startRange = NRectRange(NPoint(0, 0), NPoint(4,4))
 
     val bspTask = new SplitTask(startRange, histo,
       sideLength = 1.0, maxCostPerPartition = 3, pointsOnly = false )
 
-    histo.foreach{ case (cell,_) =>
+    histo.buckets.foreach{ case (_,(cell,_)) =>
       bspTask.costEstimation(cell.range) shouldBe 1
     }
 

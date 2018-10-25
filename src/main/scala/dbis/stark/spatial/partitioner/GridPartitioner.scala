@@ -3,13 +3,91 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.{Path, Paths}
 
 import dbis.stark.STObject
+import dbis.stark.STObject.GeoType
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.util.Try
 
-case class CellHistogram(buckets: Array[(Cell, Int)])
+object CellHistogram {
+  def empty = CellHistogram()
+}
+
+case class CellHistogram(buckets: mutable.Map[Int, (Cell, Int)] = mutable.Map.empty,protected[stark] val nonEmptyCells: mutable.Set[Int] = mutable.Set.empty[Int]) {
+
+  def isEmpty = buckets.isEmpty
+  def nonEmpty = buckets.nonEmpty
+  def length = buckets.size
+
+  def get(cellId: Int): Option[(Cell, Int)] = buckets get cellId
+
+  def getCountOrElse(cellId: Int)(default: Int) = buckets get cellId match {
+    case None => default
+    case Some((_,cnt)) => cnt
+  }
+
+  def getExtent(cellId: Int): Option[NRectRange] = buckets get cellId match {
+    case None => None
+    case Some((Cell(_,_,extent), _)) => Some(extent)
+  }
+
+  def apply(cellId: Int) = Try(buckets(cellId)) match {
+    case scala.util.Success(value) => value
+    case scala.util.Failure(exception) =>
+      println(s"histo: ${buckets.iterator.map(_._2._1.range.wkt).mkString("\n")}")
+      throw exception
+  }
+
+
+
+  def increment(cellId: Int, cell: Cell, o: GeoType, pointsOnly: Boolean): Unit = {
+    buckets get cellId match {
+      case None =>
+        buckets += cellId -> (cell, 1)
+        nonEmptyCells += cellId
+
+      case Some((c, cnt)) =>
+        if(!pointsOnly)
+          c.extendBy(Utils.fromGeo(o))
+
+        buckets.update(cellId, (c, cnt+1))
+    }
+  }
+
+  def combine(other: CellHistogram, pointsOnly:Boolean): CellHistogram = {
+
+    val newBuckets = mutable.Map.empty[Int, (Cell, Int)]
+    val newNonEmptyCells = mutable.Set.empty[Int]
+
+    buckets.foreach{ case (i, (cell, cnt)) =>
+      newBuckets += i -> (cell.clone(), cnt)
+    }
+
+    other.buckets.foreach{ case (cellId, (cell, cnt)) =>
+
+      newBuckets get cellId match {
+        case None =>
+          newBuckets += cellId -> (cell, cnt)
+          newNonEmptyCells += cellId
+
+        case Some((c, cnt1)) =>
+          val newC = c.clone()
+          if(!pointsOnly)
+            newC.extendBy(cell.extent)
+
+          newBuckets.update(cellId, (newC, cnt + cnt1))
+      }
+    }
+
+    new CellHistogram(newBuckets, newNonEmptyCells)
+
+  }
+
+
+}
 
 trait SpatialPartitioner extends Partitioner {
 
@@ -130,38 +208,27 @@ object GridPartitioner {
 
   def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int,
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
-                                       xLength: Double, yLength:Double): Array[(Cell,Int)] = {
+                                       xLength: Double, yLength:Double): CellHistogram = {
 
     def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
 
       val p = Utils.getCenter(pt._1.getGeo)
       val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
-      histo1.buckets(cellId) = (histo1.buckets(cellId)._1, histo1.buckets(cellId)._2 + 1)
-      if(!pointsOnly) {
-        histo1.buckets(cellId)._1.extendBy(Utils.fromGeo(pt._1.getGeo))
-//        histo1.buckets(cellId)._1.extent.extend(
-      }
-//        histo1.buckets(cellId) = (), histo1.buckets(cellId)._2)
+      val bounds = getCellBounds(cellId, numXCells, xLength, yLength,minX, minY)
+
+      histo1.increment(cellId, Cell(bounds), pt._1.getGeo, pointsOnly)
+
       histo1
     }
 
     def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
-
-      val newBuckets = histo1.buckets.iterator.zip(histo2.buckets.iterator).map{ case ((cell1, cnt1),(cell2,cnt2)) =>
-
-        val newCell = if(pointsOnly) Cell(cell1.range) else Cell(cell1.range, cell1.extent.extend(cell2.extent))
-        val newCnt = cnt1 + cnt2
-        (newCell, newCnt)
-      }.toArray
-
-
-      CellHistogram(newBuckets)
+      histo1.combine(histo2,pointsOnly)
     }
 
-    val histo = buildGrid(numXCells,numYCells, xLength, yLength, minX,minY)
+//    val histo = buildGrid(numXCells,numYCells, xLength, yLength, minX,minY)
 
-    rdd.aggregate(CellHistogram(histo))(seq, combine).buckets
+    rdd.aggregate(CellHistogram.empty)(seq, combine)
 
     /* fill the array. If with extent, we need to keep the exent of each element and combine it later
      * to create the extent of a cell based on the extents of its contained objects
@@ -212,11 +279,20 @@ object GridPartitioner {
 
   }
 
-  def buildGrid(numXCells: Int, numYCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): Array[(Cell, Int)] =
-    Array.tabulate(numXCells * numYCells){ i =>
+  def buildGrid(numXCells: Int, numYCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): CellHistogram = {
+
+    val gridHisto = mutable.Map.empty[Int, (Cell, Int)]
+    var i = 0
+    val num = numXCells * numYCells
+    while(i < num) {
       val cellBounds = getCellBounds(i, numXCells, xLength, yLength, minX, minY)
-      (Cell(i,cellBounds), 0)
+      gridHisto += i -> (Cell(i, cellBounds), 0)
+
+      i += 1
     }
+
+    CellHistogram(gridHisto)
+  }
 
 }
 

@@ -2,11 +2,10 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Paths
 
-import dbis.stark.{Fix,STObject, StarkKryoRegistrator, StarkTestUtils}
-import org.apache.spark.SpatialRDD._
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
+import dbis.stark.{Fix, STObject, StarkKryoRegistrator, StarkTestUtils}
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.serializer.KryoSerializer
@@ -113,7 +112,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       (Cell(NRectRange(NPoint(4,4), NPoint(5,5)),NRectRange(NPoint(4,4), NPoint(5,5))), 1)  // 8
     )
 
-    parti.cells should contain only (shouldSizes:_*)
+    parti.cells.buckets.values should contain only (shouldSizes:_*)
   }
 
   it should "have correct grid" in {
@@ -134,7 +133,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     )
 
     parti.cells.length shouldBe shouldSizes.length
-    parti.cells.zipWithIndex.foreach{ case ((cell,_),idx) =>
+    parti.cells.buckets.values.zipWithIndex.foreach{ case ((cell,_),idx) =>
       cell shouldBe shouldSizes(idx)
     }
 
@@ -146,8 +145,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val parti = new BSPartitioner(rdd, 0.1, 1, pointsOnly = true)
 
     parti.printPartitions("/tmp/idtest_partitions")
+    parti.printHistogram(java.nio.file.Paths.get("/tmp/idtest_histo"))
 
-//    val partIds = Array(0,0,1,2,3)
+    val partIds = Array(0,0,1,2,3)
 
     val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect()
 
@@ -237,7 +237,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 //    parti.printPartitions(java.nio.file.Paths.get(System.getProperty("user.home"), "partition2.csv"))
 
     // make sure there are no duplicate cells, i.e. they shouldn't have the same region
-    parti.cells.map { case (cell, _) => cell.range }.distinct.length shouldBe parti.cells.length
+    parti.cells.buckets.values.map { case (cell, _) => cell.range }.toList.distinct.length shouldBe parti.cells.length
 
 
     // every point must be in one partition
@@ -259,7 +259,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
 
-        val containingCell = parti.cells.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        val containingCell = parti.cells.buckets.values.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
           println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
         } else {
@@ -284,7 +284,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 //    BSPartitioner.numCellThreshold = -5
     val parti = new BSPartitioner(rdd, 1, 100, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
 
-    val nonempty = parti.cells.filter(_._2 > 0)
+    val nonempty = parti.cells.buckets.values.filter(_._2 > 0)
 //    withClue("number of non empty cells") { nonempty.length shouldBe 7 }
 
     val cnt = rdd.count()
@@ -321,7 +321,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
 
-        val containingCell = parti.cells.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        val containingCell = parti.cells.buckets.values.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
           println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
         } else {
@@ -376,7 +376,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
 
-        val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        val containingCell = parti.cells.buckets.values.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
           println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
         } else {
@@ -427,7 +427,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
             println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
           }
 
-          val containingCell = parti.cells.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+          val containingCell = parti.cells.buckets.values.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
           if(containingCell.isDefined) {
             println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
           } else {

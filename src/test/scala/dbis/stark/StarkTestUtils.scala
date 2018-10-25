@@ -124,7 +124,15 @@ object StarkTestUtils {
     
     val rdd = StarkTestUtils.createRDD(sc, file, sep, numParts, distinct)
     rdd.index(new BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
-  } 
+  }
+
+  def timing[R](name: String)(block: => R) = {
+    val start = System.currentTimeMillis()
+    val res = block
+    val end = System.currentTimeMillis()
+    println(s"$name took ${end - start}")
+    res
+  }
   
   def distinct[V](rdd: RDD[(STObject, V)]) = {
     

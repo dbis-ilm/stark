@@ -5,7 +5,6 @@ import java.util.concurrent.{ForkJoinPool, RecursiveTask}
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 
 import scala.collection.immutable.IndexedSeq
-import scala.collection.mutable.ListBuffer
 
 
 /**
@@ -21,7 +20,7 @@ import scala.collection.mutable.ListBuffer
  * cannot be further split.
  */
 class BSPBinaryAsync(private val _start: NRectRange,
-          protected[stark] val cellHistogram: Array[(Cell, Int)],
+          protected[stark] val cellHistogram: CellHistogram,
           private val sideLength: Double,
           private val maxCostPerPartition: Double,
           private val pointsOnly: Boolean,
@@ -40,28 +39,30 @@ class BSPBinaryAsync(private val _start: NRectRange,
    * This is a lazy value
    */
   lazy val partitions: Array[Cell] = {
-    var i = 0
-    /*
-     * It may happen, that data is so dense that it relies only in very few cells
-     * So it may save time to return only those cells instead of computing the
-     * actual partitioning
-     *
-     * To do so, we check the histogram and find the non-empty cells. If these
-     * are fewer than a given threshold, return them as a partitioning.
-     */
-    val nonempty = ListBuffer.empty[Cell]
-    while(i < cellHistogram.length && nonempty.length <= numCellThreshold) {
-      val cell = cellHistogram(i)._1
+//    var i = 0
+//    /*
+//     * It may happen, that data is so dense that it lies only in very few cells
+//     * So it may save time to return only those cells instead of computing the
+//     * actual partitioning
+//     *
+//     * To do so, we check the histogram and find the non-empty cells. If these
+//     * are fewer than a given threshold, return them as a partitioning.
+//     */
+//    val nonempty = ListBuffer.empty[Cell]
+//    while(i < cellHistogram.length && nonempty.length <= numCellThreshold) {
+//
+//      if(cellHistogram(i)._2 > 0)
+//        nonempty += cellHistogram(i)._1
+//
+//      i += 1
+//    }
 
-      if(cellHistogram(i)._2 > 0)
-        nonempty += cell
 
-      i += 1
-    }
+
 
     //return the non-empty cells or compute the actual partitioning
-    val resultPartitions = if(i == cellHistogram.length) {
-      nonempty
+    val resultPartitions = if(cellHistogram.nonEmptyCells.size <= numCellThreshold) {
+      cellHistogram.nonEmptyCells.map{ cellId => cellHistogram(cellId)._1}
     } else {
 
       /* The actual partitioning is done using a recursive split of a candidate partition
@@ -100,13 +101,14 @@ class BSPBinaryAsync(private val _start: NRectRange,
   * @param pointsOnly True if the dataset contains only points
   */
 class SplitTask(universe: NRectRange,
-                range: NRectRange, protected[stark] val cellHistogram: Array[(Cell, Int)],
+                range: NRectRange,
+                protected[stark] val cellHistogram: CellHistogram,
                 private val sideLength: Double,
                 private val maxCostPerPartition: Double,
                 private val pointsOnly: Boolean) extends RecursiveTask[List[Cell]] {
 
 
-  def this(range: NRectRange, cellHistogram: Array[(Cell, Int)],
+  def this(range: NRectRange, cellHistogram: CellHistogram,
         sideLength: Double, maxCostPerPartition: Double, pointsOnly: Boolean) =
     this(range, range,cellHistogram, sideLength,maxCostPerPartition, pointsOnly)
 
@@ -156,9 +158,9 @@ class SplitTask(universe: NRectRange,
     var sum = 0
     while (i < cellIds.size) {
       val id = cellIds(i)
-      if (id >= 0 && id < cellHistogram.length) {
-        sum += cellHistogram(id)._2
-      }
+//      if (id >= 0 && id < cellHistogram.length) {
+        sum += cellHistogram.getCountOrElse(id)(0)
+//      }
       i += 1
     }
     sum
@@ -276,7 +278,7 @@ class SplitTask(universe: NRectRange,
 
 //    val partCost = costEstimation(part)
 //    println(s"split ($dim) $part ($partCost) into \n ${r1.map(_.wkt).getOrElse("-")} ($cost1)\n ${r2.map(_.wkt).getOrElse("-")} ($cost2)")
-    println("")
+//    println("")
 
 //    require(cost1 + cost2 == partCost, s"costs do not match partCost=$partCost != cost1=$cost1 + cost2=$cost2")
 
@@ -318,9 +320,12 @@ class SplitTask(universe: NRectRange,
 
     while(i < cellIds.length) {
       val id = cellIds(i)
-      if(id >= 0 && id < cellHistogram.length) {
-        extent = extent.extend(cellHistogram(id)._1.extent)
+      cellHistogram.getExtent(id) match {
+        case Some(cellExtent) =>
+          extent = extent.extend(cellExtent)
+        case _ => // ignore if not found
       }
+
       i += 1
     }
 

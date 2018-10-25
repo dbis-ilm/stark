@@ -2,12 +2,12 @@ package dbis.stark
 
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.partitioner.{CellHistogram, OneToManyPartition}
 import dbis.stark.spatial._
+import dbis.stark.spatial.indexed.RTree
+import dbis.stark.spatial.partitioner.CellHistogram
 import org.locationtech.jts.geom._
-import org.locationtech.jts.io.{WKTReader, WKTWriter}
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 class SkylineSerializer extends Serializer[Skyline[Any]] {
@@ -223,31 +223,43 @@ class CellSerializer extends Serializer[Cell] {
 class HistogramSerializer extends Serializer[CellHistogram] {
   val cellSerializer = new CellSerializer
   override def write(kryo: Kryo, output: Output, histo: CellHistogram) = {
-    output.writeInt(histo.buckets.length, true)
-    var i = 0
-    while(i < histo.buckets.length) {
-      val (cell, cnt) = histo.buckets(i)
+
+    output.writeInt(histo.buckets.size, true)
+
+    histo.buckets.iterator.foreach{ case (cellId, (cell, cnt)) =>
+      cell.id = cellId
       kryo.writeObject(output, cell, cellSerializer)
       output.writeInt(cnt, true)
-
-      i += 1
     }
+
+    output.writeInt(histo.nonEmptyCells.size)
+    histo.nonEmptyCells.iterator.foreach( cellId => output.writeInt(cellId, true))
+
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[CellHistogram]) = {
     val num = input.readInt(true)
-    val buckets = new Array[(Cell, Int)](num)
+    val buckets = mutable.Map.empty[Int, (Cell, Int)]
     var i = 0
     while(i < num) {
       val cell = kryo.readObject(input, classOf[Cell], cellSerializer)
       val cnt = input.readInt(true)
 
-      buckets(i) = (cell, cnt)
+      buckets += cell.id -> (cell, cnt)
 
       i += 1
     }
 
-    CellHistogram(buckets)
+    val numNonEmptyCells = input.readInt(true)
+    val nonEmptyCells = mutable.Set.empty[Int]
+    i = 0
+    while(i < numNonEmptyCells) {
+      val cellId = input.readInt(true)
+      nonEmptyCells += cellId
+      i += 1
+    }
+
+    CellHistogram(buckets, nonEmptyCells)
   }
 }
 

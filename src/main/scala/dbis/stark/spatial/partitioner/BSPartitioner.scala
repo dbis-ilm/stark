@@ -58,7 +58,6 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
   protected[partitioner] val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
 
-
   def this(rdd: RDD[(G,V)],
            sideLength: Double,
            maxCostPerPartition: Double,
@@ -106,12 +105,20 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     * We iterate over all elements in the RDD, determine to which
     * cell it belongs and then simply aggregate by cell
     */
-  protected[spatial] val cells: Array[(Cell, Int)] =
+  protected[spatial] val cells: CellHistogram =
     GridPartitioner.buildHistogram(theRDD,pointsOnly,numXCells,numYCells,minX,minY,maxX,maxY,sideLength,sideLength)
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
-  protected[spatial] val bsp = new BSP(
+  //  protected[spatial] val bsp = new BSP(
+  //    start,
+  //    cells, // for BSP we only need calculated cell sizes and their respective counts
+  //    sideLength,
+  //    maxCostPerPartition,
+  //    pointsOnly,
+  //    BSPartitioner.numCellThreshold)
+
+  protected[spatial] val bsp = new BSPBinaryAsync(
     start,
     cells, // for BSP we only need calculated cell sizes and their respective counts
     sideLength,
@@ -120,16 +127,16 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     BSPartitioner.numCellThreshold)
 
 
-//  printPartitions(Paths.get(System.getProperty("user.home"), "partis.wkt"))
-//  printHistogram(Paths.get(System.getProperty("user.home"), "histo.wkt"))
+//  printPartitions(java.nio.file.Paths.get(System.getProperty("user.home"), "partis.wkt"))
+//  printHistogram(java.nio.file.Paths.get(System.getProperty("user.home"), "histo.wkt"))
 
 
 //  protected[spatial] var bsp = new BSPBinary(
-//      Array(minX, minY), 
-//      Array(maxX, maxY), 
+//      Array(minX, minY),
+//      Array(maxX, maxY),
 //      20,
-//      cells, // for BSP we only need calculated cell sizes and their respective counts 
-//      _sideLength, 
+//      cells, // for BSP we only need calculated cell sizes and their respective counts
+//      _sideLength,
 //      _maxCostPerPartition,
 //      withExtent,
 //      BSPartitioner.numCellThreshold)
@@ -145,7 +152,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
   def printHistogram(fName: java.nio.file.Path) {
 
-    val list2 = cells.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList
+    val list2 = cells.buckets.values.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList
     super.writeToFile(list2, fName)
   } 
   

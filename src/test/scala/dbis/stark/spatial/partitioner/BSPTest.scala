@@ -7,6 +7,7 @@ import dbis.stark.spatial.Cell
 import dbis.stark.spatial.NRectRange
 import org.scalatest.tagobjects.Slow
 
+import scala.collection.mutable
 import scala.util.Random
 
 class BSPTest extends FlatSpec with Matchers {
@@ -297,7 +298,10 @@ class BSPTest extends FlatSpec with Matchers {
 
     val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 
-    val bsp = new BSPBinaryAsync(whole,histo,sideLength,100,true)
+    val buckets = mutable.Map.empty[Int, (Cell, Int)]
+    histo.foreach{ case (cell, cnt) => buckets += cell.id -> (cell, cnt)}
+
+    val bsp = new BSPBinaryAsync(whole,CellHistogram(buckets),sideLength,100,true)
 
     val start = System.currentTimeMillis()
     bsp.partitions.length should be > 0
@@ -322,7 +326,10 @@ class BSPTest extends FlatSpec with Matchers {
 
     val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 
-    val bspAsync = new BSPBinaryAsync(whole,histo,sideLength,100,true)
+    val buckets = mutable.Map.empty[Int, (Cell, Int)]
+    histo.foreach{ case (cell, cnt) => buckets += cell.id -> (cell, cnt)}
+
+    val bspAsync = new BSPBinaryAsync(whole,CellHistogram(buckets),sideLength,100,true)
 
 
     val start = System.currentTimeMillis()

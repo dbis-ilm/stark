@@ -24,6 +24,12 @@ class SpatialKnnJoinRDD[G <: STObject : ClassTag, V : ClassTag, V2: ClassTag ](
 //                                                                    oneToMany:Boolean = false
               ) extends JoinRDD[(G,V), Index[V2], (V,V2)](_left, _right, true, false) {
 
+
+  /**
+    * Returns [[OneToManyPartition]]. Here with one partition of the [[_right]] RDD mapped
+    * to all partitions o the [[_left]] RDD
+    * @return
+    */
   override def getPartitions = {
     val leftParts:Seq[Int] = left.partitions.indices
     right.partitions.iterator.zipWithIndex.map{case (rp, i) =>

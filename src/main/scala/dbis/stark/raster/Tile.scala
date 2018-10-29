@@ -1,15 +1,12 @@
 package dbis.stark.raster
 
-import dbis.stark.STObject.MBR
-
-import scala.reflect.ClassTag
-import scala.reflect._
+import scala.reflect.{ClassTag, _}
 
 /**
  * Tile represents a data type for 2D raster data.
  *
  */
-case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int, data: Array[U], pixelWidth: Double = 1) extends Serializable {
+case class Tile[@specialized(Int, Double, Byte) U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int, data: Array[U], pixelWidth: Double = 1) extends Serializable {
 
   /**
    * Contructor for tile with given data.

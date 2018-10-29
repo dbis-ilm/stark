@@ -1,6 +1,6 @@
 package dbis.stark.spatial
 
-import dbis.stark.spatial.partitioner.{OneToManyPartition, OneToOnePartition, GridPartitioner}
+import dbis.stark.spatial.partitioner.{GridPartitioner, OneToManyPartition, OneToOnePartition}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 

@@ -1,8 +1,10 @@
 package dbis.stark
 
+import java.nio.file.{OpenOption, Paths}
+
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import org.locationtech.jts.io.WKTReader
+import org.locationtech.jts.io.{WKBWriter, WKTReader}
 
 class STObjectTest extends FlatSpec with Matchers {
     
@@ -19,7 +21,21 @@ class STObjectTest extends FlatSpec with Matchers {
     
     withClue(s"$o intersects at $qryO"){ o.intersects(qryO) shouldBe true }
   }
-  
+
+  it should "do WKB" in {
+    val wkt =  "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))"
+
+    val obj = new WKTReader().read(wkt)
+    val writer = new WKBWriter()
+
+
+    val array = writer.write(obj)
+    java.nio.file.Files.write(Paths.get("/tmp/polygon.wkb"),array)
+
+
+
+  }
+
   it should "intersect with a contained polygon and instant" in {
     
     val g = new WKTReader().read("POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))")

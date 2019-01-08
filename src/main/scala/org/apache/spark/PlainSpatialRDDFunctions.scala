@@ -507,13 +507,13 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
 
   def index(partitionerConfig: PartitionerConfig, indexConfig: IndexConfig): RDD[Index[(G,V)]] =
-    index(Some(PartitionerFactory.get(partitionerConfig, self)), indexConfig)
+    index(PartitionerFactory.get(partitionerConfig, self), indexConfig)
 
 
   def rasterize(tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double, partitions: Int): RasterRDD[V] = {
     val parti = GridStrategy(tileWidth, pointsOnly = true, Some((-180,180,-90,90)), sampleFraction = 0)
 
-    val parted = self.partitionBy(PartitionerFactory.get(parti,self))
+    val parted = self.partitionBy(PartitionerFactory.get(parti,self).get)
 
     val tileHeight = tileWidth
 

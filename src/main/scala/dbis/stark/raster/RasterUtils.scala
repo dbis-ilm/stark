@@ -1,5 +1,7 @@
 package dbis.stark.raster
 
+import java.awt.image.{BufferedImage, DataBufferByte}
+
 import dbis.stark.STObject.{GeoType, MBR}
 import org.locationtech.jts.geom.GeometryFactory
 
@@ -9,6 +11,31 @@ import scala.reflect.ClassTag
   * A helper class to provide commonly used raster data functions
   */
 object RasterUtils {
+
+  def greyScaleImgToUnsignedByteArray(bufferedImage: BufferedImage): Array[Array[Int]] = {
+    val width = bufferedImage.getWidth()
+    val pixels = bufferedImage.getRaster.getDataBuffer.asInstanceOf[DataBufferByte].getData
+    val result = Array.ofDim[Int](bufferedImage.getHeight(), bufferedImage.getWidth())
+
+    var pixel = 0
+    var row = 0
+    var col = 0
+    while ( {
+      pixel < pixels.length
+    }) {
+      //println(pixels(pixel) + ":" + (pixels(pixel) & 0xff))
+      result(row)(col) = pixels(pixel) & 0xff
+      col += 1
+      if (col == width) {
+        col = 0
+        row += 1
+      }
+
+      pixel += 1
+    }
+
+    result
+  }
 
   // used to instantiate vector geometries
   private val geoFactory = new GeometryFactory()
@@ -27,7 +54,7 @@ object RasterUtils {
     * @tparam U The pixel type
     * @return Returns a tile containing only pixels intersecting with the given geometry
     */
-  def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U): Tile[U] = {
+  def getPixels[U](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U)(implicit ord: Ordering[U], classTag$U: ClassTag[U]): Tile[U] = {
 
     // make the raster tile a vector rectangle
     val tileGeo = tileToGeo(tile)
@@ -124,14 +151,18 @@ object RasterUtils {
   def tileToMBR(tile: Tile[_]): MBR =
     new MBR(tile.ulx, tile.ulx + (tile.width * tile.pixelWidth), tile.uly - (tile.height * tile.pixelWidth), tile.uly)
 
-  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Double = 1): Tile[U] =
-    new Tile[U](mbr.getMinX,mbr.getMaxY,
-      math.ceil(mbr.getWidth).toInt, math.ceil(mbr.getHeight).toInt,
-      pixelWidth,
-      default
-    )
+  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Double = 1)(implicit ord: Ordering[U]): Tile[U] = {
+    val width = math.ceil(mbr.getWidth).toInt
+    val height = math.ceil(mbr.getHeight).toInt
 
-  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Double): Tile[U] = {
+    new Tile[U](mbr.getMinX, mbr.getMaxY,
+      width, height,
+      Array.fill[U](width * height)(default),
+      pixelWidth
+    )
+  }
+
+  def mbrToTile[U](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Double)(implicit ord: Ordering[U], classTag$U: ClassTag[U]): Tile[U] = {
     val width = (math.ceil(mbr.getWidth) / pixelWidth).toInt
     val height = (math.ceil(mbr.getHeight) / pixelWidth).toInt
     new Tile[U](mbr.getMinX,mbr.getMaxY,

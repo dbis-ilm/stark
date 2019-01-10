@@ -510,7 +510,9 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     index(PartitionerFactory.get(partitionerConfig, self), indexConfig)
 
 
-  def rasterize(tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double, partitions: Int): RasterRDD[V] = {
+  def rasterize[U : ClassTag](tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double,
+                                            partitions: Int, converter: V => U)(implicit ord:Ordering[U]): RasterRDD[U] = {
+
     val parti = GridStrategy(tileWidth, pointsOnly = true, Some((-180,180,-90,90)), sampleFraction = 0)
 
     val parted = self.partitionBy(PartitionerFactory.get(parti,self).get)
@@ -528,7 +530,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val tileLengthY = tileHeight * pixelWidth
 
     parted.mapPartitionsWithIndex((tileNum, iter) => {
-      val arr = iter.map(_._2).toArray
+      val arr = iter.map(t => converter(t._2)).toArray
 
       val xTile = tileNum % numXTiles
       val yTile = tileNum / numYTiles

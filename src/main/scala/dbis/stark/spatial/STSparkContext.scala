@@ -1,14 +1,16 @@
 package dbis.stark.spatial
 
+import java.awt.image.BufferedImage
 import java.nio.ByteBuffer
 import java.nio.file.Paths
 
-import dbis.stark.raster.{RasterRDD, Tile}
+import dbis.stark.raster.{RasterRDD, RasterUtils, SMA, Tile}
 import dbis.stark.{Instant, Interval, STObject}
+import javax.imageio.ImageIO
 import org.apache.hadoop.fs.Path
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.reflect.ClassTag
 
@@ -74,7 +76,7 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       val tWidth = arr(2).toInt
       val tHeight = arr(3).toInt
 
-      val pixelWidth = arr(4).toDouble
+      val pw = arr(4).toDouble
 //      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
 
       val data = new Array[Double](arr.length - 5)
@@ -87,7 +89,7 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
         i += 1
       }
 
-      Tile(ulx, uly, tWidth, tHeight, data, pixelWidth = pixelWidth)
+      Tile[Double](ulx, uly, tWidth, tHeight, data, pw)
     }
 
 //    val dir = new File(folderPath)
@@ -146,6 +148,59 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       Tile(ulx, uly, width, height, values, pw)
     }
   }
+
+  /**
+    * Loads a raster data set where each tile is stored in its own file and parameters are encoded in file name
+    * @param folderPath The folder containing all tile files
+    * @param imageReader A function converting the image of a tile into a data array (grey scale, RGB, ...).E.g. [[dbis.stark.raster.RasterUtils.greyScaleImgToUnsignedByteArray]]
+    * @return Returns a [[RasterRDD[Byte]] containing all tiles
+    */
+  def loadNanoFiles(folderPath: String, imageReader: BufferedImage => Array[Array[Int]] = RasterUtils.greyScaleImgToUnsignedByteArray): RasterRDD[Byte] =
+
+    super.binaryFiles(folderPath)
+      .map{case(name, data) => (name.split("_"),data)}
+      .filter(_._1.length == 10)
+      .map{case(nameEncodedData, binaryData) =>
+        val str = binaryData.open()
+        val img = ImageIO.read(str)
+        str.close()
+
+        val data = imageReader(img)
+
+
+        val xCount = nameEncodedData(0)//Counter of Image x-axes
+        val yCount = nameEncodedData(1)
+//        val zCount = nameEncodedData(2)
+//        val xCoord = nameEncodedData(3)//x-coordinate of image creation position (ul?)
+//        val yCoord = nameEncodedData(4)
+//        val zCoord = nameEncodedData(5)
+//        val pixelDeltaX = nameEncodedData(6)//distance between pixels in x-coordinate
+//        val pixelDeltaY = nameEncodedData(7)
+//        val pixelDeltaZ = nameEncodedData(8)
+
+        val flatData = data.flatten
+        val sma = SMA(flatData(0).toByte, flatData(0).toByte, 0.0)
+        var i = 1
+
+        val byteData = new Array[Byte](flatData.length)
+        byteData(0) = flatData(0).toByte
+
+        while(i < flatData.length) {
+          val b = flatData(i).toByte
+          if(b < sma.min)
+            sma.min = b
+          else if(b > sma.max)
+            sma.max = b
+
+          byteData(i) = b
+          i += 1
+        }
+
+        // TODO what is -100 here? make it generic
+        Tile[Byte]((xCount.toDouble - 100) * img.getWidth(),
+          ((yCount.toDouble - 100) + 1) * img.getHeight(),
+          img.getWidth(), img.getHeight(), byteData, sma = Some(sma))//this converts to signed again
+      }
 
   private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {
     val p = Paths.get(path)

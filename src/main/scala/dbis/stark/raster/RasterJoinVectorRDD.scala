@@ -11,7 +11,7 @@ import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
-class RasterJoinVectorRDD[U: ClassTag, P: ClassTag] (_left: RasterRDD[U],
+class RasterJoinVectorRDD[U<% Ordered[U]: ClassTag, P: ClassTag] (_left: RasterRDD[U],
                                                      _right: RDD[(STObject, P)],
                                                      predicate: JoinPredicate,
                                                      pixelDefault: U,

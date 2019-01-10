@@ -18,14 +18,9 @@ import scala.reflect.ClassTag
   * @param _partitioner The optional partitioner that _was_ used
   */
 class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
-                              private val _partitioner: Option[Partitioner]) extends RDD[Tile[U]](_parent) {
+                              private val _partitioner: Option[Partitioner] = None)(implicit ord: Ordering[U])
+  extends RDD[Tile[U]](_parent) {
 
-  /**
-    * Create new Raster RDD from a parent (without partitioner)
-    * @param _parent The parent
-    * @return Returns a new instance of RasterRDD
-    */
-  def this(_parent: RDD[Tile[U]]) = this(_parent, None)
 
   /**
     * The partitioner that was used on this RDD
@@ -69,11 +64,11 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
 //  def join(other: RDD[STObject], predicate: JoinPredicate, indexConf: Option[IndexConfig] = None): RasterRDD[U] =
 //    new RasterJoinVectorRDD(this, other, predicate, indexConf)
 
-  def join[P: ClassTag](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate,
+  def join[P : ClassTag](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate,
                         indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(Tile[U],P)] =
     new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany)
 
-  def joinWithAggregate[P: ClassTag, R](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, aggregate: Tile[U] => R, indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(R,P)] =
+  def joinWithAggregate[P : ClassTag, R](other: RDD[(STObject, P)], pixelDefault: U, predicate: JoinPredicate, aggregate: Tile[U] => R, indexConf: Option[IndexConfig] = None, oneToMany: Boolean = false): RDD[(R,P)] =
     new RasterJoinVectorRDD(this, other, predicate, pixelDefault, indexConf, oneToMany).map{ case (tile, p) => (aggregate(tile), p)}
 
   def join[P: ClassTag](other: RDD[Index[P]], pixelDefault: U, predicate: JoinPredicate, oneToMany: Boolean): RDD[(Tile[U],P)] = {
@@ -86,7 +81,7 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
     }
   }
 
-  def join[P: ClassTag, R: ClassTag](other: RasterRDD[P], predicate: JoinPredicate, func: (U,P) => R, oneToMany: Boolean) =
+  def join[P, R](other: RasterRDD[P], predicate: JoinPredicate, func: (U,P) => R, oneToMany: Boolean)(implicit ev$1: Ordering[P], ev$2: Ordering[R], classTag$P: ClassTag[P], classTag$R: ClassTag[R]) =
     RasterJoinRDD(this, other, predicate, func, oneToMany)
 
 
@@ -125,11 +120,26 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
     new PlainSpatialRDDFunctions(parted).saveAsStarkObjectFile(path)
   }
 
+  def countValue(x: U): Long = {
+    this.aggregate(0)({(c, t) =>
+      c + t.countValue(x)
+    },{(c1,c2) => c1 + c2})
+  }
+
+  def hasValue(v: U): Boolean = {
+    this.mapPartitions{iter =>
+      Iterator.single(iter.exists(t => t.hasValue(v)))
+    }.aggregate(false)((b1,b2) => b1 || b2, (b1,b2) => b1 || b2)
+  }
+
+  def histogram() = {
+
+  }
 }
 
 
 object  RasterRDD {
-  implicit def toRasterRDD[U : ClassTag](rdd: RDD[Tile[U]]) = new RasterRDD[U](rdd)
-  implicit def toDrawableDouble(rdd: RDD[Tile[Double]]) = new DrawableRasterRDDFunctionsDouble(rdd)
-  implicit def toDrawableInt(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctionsInt(rdd)
+  implicit def toRasterRDD[U](rdd: RDD[Tile[U]])(implicit ord: Ordering[U], classTag$U: ClassTag[U]) = new RasterRDD[U](rdd)
+//  implicit def toDrawableDouble(rdd: RDD[Tile[Double]]) = new DrawableRasterRDDFunctionsDouble(rdd)
+//  implicit def toDrawableInt(rdd: RDD[Tile[Int]]) = new DrawableRasterRDDFunctionsInt(rdd)
 }

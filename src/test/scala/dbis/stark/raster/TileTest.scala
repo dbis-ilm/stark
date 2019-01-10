@@ -1,13 +1,11 @@
 package dbis.stark.raster
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import org.scalatest.matchers.BePropertyMatcher
+import org.scalatest.{FlatSpec, Matchers}
 
 class TileTest extends FlatSpec with Matchers {
 
   "A tile" should "be created with correct parameters" in {
-    val tile = new Tile(10, 5, Array.fill(50)(0))
+    val tile = new Tile(0, 5, 10, 5, Array.fill(50)(0))
     tile.value(2, 2) shouldEqual 0
     tile.width shouldEqual 10
     tile.height shouldEqual 5
@@ -42,20 +40,20 @@ class TileTest extends FlatSpec with Matchers {
   }
 
   it should "be updatable" in {
-    val tile = new Tile(10, 5, Array.fill(50)(0))
+    val tile = new Tile(0,5,10, 5, Array.fill(50)(0))
     tile.set(2, 2, 4)
     tile.value(2, 2) shouldEqual 4
   }
 
   it should "be created from another tile using map" in {
-    val tile = new Tile(10, 5, Array.fill(50)(0))
+    val tile = new Tile(0,5,10, 5, Array.fill(50)(0))
     val other = tile.map(_ => 10)
     other.value(0, 1) shouldEqual 10
     other.value(4, 4) shouldEqual 10
   }
 
   it should "print a matrix" in {
-    val tile = new Tile(3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0))
+    val tile = new Tile(0,3,3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0))
     val s = tile.matrix
 
 //    println(s)
@@ -75,7 +73,7 @@ class TileTest extends FlatSpec with Matchers {
 
   it should "compute correct position for bigger" in {
 
-    val tile = new Tile(ulx = 0, uly = 11,  16, 11)
+    val tile = Tile[Int](ulx = 0, uly = 11,  16, 11)
 
     tile.idxFromPos(0.5, 10.5) shouldBe 0
     tile.idxFromPos(4.5, 6.5) shouldBe 68
@@ -84,7 +82,7 @@ class TileTest extends FlatSpec with Matchers {
   }
 
   it should "compute correct row if tile doesn't start at 0" in {
-    val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
+    val tile = Tile[Int](ulx = 10, uly = 10, width = 7, height = 5)
 
     withClue("for tile uly"){tile.row(tile.uly) shouldBe 0}
     tile.row(9.5) shouldBe 0
@@ -96,7 +94,7 @@ class TileTest extends FlatSpec with Matchers {
   }
 
   it should "copute the correct column if tile doesn't start at 0" in {
-    val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
+    val tile = Tile[Int](ulx = 10, uly = 10, width = 7, height = 5)
 
     withClue("for tile ulx"){tile.row(tile.ulx) shouldBe 0}
     tile.column(9.5) shouldBe 0
@@ -108,7 +106,7 @@ class TileTest extends FlatSpec with Matchers {
 
   it should "compute correct position if tile doesn't start at 0" in {
 
-    val tile = new Tile(ulx = 10, uly = 10, width = 7, height = 5)
+    val tile = Tile[Int](ulx = 10, uly = 10, width = 7, height = 5)
 
     tile.idxFromPos(12.5, 7.5) shouldBe 16
     tile.idxFromPos(16.5, 5.5) shouldBe 34
@@ -119,10 +117,10 @@ class TileTest extends FlatSpec with Matchers {
 
 
   "Count" should "return the number of points with the given value" in {
-    val tile = new Tile(3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0))
-    tile.count(1) shouldEqual 3
-    tile.count(2) shouldEqual 2
-    tile.count(0) shouldEqual 4
+    val tile = Tile(3, 3, Array(0, 0, 1, 2, 1, 0, 2, 1, 0))
+    tile.countValue(1) shouldEqual 3
+    tile.countValue(2) shouldEqual 2
+    tile.countValue(0) shouldEqual 4
   }
 
 

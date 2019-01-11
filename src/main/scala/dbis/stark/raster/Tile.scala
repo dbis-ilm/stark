@@ -13,7 +13,7 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
   case class Tile[U : ClassTag](ulx: Double, uly: Double,
                                 width: Int, height: Int,
                                 data: Array[U], pixelWidth: Double = 1,
-                                protected[raster] var sma: Option[SMA[U]] = None)(implicit ord: Ordering[U]) {
+                                var sma: Option[SMA[U]] = None)(implicit ord: Ordering[U]) {
 
   /**
    * Contructor for tile with given data.
@@ -31,9 +31,9 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
     */
 //  def this(width: Int, height: Int) = this(0, height, width, height, Array.fill[U](width * height)(null.asInstanceOf[U]))
 
-  def computeSMA(): Unit = {
+  def computeSMA(): Tile[U] = {
     if(data.isEmpty)
-      return
+      return this
 
     var min = data(0)
     var max = data(0)
@@ -51,6 +51,7 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
     }
 
     sma = Some(SMA(min, max, 0))
+    this
   }
 
   def updateSMA(u: U): Unit = sma match {
@@ -61,7 +62,7 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
         theSMA.max = u
 
       // TODO: update average
-    case None => computeSMA()
+    case None => //computeSMA()
   }
 
   lazy val center = (ulx + (width*pixelWidth)/2 , uly - (height*pixelWidth)/2)
@@ -71,20 +72,17 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
    */
   def set(x: Double, y: Double, v: U): Unit = {
     data(idxFromPos(x, y)) = v
-    if (Tile.USE_SMA)
-      updateSMA(v)
+    updateSMA(v)
   }
 
   def set(i: Int, v: U) = {
     data(i) = v
-    if (Tile.USE_SMA)
-      updateSMA(v)
+    updateSMA(v)
   }
 
   def setArray(i: Int, j: Int, v: U) = {
     data(j * width + i) = v
-    if (Tile.USE_SMA)
-      updateSMA(v)
+    updateSMA(v)
   }
 
   /**
@@ -126,9 +124,7 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
    */
   def map[T : ClassTag](f: U => T)(implicit ord: Ordering[T]): Tile[T] = {
     val t = Tile(ulx, uly, width, height, data.map(f),pixelWidth)
-    if (Tile.USE_SMA)
-      t.computeSMA()
-
+    t.computeSMA()
     t
   }
 
@@ -182,7 +178,6 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
 }
 
 object Tile {
-  var USE_SMA: Boolean = true
 //  def apply(w: Int, h: Int, data: Array[Byte]) : Tile = new Tile(w, h, data)
 //  def apply(x: Double, y: Double, w: Int, h: Int, data: Array[Byte]) : Tile = new Tile(x, y, w, h, data)
 

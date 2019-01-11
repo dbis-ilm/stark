@@ -155,52 +155,66 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     * @param imageReader A function converting the image of a tile into a data array (grey scale, RGB, ...).E.g. [[dbis.stark.raster.RasterUtils.greyScaleImgToUnsignedByteArray]]
     * @return Returns a [[RasterRDD[Byte]] containing all tiles
     */
-  def loadNanoFiles(folderPath: String, imageReader: BufferedImage => Array[Array[Int]] = RasterUtils.greyScaleImgToUnsignedByteArray): RasterRDD[Byte] =
+  def loadNanoFiles(folderPath: String, imageReader: BufferedImage => Array[Array[Int]] = RasterUtils.greyScaleImgToUnsignedByteArray, useSma: Boolean = false): RasterRDD[Int] = {
 
     super.binaryFiles(folderPath)
-      .map{case(name, data) => (name.split("_"),data)}
-      .filter(_._1.length == 10)
-      .map{case(nameEncodedData, binaryData) =>
-        val str = binaryData.open()
-        val img = ImageIO.read(str)
-        str.close()
+      .map { case (fqn, data) =>
 
-        val data = imageReader(img)
+        val pos = fqn.lastIndexOf("/")
+        val name = fqn.substring(pos+1)
+        (name.split("_"), data) }
 
 
-        val xCount = nameEncodedData(0)//Counter of Image x-axes
-        val yCount = nameEncodedData(1)
-//        val zCount = nameEncodedData(2)
-//        val xCoord = nameEncodedData(3)//x-coordinate of image creation position (ul?)
-//        val yCoord = nameEncodedData(4)
-//        val zCoord = nameEncodedData(5)
-//        val pixelDeltaX = nameEncodedData(6)//distance between pixels in x-coordinate
-//        val pixelDeltaY = nameEncodedData(7)
-//        val pixelDeltaZ = nameEncodedData(8)
+//    println(s"a ${a.take(10).map(_._1.mkString("-")).mkString("\n")}")
+    .filter(_._1.length == 10)
+//    println(s"b ${b.count()}")
 
-        val flatData = data.flatten
-        val sma = SMA(flatData(0).toByte, flatData(0).toByte, 0.0)
-        var i = 1
+//    parallelize(Seq(Tile[Int](0, 0, 10, 10)))
+          .map{case(nameEncodedData, binaryData) =>
+            val str = binaryData.open()
+            val img = ImageIO.read(str)
+            str.close()
 
-        val byteData = new Array[Byte](flatData.length)
-        byteData(0) = flatData(0).toByte
+            val data = imageReader(img)
 
-        while(i < flatData.length) {
-          val b = flatData(i).toByte
-          if(b < sma.min)
-            sma.min = b
-          else if(b > sma.max)
-            sma.max = b
 
-          byteData(i) = b
-          i += 1
-        }
+            val xCount = nameEncodedData(0)//Counter of Image x-axes
+            val yCount = nameEncodedData(1)
+    //        val zCount = nameEncodedData(2)
+    //        val xCoord = nameEncodedData(3)//x-coordinate of image creation position (ul?)
+    //        val yCoord = nameEncodedData(4)
+    //        val zCoord = nameEncodedData(5)
+    //        val pixelDeltaX = nameEncodedData(6)//distance between pixels in x-coordinate
+    //        val pixelDeltaY = nameEncodedData(7)
+    //        val pixelDeltaZ = nameEncodedData(8)
 
-        // TODO what is -100 here? make it generic
-        Tile[Byte]((xCount.toDouble - 100) * img.getWidth(),
-          ((yCount.toDouble - 100) + 1) * img.getHeight(),
-          img.getWidth(), img.getHeight(), byteData, sma = Some(sma))//this converts to signed again
-      }
+            val flatData = data.flatten
+
+            val sma = SMA(flatData(0), flatData(0), 0.0)
+            var i = 1
+
+            val byteData = new Array[Int](flatData.length)
+            byteData(0) = flatData(0).toByte
+
+            while(i < flatData.length) {
+              val b = flatData(i)
+              if(useSma) {
+                if (b < sma.min)
+                  sma.min = b
+                else if (b > sma.max)
+                  sma.max = b
+              }
+
+              byteData(i) = b
+              i += 1
+            }
+
+            // TODO what is -100 here? make it generic
+            Tile((xCount.toDouble - 100) * img.getWidth(),
+              ((yCount.toDouble - 100) + 1) * img.getHeight(),
+              img.getWidth(), img.getHeight(), byteData, sma = if(useSma) Some(sma) else None)//this converts to signed again
+          }
+  }
 
   private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {
     val p = Paths.get(path)

@@ -1,14 +1,13 @@
 package dbis.stark.raster
 
-import java.nio.ByteBuffer
-
 import dbis.stark.STObject
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{Index, IndexConfig}
 import dbis.stark.spatial.partitioner.GridStrategy
+import org.apache.spark._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partition, Partitioner, PlainSpatialRDDFunctions, TaskContext}
+import org.apache.spark.serializer.KryoSerializer
 
 import scala.reflect.ClassTag
 
@@ -87,32 +86,121 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
 
   override def saveAsTextFile(path: String) = {
     this.map{ t =>
-      s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}"
+      s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}${t.sma.map(","+_.toString).getOrElse("")}"
     }.saveAsTextFile(path)
   }
 
-  def saveAsObjectFile(path: String, partitions: Int = 8): Unit = {
-    val DOUBLE = 8
-    val INT = 4
+  def saveAsObjectFile(path: String, partitions: Int, conf: SparkConf): Unit = {
 
     val parti = GridStrategy(partitions, pointsOnly = true, minmax = None, sampleFraction = 0)
 
-    val mapped = this.map{t =>
+    val mapped = this.mapPartitions { iter =>
 
-      val buf = ByteBuffer.allocate(DOUBLE + DOUBLE + INT + INT + DOUBLE + INT + t.data.length*DOUBLE)
-      buf.putDouble(t.ulx)
-      buf.putDouble(t.uly)
-      buf.putInt(t.width)
-      buf.putInt(t.height)
-      buf.putDouble(t.pixelWidth)
-      buf.putInt(t.data.length)
-      var i = 0
-      while(i < t.data.length) {
-        buf.putDouble(t.data(i).asInstanceOf[Double])
-        i += 1
+      val ser = new KryoSerializer(conf)
+
+      val output = ser.newKryoOutput()
+      val kryo = ser.newKryo()
+
+      val res = iter.map { t =>
+
+        kryo.writeObject(output, t)
+        output.flush()
+        val objBytes = output.getBuffer
+
+
+//        val smaBytes: Option[(Array[Byte], Array[Byte], Double)] = t.sma map {
+//          case SMA(min, max, avg) =>
+//
+//            oos.writeObject(min)
+//            oos.flush()
+//            bos.flush()
+//            oos.reset()
+//            bos.reset()
+//            val minBytes = bos.toByteArray
+//
+//
+//            oos.writeObject(max)
+//            oos.flush()
+//            bos.flush()
+//            oos.reset()
+//            bos.reset()
+//            val maxBytes = bos.toByteArray
+//
+//            (minBytes, maxBytes,avg)
+//        }
+//
+//        bos.reset()
+//        oos.reset()
+//
+//        val smaBytesLength = smaBytes.map{ case (minBytes, maxBytes,_) =>
+//            INT + minBytes.length + // numbytes + actual bytes
+//            INT + maxBytes.length + // numbytes + actual bytes
+//            DOUBLE // average
+//        }.getOrElse(0) // no SMA present
+//
+//        var i = 0
+//
+//        var numDataBytes = 0
+//        val dataBytes = mutable.ListBuffer.empty[Array[Byte]]
+//
+//        while (i < t.data.length) {
+////          buf.putInt(t.data(i).asInstanceOf[Int])
+//
+//          oos.writeObject(t.data(i))
+//          oos.flush()
+//          val pixelBytes = bos.toByteArray
+//          numDataBytes += pixelBytes.length
+//          dataBytes += pixelBytes
+//
+//          bos.reset()
+//          oos.reset()
+//
+//          i += 1
+//        }
+//
+//        val buf = ByteBuffer.allocate(DOUBLE + DOUBLE + // ulx, uly
+//          INT + INT + DOUBLE + // width, height, pixelwidth
+//          1 + smaBytesLength + // SMA indicator (yes or no) + sma bytes
+//          INT + dataBytes.length * INT + numDataBytes) // num entries, length per entry, total bytes
+//
+//        buf.putDouble(t.ulx)
+//        buf.putDouble(t.uly)
+//        buf.putInt(t.width)
+//        buf.putInt(t.height)
+//        buf.putDouble(t.pixelWidth)
+//        //      buf.putInt(t.data.length)
+//
+//
+//        smaBytes match {
+//          case Some((minBytes, maxBytes, avg)) =>
+//            buf.put(1.toByte)
+//            buf.putInt(minBytes.length)
+//            buf.put(minBytes)
+//            buf.putInt(maxBytes.length)
+//            buf.put(maxBytes)
+//            buf.putDouble(avg)
+//          case None =>
+//            buf.put(0.toByte)
+//        }
+//
+//
+//        i = 0
+//        while(i < dataBytes.length) {
+//          // TODO could be left out if all pixels have same amount, e.g. Int, ...
+//          buf.putInt(dataBytes(i).length)
+//          buf.put(dataBytes(i))
+//          i += 1
+//        }
+
+        output.clear()
+
+        (STObject(RasterUtils.tileToGeo(t)), objBytes)
+
       }
 
-      (STObject(RasterUtils.tileToGeo(t)), buf.array())
+      output.close()
+
+      res
     }
 
     val parted = new PlainSpatialRDDFunctions(mapped).partitionBy(parti)

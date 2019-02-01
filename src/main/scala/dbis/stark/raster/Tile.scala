@@ -4,7 +4,9 @@ import scala.reflect.{ClassTag, _}
 
 case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
                                                              var max: U,
-                                                             var avg: Double)
+                                                             var avg: Double) {
+  override def toString = s"$min,$max,$avg"
+}
 
 /**
  * Tile represents a data type for 2D raster data.

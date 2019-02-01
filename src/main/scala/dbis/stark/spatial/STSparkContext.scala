@@ -1,15 +1,16 @@
 package dbis.stark.spatial
 
 import java.awt.image.BufferedImage
-import java.nio.ByteBuffer
 import java.nio.file.Paths
 
+import com.esotericsoftware.kryo.io.Input
 import dbis.stark.raster.{RasterRDD, RasterUtils, SMA, Tile}
 import dbis.stark.{Instant, Interval, STObject}
 import javax.imageio.ImageIO
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.reflect.ClassTag
@@ -41,7 +42,7 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     * @return Returns the [[org.apache.spark.rdd.RDD]]
     */
   def textFile(path: String, qry: STObject, minPartitions: Int): RDD[String] = {
-    val partitionsToLoad: String = getPartitionsToLoad(path, qry)
+    val partitionsToLoad: String = getPartitionsToLoad(path, Some(qry))
 
     if(partitionsToLoad.isEmpty)
       this.emptyRDD[String]
@@ -49,7 +50,10 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       super.textFile(partitionsToLoad, minPartitions)
   }
 
-  def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int): RDD[T] = {
+  def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int): RDD[T] =
+    this.objectFile(path, Some(qry), minPartitions)
+
+  def objectFile[T : ClassTag](path: String, qry: Option[STObject], minPartitions: Int): RDD[T] = {
 
     val partitionstoLoad = getPartitionsToLoad(path, qry)
 
@@ -59,7 +63,7 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       super.objectFile[T](partitionstoLoad, minPartitions)
   }
 
-  def tileFile(file: String, partitions: Int, qry: Option[STObject]): RasterRDD[Double] = {
+  def tileFile[U: ClassTag](file: String, partitions: Int, qry: Option[STObject],f: String => U)(implicit ord: Ordering[U]): RasterRDD[U] = {
 
     val raw = qry match {
       case None =>
@@ -79,17 +83,28 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       val pw = arr(4).toDouble
 //      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
 
-      val data = new Array[Double](arr.length - 5)
+//      val data = new Array[Double](arr.length - 5)
+      val data = new Array[U](tWidth * tHeight)
 
 //      Array.copy(arr, 4, data, 0, arr.length - 4)
 
       var i = 0
       while(i < data.length) {
-        data(i) = arr(i+5).toDouble
+        data(i) = f(arr(i+5))
         i += 1
       }
 
-      Tile[Double](ulx, uly, tWidth, tHeight, data, pw)
+      val sma: Option[SMA[U]] = if(i < arr.length) {
+        // we have SMA
+        val min = f(arr(i))
+        val max = f(arr(i+1))
+        val avg = arr(i+2).toDouble
+
+        Some(SMA(min, max, avg))
+      } else
+        None
+
+      Tile[U](ulx, uly, tWidth, tHeight, data, pw, sma)
     }
 
 //    val dir = new File(folderPath)
@@ -121,31 +136,81 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
 //    sc.parallelize(tileList)
   }
 
-  def objectTiles(file: String, partitions: Int = 1024, query: Option[STObject] = None): RasterRDD[Double] = {
-    val byteRDD = query match {
-      case None =>
-        super.objectFile[(STObject, Array[Byte])](file, partitions)
-      case Some(so) =>
-        this.objectFile[(STObject, Array[Byte])](file,so,partitions)
-    }
+  def objectTiles[U: ClassTag](file: String, partitions: Int = 1024, query: Option[STObject])(implicit ord: Ordering[U]): RasterRDD[U] = {
 
-    byteRDD.map{ case (_, arr) =>
-      val buf = ByteBuffer.wrap(arr)
-      val ulx = buf.getDouble
-      val uly = buf.getDouble
-      val width = buf.getInt
-      val height = buf.getInt
-      val pw = buf.getDouble
+    val byteRDD = this.objectFile[(STObject, Array[Byte])](file, query, partitions)
 
-      val numValues = buf.getInt
-      val values = new Array[Double](numValues)
-      var i = 0
-      while(i < numValues) {
-        values(i) = buf.getDouble
-        i += 1
+    val ser = new KryoSerializer(getConf)
+
+    byteRDD.mapPartitions { iter =>
+
+      val kryo = ser.newKryo()
+
+      iter.map { case (_, arr) =>
+//        val buf = ByteBuffer.wrap(arr)
+//        val ulx = buf.getDouble
+//        val uly = buf.getDouble
+//        val width = buf.getInt
+//        val height = buf.getInt
+//        val pw = buf.getDouble
+//
+//
+//        val sma = if (buf.get() == 1) {
+//
+//
+//          val numMinBytes = buf.getInt
+//          val minBytes = new Array[Byte](numMinBytes)
+//
+//          buf.get(minBytes)
+//
+//          var bis = new ByteArrayInputStream(minBytes)
+//          var ois = new ObjectInputStream(bis)
+//          val min = ois.readObject().asInstanceOf[U]
+//
+//
+//          val numMaxBytes = buf.getInt
+//          val maxBytes = new Array[Byte](numMaxBytes)
+//          buf.get()
+//          bis = new ByteArrayInputStream()
+//
+//
+//          val min = buf.getInt.asInstanceOf[U]
+//          val max = buf.getInt.asInstanceOf[U]
+//          val avg = buf.getDouble
+//
+//          Some(SMA(min, max, avg))
+//        } else None
+//
+//
+//        //      val numValues = buf.getInt
+//        val numValues = width * height
+//        val values = new Array[U](numValues)
+//        var i = 0
+//        while (i < numValues) {
+//
+//          val numPixelBytes = buf.getInt()
+//
+//          val arr = new Array[Byte](numPixelBytes)
+//
+//          val bis = new ByteArrayInputStream(arr)
+//          val ois = new ObjectInputStream(bis)
+//
+//
+//          // TODO read as U and deserialize
+//          values(i) = buf.getInt.asInstanceOf[U]
+//          i += 1
+//        }
+//        Tile(ulx, uly, width, height, values, pw, sma)
+
+//          val bis = new ByteArrayInputStream(arr)
+//          val ois = new ObjectInputStream(bis)
+//          ois.readObject().asInstanceOf[Tile[U]]
+        val input = new Input(arr)
+        val tile = kryo.readObject(input, classOf[Tile[U]])
+
+        tile
+
       }
-
-      Tile(ulx, uly, width, height, values, pw)
     }
   }
 
@@ -216,12 +281,14 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
           }
   }
 
-  private[stark] def getPartitionsToLoad(path: String, qry: STObject) = {
+  private[stark] def getPartitionsToLoad(path: String, qry: Option[STObject]): String = {
     val p = Paths.get(path)
     // the path to the info file
     val infoFile = p.resolve(STSparkContext.PARTITIONINFO_FILE).toString
 
-    val partitionsToLoad = if (dfs.isDirectory(new Path(path)) && dfs.exists(new Path(infoFile))) {
+    val isDir = dfs.isDirectory(new Path(path))
+    val partitionsToLoad = if (qry.isDefined && isDir && dfs.exists(new Path(infoFile))) {
+      val query = qry.get
       super.textFile(infoFile) // load info file
         .map(_.split(STSparkContext.PARTITIONINFO_DELIM))
         .map { arr =>
@@ -243,11 +310,13 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
 
           (stobj, arr(3))
         } // (STObject, path)
-        .intersects(qry) // find relevant partitions
+        .intersects(query) // find relevant partitions
         .map { case (_, file) => Paths.get(path, file).toString } // only path
         .collect() // fetch into single array
         .mkString(",") // make comma separated string for SparkContext#textFile
 
+    } else if(isDir){
+      p.resolve("part-*").toString
     } else // if it's not possible to load info file, load everything under this path
       path
 

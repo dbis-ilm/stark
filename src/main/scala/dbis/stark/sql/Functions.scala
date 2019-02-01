@@ -8,7 +8,7 @@ import org.apache.spark.sql.functions.udf
 object Functions {
 
   spatial.registerUDTs()
-  //raster.registerUDTs()
+  raster.registerUDTs()
 
   val fromWKT = udf(STObject.fromWKT _)
 

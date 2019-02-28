@@ -8,6 +8,7 @@ import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 import org.apache.spark.sql.spatial.StarkSerializer
+import org.apache.spark.unsafe.types.UTF8String
 
 /**
   * Spatio-temporal join execution
@@ -55,10 +56,28 @@ object STJoinExec {
 
     val ref = BindReferences.bindReference(expr, plan.output)
 
+//    System.err.println(plan.schemaString)
+//    System.err.println(expr)
+
+
     plan.execute().map { row =>
 
       val evaled = ref.eval(row)
-      val joinColumn = StarkSerializer.deserialize(evaled.asInstanceOf[ArrayData])
+
+      val joinColumn = evaled match {
+        case a: ArrayData =>
+          Some(StarkSerializer.deserialize(a))
+        case s: UTF8String =>
+          Some(STObject(s.toString))
+        case _ if evaled == null =>
+//          sys.error(s"evaled to null for ${row.toString} and ref: $ref")
+          None
+        case _ =>
+
+          sys.error(s"unknown type: $evaled")
+      }
+
+//      val joinColumn = StarkSerializer.deserialize(evaled.asInstanceOf[ArrayData])
 
 //      println(s"$prefix AFTER ROW: ${row.getString(0)} , \t${row.getLong(1)} \t${
 //        val arr = row.get(2, STObjectUDT).asInstanceOf[ArrayData]
@@ -66,7 +85,8 @@ object STJoinExec {
 //      }")
 
       (joinColumn, row) //.toSeq(plan.schema)
-    }
+    }.filter(_._1.isDefined)
+      .map{ case (Some(so), r) => (so,r)}
   }
 
 }

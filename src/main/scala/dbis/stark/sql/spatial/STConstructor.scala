@@ -17,12 +17,18 @@ abstract class STConstructor(exprs: Seq[Expression])
   override def children = exprs
 }
 
-case class STGeomFromWKT(exprs: Seq[Expression]) extends Expression
+case class STGeomFromWKT(exprs: Seq[Expression]) extends STConstructor(exprs)
   with CodegenFallback {
   require(exprs.length == 1, s"Only one expression allowed for STGeomFromText, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
     val evaled = exprs.head.eval(input)
+
+    if(evaled == null) {
+
+      sys.error(s"shit. ${input.getClass.getCanonicalName}${input.toString}  expr: ${exprs.mkString(";")}  ${exprs.head.prettyName}  cols: ${input.numFields} ")
+    }
+
     val inputString = evaled.asInstanceOf[UTF8String].toString
     val theObject = STObject(inputString)
 

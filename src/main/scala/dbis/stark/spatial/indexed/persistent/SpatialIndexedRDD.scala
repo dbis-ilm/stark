@@ -7,9 +7,9 @@ import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialPartition}
 import dbis.stark.spatial.{JoinPredicate, Utils}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, TaskContext}
-import spire.ClassTag
 
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 
 class SpatialIndexedRDD[G <: STObject : ClassTag, V : ClassTag](@transient private val parent: RDD[Index[(G,V)]],
                                                                 qry: G, predicate: JoinPredicate, predicateFunc: (G,G) => Boolean,

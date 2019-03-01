@@ -17,7 +17,7 @@ abstract class STConstructor(exprs: Seq[Expression])
   override def children = exprs
 }
 
-case class STGeomFromWKT(exprs: Seq[Expression]) extends STConstructor(exprs)
+case class STGeomFromWKT(exprs: Seq[Expression]) extends Expression
   with CodegenFallback {
   require(exprs.length == 1, s"Only one expression allowed for STGeomFromText, but got ${exprs.length}")
 

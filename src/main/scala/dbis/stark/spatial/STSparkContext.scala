@@ -16,6 +16,33 @@ import scala.reflect.ClassTag
 object STSparkContext {
   final val PARTITIONINFO_FILE = "partition_info"
   final val PARTITIONINFO_DELIM = ";"
+
+  def tileFile(raw: RDD[String]): RasterRDD[Double] = {
+
+    raw.map{ line =>
+      val arr = line.split(',')
+      val ulx = arr(0).toDouble
+      val uly = arr(1).toDouble
+
+      val tWidth = arr(2).toInt
+      val tHeight = arr(3).toInt
+
+      val pixelWidth = arr(4).toDouble
+      //      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
+
+      val data = new Array[Double](arr.length - 5)
+
+      //      Array.copy(arr, 4, data, 0, arr.length - 4)
+
+      var i = 0
+      while(i < data.length) {
+        data(i) = arr(i+5).toDouble
+        i += 1
+      }
+
+      Tile(ulx, uly, tWidth, tHeight, data, pixelWidth = pixelWidth)
+    }
+  }
 }
 
 /**
@@ -57,38 +84,16 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       super.objectFile[T](partitionstoLoad, minPartitions)
   }
 
-  def tileFile(file: String, partitions: Int, qry: Option[STObject]): RasterRDD[Double] = {
 
+
+  def tileFile(file: String, partitions: Int, qry: Option[STObject]): RasterRDD[Double] = {
     val raw = qry match {
       case None =>
         super.textFile(file, partitions)
       case Some(so) =>
         this.textFile(file, so, partitions)
     }
-
-    raw.map{ line =>
-      val arr = line.split(',')
-      val ulx = arr(0).toDouble
-      val uly = arr(1).toDouble
-
-      val tWidth = arr(2).toInt
-      val tHeight = arr(3).toInt
-
-      val pixelWidth = arr(4).toDouble
-//      require(tWidth * tHeight == arr.length - 4, s"w*h = ${tWidth * tHeight} != ${arr.length - 4}")
-
-      val data = new Array[Double](arr.length - 5)
-
-//      Array.copy(arr, 4, data, 0, arr.length - 4)
-
-      var i = 0
-      while(i < data.length) {
-        data(i) = arr(i+5).toDouble
-        i += 1
-      }
-
-      Tile(ulx, uly, tWidth, tHeight, data, pixelWidth = pixelWidth)
-    }
+    STSparkContext.tileFile(raw)
 
 //    val dir = new File(folderPath)
 //    var fileList = List[File]()

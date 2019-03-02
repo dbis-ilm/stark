@@ -6,6 +6,11 @@ import dbis.stark.STObject.{GeoType, MBR}
 import org.locationtech.jts.geom.GeometryFactory
 import java.awt.Graphics2D
 import java.awt.RenderingHints
+import java.nio.file.Path
+
+import javax.imageio.ImageIO
+import org.apache.spark.rdd.RDD
+
 import scala.reflect.ClassTag
 
 /**
@@ -158,7 +163,16 @@ object RasterUtils {
   def contains(left: Tile[_], right: Tile[_]): Boolean =
     tileToMBR(left).contains(tileToMBR(right))
 
-  def rasterToImage[U](raster: RasterRDD[U], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): BufferedImage = {
+  def saveAsImage[U](path: Path, raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): Unit = {
+
+
+    val img = rasterToImage(raster,colorFunc,resize,imgWidth,imgHeight)
+
+    val suffix = path.getFileName.toString.split('.')(1)
+    ImageIO.write(img, suffix, path.toFile)
+  }
+
+  def rasterToImage[U](raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): BufferedImage = {
     require(!resize || (resize && imgWidth > 0 && imgHeight > 0), s"Dimensions should be > 0 resize is desired! ${this.getClass.getSimpleName}")
 
     val data = raster.mapPartitions(localTiles  => {

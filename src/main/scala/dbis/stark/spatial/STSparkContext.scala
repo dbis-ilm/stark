@@ -147,64 +147,6 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       val kryo = ser.newKryo()
 
       iter.map { case (_, arr) =>
-//        val buf = ByteBuffer.wrap(arr)
-//        val ulx = buf.getDouble
-//        val uly = buf.getDouble
-//        val width = buf.getInt
-//        val height = buf.getInt
-//        val pw = buf.getDouble
-//
-//
-//        val sma = if (buf.get() == 1) {
-//
-//
-//          val numMinBytes = buf.getInt
-//          val minBytes = new Array[Byte](numMinBytes)
-//
-//          buf.get(minBytes)
-//
-//          var bis = new ByteArrayInputStream(minBytes)
-//          var ois = new ObjectInputStream(bis)
-//          val min = ois.readObject().asInstanceOf[U]
-//
-//
-//          val numMaxBytes = buf.getInt
-//          val maxBytes = new Array[Byte](numMaxBytes)
-//          buf.get()
-//          bis = new ByteArrayInputStream()
-//
-//
-//          val min = buf.getInt.asInstanceOf[U]
-//          val max = buf.getInt.asInstanceOf[U]
-//          val avg = buf.getDouble
-//
-//          Some(SMA(min, max, avg))
-//        } else None
-//
-//
-//        //      val numValues = buf.getInt
-//        val numValues = width * height
-//        val values = new Array[U](numValues)
-//        var i = 0
-//        while (i < numValues) {
-//
-//          val numPixelBytes = buf.getInt()
-//
-//          val arr = new Array[Byte](numPixelBytes)
-//
-//          val bis = new ByteArrayInputStream(arr)
-//          val ois = new ObjectInputStream(bis)
-//
-//
-//          // TODO read as U and deserialize
-//          values(i) = buf.getInt.asInstanceOf[U]
-//          i += 1
-//        }
-//        Tile(ulx, uly, width, height, values, pw, sma)
-
-//          val bis = new ByteArrayInputStream(arr)
-//          val ois = new ObjectInputStream(bis)
-//          ois.readObject().asInstanceOf[Tile[U]]
         val input = new Input(arr)
         val tile = kryo.readObject(input, classOf[Tile[U]])
 

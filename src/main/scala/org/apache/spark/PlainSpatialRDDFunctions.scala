@@ -218,7 +218,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		   * matches the input format and
 		   */
 
-		  (key, Vectors.dense(c.getY, c.getX), (g,v))
+		  (key, Vectors.dense(c.getX, c.getY), (g,v))
 	  }
 
 	  // start the DBScan computation
@@ -241,7 +241,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
      * this can be used for debugging and visualization
      */
     if(outfile.isDefined)
-    points.coalesce(1).saveAsTextFile(outfile.get)
+      points.coalesce(1).saveAsTextFile(outfile.get)
 
     points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }

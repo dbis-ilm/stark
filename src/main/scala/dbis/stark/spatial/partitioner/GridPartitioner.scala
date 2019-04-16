@@ -3,7 +3,7 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.{Path, Paths}
 
 import dbis.stark.STObject
-import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange, StarkUtils}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 
@@ -134,12 +134,12 @@ object GridPartitioner {
 
     def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
 
-      val p = Utils.getCenter(pt._1.getGeo)
+      val p = StarkUtils.getCenter(pt._1.getGeo)
       val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
       histo1.buckets(cellId) = (histo1.buckets(cellId)._1, histo1.buckets(cellId)._2 + 1)
       if(!pointsOnly) {
-        histo1.buckets(cellId)._1.extendBy(Utils.fromGeo(pt._1.getGeo))
+        histo1.buckets(cellId)._1.extendBy(StarkUtils.fromGeo(pt._1.getGeo))
 //        histo1.buckets(cellId)._1.extent.extend(
       }
 //        histo1.buckets(cellId) = (), histo1.buckets(cellId)._2)

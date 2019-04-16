@@ -3,7 +3,7 @@ package org.apache.spark
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialPartition, TemporalPartitioner}
-import dbis.stark.spatial.{JoinPredicate, Utils}
+import dbis.stark.spatial.{JoinPredicate, StarkUtils}
 import dbis.stark.{Interval, STObject}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
@@ -68,7 +68,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
           val cell = sp.partitionBounds(parentPartiId)
 
           // check if partitions intersect
-          if (Utils.toEnvelope(cell.extent).intersects(qryEnv)) {
+          if (StarkUtils.toEnvelope(cell.extent).intersects(qryEnv)) {
             // create a new "spatial partition" pointing to the parent partition
             spatialParts += SpatialPartition(spatialPartId, parentPartiId, parent)
             spatialPartId += 1

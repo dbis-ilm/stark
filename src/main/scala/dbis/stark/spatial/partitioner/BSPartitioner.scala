@@ -154,7 +154,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   override def getPartitionId(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
-    val c = Utils.getCenter(g.getGeo)
+    val c = StarkUtils.getCenter(g.getGeo)
 
     val pX = c.getX
     val pY = c.getY
@@ -191,7 +191,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     }
 
     if(outside || (!pointsOnly && sampleFraction > 0)) {
-      bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+      bsp.partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
     }
 
 

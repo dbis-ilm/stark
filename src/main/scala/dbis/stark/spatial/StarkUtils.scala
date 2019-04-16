@@ -1,9 +1,10 @@
 package dbis.stark.spatial
 
-import org.locationtech.jts.geom.{Coordinate, Envelope, GeometryFactory, Point}
+import dbis.stark.STObject
+import org.locationtech.jts.geom._
 import dbis.stark.STObject.{GeoType, MBR}
 
-object Utils {
+object StarkUtils {
 
   @inline
   def toEnvelope(r: NRectRange): MBR = new Envelope(r.ll(0), r.ur(0), r.ll(1), r.ur(1))
@@ -21,6 +22,15 @@ object Utils {
   def makeGeo(mbr: MBR): GeoType = {
     val fac = new GeometryFactory()
     fac.toGeometry(mbr)
+  }
+
+  def convexHull(geos: Iterable[STObject]): STObject = {
+
+    val factory = new GeometryFactory()
+    val hull = factory.createGeometryCollection(geos.map(_.getGeo).toArray).convexHull()
+
+    STObject(hull)
+
   }
 
 

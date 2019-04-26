@@ -36,6 +36,18 @@ case class Tile[U : ClassTag](ulx: Double, uly: Double, width: Int, height: Int,
 
   def setArray(i: Int, j: Int, v: U) = data(j * width + i) = v
 
+  def setRow(x: Double, y: Double, array: Array[U]) = {
+    val r = row(y)
+    val c = column(x)
+    setRowIdx(c,r, array)
+  }
+
+  def setRowIdx(i: Int, j: Int, array: Array[U]) = {
+//    require(array.length == width, s"array length (${array.length} must match tile width ${width}")
+    val start = j * width + i
+    Array.copy(array, 0, data, start, array.length)
+  }
+
   /**
    * Return the value at the given position of the raster.
    */

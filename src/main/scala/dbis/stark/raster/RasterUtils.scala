@@ -1,6 +1,12 @@
 package dbis.stark.raster
 
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
+import java.nio.file.Path
+
 import dbis.stark.STObject.{GeoType, MBR}
+import javax.imageio.ImageIO
+import org.apache.spark.rdd.RDD
 import org.locationtech.jts.geom.GeometryFactory
 
 import scala.reflect.ClassTag
@@ -28,8 +34,6 @@ object RasterUtils {
     * @return Returns a tile containing only pixels intersecting with the given geometry
     */
   def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U): Tile[U] = {
-
-    org.apache.spark.mllib.linalg.SparseVector
 
     // make the raster tile a vector rectangle
     val tileGeo = tileToGeo(tile)
@@ -124,16 +128,16 @@ object RasterUtils {
 
   @inline
   def tileToMBR(tile: Tile[_]): MBR =
-    new MBR(tile.ulx, tile.ulx + tile.width, tile.uly - tile.height, tile.uly)
+    new MBR(tile.ulx, tile.ulx + (tile.width * tile.pixelWidth), tile.uly - (tile.height * tile.pixelWidth), tile.uly)
 
-  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Short = 1): Tile[U] =
+  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Double = 1): Tile[U] =
     new Tile[U](mbr.getMinX,mbr.getMaxY,
       math.ceil(mbr.getWidth).toInt, math.ceil(mbr.getHeight).toInt,
       pixelWidth,
       default
     )
 
-  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Short): Tile[U] = {
+  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Double): Tile[U] = {
     val width = (math.ceil(mbr.getWidth) / pixelWidth).toInt
     val height = (math.ceil(mbr.getHeight) / pixelWidth).toInt
     new Tile[U](mbr.getMinX,mbr.getMaxY,
@@ -157,4 +161,84 @@ object RasterUtils {
   def contains(left: Tile[_], right: Tile[_]): Boolean =
     tileToMBR(left).contains(tileToMBR(right))
 
+  def saveAsImage[U](path: Path, raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): Unit = {
+
+
+    val img = rasterToImage(raster,colorFunc,resize,imgWidth,imgHeight)
+
+    val suffix = path.getFileName.toString.split('.')(1)
+    ImageIO.write(img, suffix, path.toFile)
+  }
+
+  def rasterToImage[U](raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): BufferedImage = {
+    require(!resize || (resize && imgWidth > 0 && imgHeight > 0), s"Dimensions should be > 0 resize is desired! ${this.getClass.getSimpleName}")
+
+//    val ys = raster.map(_.uly).distinct().collect()
+//      println(s"ulys: ${ys.length}")
+//      ys.foreach(println)
+
+
+    val data = raster.mapPartitions(localTiles  => {
+      //Collect all data of tiles in tuples of (offsetX, offsetY, data[one row of the tile])
+//      localTiles.foreach(localT => println(localT))
+//      println(localTiles.size)
+      localTiles.map(tile => {
+        val array = new Array[((Int, Int), Array[Int])](tile.height)
+
+        for(y <- array.indices) {
+          val xArray = new Array[Int](tile.width)
+          for(x <- xArray.indices) {
+            xArray(x) = colorFunc(tile.valueArray(x,y))
+          }
+
+          array(y) = ((tile.ulx.toInt, math.round(tile.uly / tile.pixelWidth).toInt - y), xArray)
+        }
+
+        array
+      })
+    }).reduce((t1, t2) => {
+      t1 ++ t2
+    })
+
+    //Calculate MinMax-Coordinates
+    val (minX, maxX, minY, maxY) = data.foldLeft((Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE)){ case ((minX1,maxX1,minY1,maxY1), ((ox,oy),arr)) =>
+
+        val yMax = if(oy > maxY1) oy else maxY1
+        val yMin = if(oy < minY1) oy else minY1
+
+        val xMin = if(ox < minX1) ox else minX1
+        val xMax = if(ox + arr.length > maxX1) ox + arr.length else maxX1
+
+      (xMin,xMax,yMin,yMax)
+    }
+
+
+
+    //Construct image from one-dimensional array of collected values
+    val tile = Tile[Int](minX, maxY, maxX - minX, (maxY - minY)+1, new Array[Int]((1 + maxY - minY) * (maxX - minX)))
+    val img = new BufferedImage(tile.width, tile.height, BufferedImage.TYPE_INT_RGB)
+    val imgRaster = img.getRaster
+    println(tile.toString)
+
+    data.foreach{ case ((ox,oy),arr) =>
+        tile.setRow(ox,oy, arr)
+    }
+
+    imgRaster.setDataElements(0, 0, img.getWidth, img.getHeight, tile.data)
+
+    //Resize image if desired
+    if(resize) {
+      val factor = Math.min(imgWidth / img.getWidth.toFloat, imgHeight / img.getHeight.toFloat)
+      val w = (img.getWidth * factor).toInt
+      val h = (img.getHeight * factor).toInt
+
+      val scaled = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
+
+      val g = scaled.createGraphics
+      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+      g.drawImage(img, 0, 0, w, h, null)
+
+      scaled
+    } else img
+  }
 }

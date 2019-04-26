@@ -1,25 +1,30 @@
 package dbis.stark.sql
 
 import dbis.stark.STObject
-import dbis.stark.spatial.PredicatesFunctions
+import dbis.stark.sql.spatial._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
 
 object Functions {
 
   spatial.registerUDTs()
-  //raster.registerUDTs()
+  raster.registerUDTs()
 
   val fromWKT = udf(STObject.fromWKT _)
 
   def register(implicit spark: SparkSession): Unit = {
 
-    spark.udf.register("fromWKT", STObject.fromWKT _)
-    spark.udf.register("asString", STObject.asString _)
 
-    spark.udf.register("containedBy", PredicatesFunctions.containedby _)
-    spark.udf.register("intersects", PredicatesFunctions.intersects _)
-    spark.udf.register("contains", PredicatesFunctions.contains _)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("asString", STAsString)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_geomfromwkt", STGeomFromWKT)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_point", STPoint)
 
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_contains", STContains)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_containedby", STContainedBy)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_intersects", STIntersects)
+
+//    spark.udf.register("st_contains", STContains)
+//    spark.udf.register("st_containedby", STContainedBy)
+//    spark.udf.register("st_intersects", STIntersects)
   }
 }

@@ -16,7 +16,10 @@ import scala.reflect.ClassTag
 abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: RDD[(G,V)]) extends PairRDDFunctions[G,V](rdd) {
 
   def partitionBy(strategy: PartitionerConfig) = {
-    val partitioner = PartitionerFactory.get(strategy, rdd)
+    PartitionerFactory.get(strategy, rdd) match {
+      case Some(partitioner) => rdd.partitionBy(partitioner)
+      case None => rdd
+    }
 
 //    rdd.map{ case (g,v) =>
 //      val partId = partitioner.getPartition(g)
@@ -31,7 +34,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
 //      .map(_._2)
 
 
-    rdd.partitionBy(partitioner)
+
+
   }
 
 

@@ -74,7 +74,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
    * @param key The key geometry to compute the partition for
    * @return The Index of the partition
    */
-  override def getPartition(key: Any): Int = {
+  override def getPartitionId(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
     val center = Utils.getCenter(g.getGeo)

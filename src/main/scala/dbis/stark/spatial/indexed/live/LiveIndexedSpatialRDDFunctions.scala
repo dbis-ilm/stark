@@ -54,7 +54,12 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
-    val r = self.mapPartitionsWithIndex({ (idx, iter) =>
+
+    implicit val ord = new Ordering[((G,V),Distance)] {
+      override def compare(x: ((G,V),Distance), y: ((G,V),Distance)) = if(x._2 < y._2) -1 else if(x._2 > y._2) 1 else 0
+    }
+
+    val r = self.mapPartitionsWithIndex({ (_, iter) =>
 
                 val tree = IndexFactory.get[G,(G,V)](indexConfig)
                 require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
@@ -65,11 +70,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                 idxTree.build()
                 idxTree.kNN(qry, k, distFunc)
             })
-          .map { case (g,v) => (g, (distFunc(g,qry), v)) }
-          .sortBy(_._2._1, ascending = true)
-          .take(k)
+        .takeOrdered(k)(ord)
 
-    self.sparkContext.parallelize(r)
+    self.sparkContext.parallelize(r).map{ case ((g,v),d) => (g,(d,v))}
   }
 
   override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
@@ -85,7 +88,8 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       idxTree.build()
 
       val knnIter = idxTree.kNN(qry, k, distFunc)
-                            .map{ case (g,v) => (distFunc(g,qry),(g,v))}
+//                            .map{ case (g,v) => (distFunc(g,qry),(g,v))}
+                            .map(_.swap)
                             .toArray
 
       val knn = new KNN[(G,V)](k)

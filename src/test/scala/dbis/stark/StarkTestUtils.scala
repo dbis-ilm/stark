@@ -138,4 +138,11 @@ object StarkTestUtils {
       }
     }
   }
+
+  def timing(name: String)(f: => Unit): Unit = {
+    val start = System.currentTimeMillis()
+    f
+    val end = System.currentTimeMillis()
+    println(s"$name: ${end - start}ms")
+  }
 }

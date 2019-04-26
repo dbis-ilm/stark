@@ -3,6 +3,7 @@ package org.apache.spark
 import java.nio.file.Paths
 
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
+import dbis.stark.raster.{RasterRDD, Tile}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
@@ -427,6 +428,38 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     }
   }
 
+//  def skylinePrune(ref: STObject,
+//                   distFunc: (STObject, STObject) => (Distance, Distance),
+//                   dominatesRel: (STObject, STObject) => Boolean,
+//                   ppd: Int): RDD[(G,V)] = if(self.partitioner.nonEmpty && self.partitioner.get.isInstanceOf[GridPartitioner]) {
+//
+//
+//
+//    new RDD[(G,V)](self) {
+//
+//      private val sParti = self.partitioner.get.asInstanceOf[GridPartitioner]
+//
+//      override val partitioner = self.partitioner
+//
+//      def dominates(p1: Int, p2: Int): Boolean = {
+//        val one = sParti.partitionBounds(p1)
+//        val two = sParti.partitionBounds(p2)
+//
+//        one.
+//      }
+//
+//      override protected def getPartitions: Array[Partition] = {
+//
+//      }
+//
+//
+//      override def compute(split: Partition, context: TaskContext): Iterator[(G, V)] = ???
+//    }
+//  } else
+//    skyline(ref, distFunc, dominatesRel, ppd)
+
+
+
 
   // LIVE
 
@@ -474,7 +507,38 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
 
   def index(partitionerConfig: PartitionerConfig, indexConfig: IndexConfig): RDD[Index[(G,V)]] =
-    index(Some(PartitionerFactory.get(partitionerConfig, self)), indexConfig)
+    index(PartitionerFactory.get(partitionerConfig, self), indexConfig)
 
 
+  def rasterize[U : ClassTag](tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double,
+                                            partitions: Int, converter: V => U)(implicit ord:Ordering[U]): RasterRDD[U] = {
+
+    val parti = GridStrategy(tileWidth, pointsOnly = true, Some((-180,180,-90,90)), sampleFraction = 0)
+
+    val parted = self.partitionBy(PartitionerFactory.get(parti,self).get)
+
+    val tileHeight = tileWidth
+
+    val width = 14400
+    val height = 7200
+
+    val numXTiles = width / tileWidth
+    val numYTiles = height / tileHeight
+
+
+    val tileLengthX = tileWidth * pixelWidth
+    val tileLengthY = tileHeight * pixelWidth
+
+    parted.mapPartitionsWithIndex((tileNum, iter) => {
+      val arr = iter.map(t => converter(t._2)).toArray
+
+      val xTile = tileNum % numXTiles
+      val yTile = tileNum / numYTiles
+
+      val ulx = -180 + xTile * tileLengthX
+      val uly = 90 - yTile * tileLengthY
+
+      Iterator.single(Tile(ulx, uly, tileWidth, tileWidth, arr, pixelWidth))
+    }, preservesPartitioning = true).coalesce(partitions)
+  }
 }

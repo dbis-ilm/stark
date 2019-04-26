@@ -12,6 +12,21 @@ import scala.collection.JavaConverters._
 case class CellHistogram(buckets: Array[(Cell, Int)])
 
 trait SpatialPartitioner extends Partitioner {
+
+  private final lazy val empties = Array.fill(numPartitions)(true)
+
+  @inline
+  final def isEmpty(id: Int): Boolean = empties(id)
+
+  @inline
+  def getPartitionId(key: Any): Int
+
+  override final def getPartition(key: Any) = {
+    val id = getPartitionId(key)
+    empties(id) = false
+    id
+  }
+
   def printPartitions(fName: java.nio.file.Path): Unit
 
   def printPartitions(fName: String): Unit =
@@ -97,7 +112,8 @@ object GridPartitioner {
     * Compute the bounds of a cell with the given ID
     * @param id The ID of the cell to compute the bounds for
     */
-  protected[spatial] def getCellBounds(id: Int, xCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): NRectRange = {
+  @inline
+  protected[stark] def getCellBounds(id: Int, xCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): NRectRange = {
 
     val dy = id / xCells
     val dx = id % xCells

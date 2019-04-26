@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed
 
 import dbis.stark.STObject.GeoType
-import dbis.stark.{Distance, STObject}
+import dbis.stark.{Distance, STObject, ScalarDistance}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
 import org.locationtech.jts.index.strtree.{AbstractNode, ItemBoundable, ItemDistance, STRtreePlus}
 
@@ -132,11 +132,11 @@ class RTree[D: ClassTag ](
    * @param geom The reference object
    * @param k The number of neighbors  
    */
-  override def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[D] = {
+  override def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(D,Distance)] = {
     if(size <= 0)
       Iterator.empty
     else
-      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance(distFunc), k).iterator().map(_.data)
+      super.kNearestNeighbour(geom.getEnvelopeInternal, geom, new DataDistance(distFunc), k).iterator().map{ case (d, dist) => (d.data, ScalarDistance(dist))}
   }
 
   override private[indexed] def root() = getRoot

@@ -11,9 +11,9 @@ class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
                                           @transient private val _parent: RasterRDD[U],
                                           predicate: JoinPredicate,
                                           pixelDefault: U
-                           ) extends RasterRDD(_parent) {
+                                         )(implicit ord: Ordering[U]) extends RasterRDD(_parent) {
 
-  private val predicateFunc = JoinPredicate.predicateFunction(predicate)
+  private val predicateFunc = JoinPredicate.spatialPredicateFunction(predicate)
   private val isIntersects = predicate == JoinPredicate.INTERSECTS
 
   /**
@@ -31,18 +31,20 @@ class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
       case _ => inputSplit
     }
 
+
     firstParent[Tile[U]].iterator(split, context).filter { t =>
-      val tileGeom = RasterUtils.tileToGeo(t)
-      predicateFunc(tileGeom, qry)
-    }.map{t =>
-      RasterUtils.getPixels(t, qry.getGeo, isIntersects, pixelDefault )
-    }
+        val tileGeom = RasterUtils.tileToGeo(t)
+        predicateFunc(tileGeom, qry)
+      }
+      .map{t =>
+        RasterUtils.getPixels(t, qry.getGeo, isIntersects, pixelDefault )
+      }
   }
 
   override protected def getPartitions = firstParent.partitioner.map {
       case gp: RasterGridPartitioner =>
-        val res = gp.getPartitionsFor(qry)
-        logInfo(s"filtered partitions from ${firstParent.partitions.length} to ${res.length}")
+        val res = gp.getIntersectingPartitions(qry)
+//        logInfo(s"filtered partitions from ${firstParent.partitions.length} to ${res.length}")
         res
 
       case _ =>

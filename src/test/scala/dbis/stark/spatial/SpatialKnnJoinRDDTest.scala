@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import org.apache.spark.SpatialRDD._
 
-class SpatiakKnnJoinRDDTest extends FlatSpec with Matchers with BeforeAndAfterAll {
+class SpatialKnnJoinRDDTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   private var sc: SparkContext = _
 

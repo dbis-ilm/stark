@@ -9,7 +9,7 @@ import org.apache.spark.{Partition, TaskContext}
 
 import scala.reflect.ClassTag
 
-case class RasterJoinIndexedVectorRDD[U: ClassTag, P: ClassTag]
+case class RasterJoinIndexedVectorRDD[U<% Ordered[U]: ClassTag, P: ClassTag]
   (_left: RasterRDD[U], _right: RDD[Index[P]],
   predicate: JoinPredicate, pixelDefault: U, oneToMany: Boolean = false)
   extends JoinRDD[Tile[U], Index[P], (Tile[U], P)](_left,_right, oneToMany, true) { //RDD[(Tile[U],P)](left.context, Nil) {

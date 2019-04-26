@@ -30,6 +30,8 @@ lodhub_data
 
 __my_script/
 
+spark-warehouse
+
 #####
 # ignore database
 db

@@ -1,10 +1,16 @@
 package dbis.stark
 
+import java.nio.ByteBuffer
+
+trait StarkSerializable {
+  def determineByteSize: Int
+  def serialize(buffer: ByteBuffer): Unit
+}
+
 /**
  * A basic temporal expression class
  */
-trait TemporalExpression extends BaseExpression[TemporalExpression] {
-  
+trait TemporalExpression extends BaseExpression[TemporalExpression] with StarkSerializable {
 
   def intersects(t: TemporalExpression): Boolean
   
@@ -27,5 +33,4 @@ trait TemporalExpression extends BaseExpression[TemporalExpression] {
   def >(o: TemporalExpression): Boolean 
   
   def >=(o: TemporalExpression): Boolean
-  
 }

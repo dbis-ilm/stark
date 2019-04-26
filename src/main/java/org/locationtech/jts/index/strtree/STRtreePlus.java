@@ -35,6 +35,7 @@ package org.locationtech.jts.index.strtree;
 
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.util.PriorityQueue;
+import scala.Tuple2;
 
 import java.util.*;
 
@@ -120,20 +121,21 @@ public class STRtreePlus<T> extends STRtree
    * @param itemDist a distance metric applicable to the items in this tree and the query item
    * @return the nearest item in this tree
    */
-  public List<T> kNearestNeighbour(Envelope env, Object item, ItemDistance itemDist, int k)
+
+  public List<Tuple2<T,Double>> kNearestNeighbour(Envelope env, Object item, ItemDistance itemDist, int k)
   {
     Boundable bnd = new ItemBoundable(env, item);
     BoundablePair bp = new BoundablePair(this.getRoot(), bnd, itemDist);
     return nearestNeighbour(bp,k);
   }
   
-  private List<T> nearestNeighbour(BoundablePair initBndPair, int k) 
+  private List<Tuple2<T,Double>> nearestNeighbour(BoundablePair initBndPair, int k)
   {
     return nearestNeighbour(initBndPair, Double.POSITIVE_INFINITY,k);
   }
   
   @SuppressWarnings("unchecked")
-  private List<T> nearestNeighbour(BoundablePair initBndPair, double maxDistance, int k) 
+  private List<Tuple2<T,Double>> nearestNeighbour(BoundablePair initBndPair, double maxDistance, int k)
   {
     double distanceLowerBound = maxDistance;
     
@@ -242,7 +244,17 @@ public class STRtreePlus<T> extends STRtree
     }
     // done - return items with min distance
 
-    return kNearestNeighbors;
+    Iterator<T> neighborIter = kNearestNeighbors.iterator();
+    Iterator<Double> distIter = kNearestDistances.iterator();
+    List<Tuple2<T,Double>> result = new LinkedList<>();
+    while(neighborIter.hasNext()) {
+        T neighbor = neighborIter.next();
+        Double dist = distIter.next();
+
+        result.add(new Tuple2<>(neighbor, dist));
+    }
+
+    return result;
   }
 
     /* return leaf? nodes 

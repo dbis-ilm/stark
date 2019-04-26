@@ -59,7 +59,7 @@ trait KnnIndex[V] {
     *                 distances between objects during querying
     * @return Returns an iterator over the k nearest neighbors
     */
-  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[V]
+  def kNN(geom: STObject, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(V,Distance)]
 }
 
 /**

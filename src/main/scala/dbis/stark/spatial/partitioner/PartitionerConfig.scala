@@ -7,7 +7,7 @@ import scala.reflect.ClassTag
 
 object PartitionStrategy extends Enumeration {
   type PartitionStrategy = Value
-  val GRID, BSP, RTREE = Value
+  val NONE, GRID, BSP, RTREE = Value
 }
 import PartitionStrategy._
 
@@ -17,6 +17,8 @@ abstract class PartitionerConfig(val strategy: PartitionStrategy,
                                  minmax: Option[(Double, Double, Double, Double)],
                                  sampleFraction: Double = 0
                                 ) extends Serializable
+
+case class NoPartitionerStrategy() extends PartitionerConfig(PartitionStrategy.NONE, false, None)
 
 case class BSPStrategy(cellSize: Double,
                        maxCost: Double,
@@ -37,25 +39,25 @@ case class RTreeStrategy(order: Int, pointsOnly: Boolean = false,
 
 
 object PartitionerFactory {
-  def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): GridPartitioner = strategy match {
+  def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): Option[GridPartitioner] = strategy match {
     case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor) => minmax match {
-      case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly)
-      case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor)
+      case None => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly))
+      case Some(mm) => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor))
     }
 
     case GridStrategy(partitionsPerDimensions, pointsOnly, minmax, sampleFraction) => minmax match {
-      case None => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly)
-      case Some(mm) => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction)
+      case None => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly))
+      case Some(mm) => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction))
     }
 
     case RTreeStrategy(order, pointsOnly, minmax, sampleFactor) =>
       val sample = if(sampleFactor > 0) rdd.sample(withReplacement = false, sampleFactor).collect() else rdd.collect()
       minmax match {
-        case None => new RTreePartitioner(sample, order, pointsOnly)
-        case Some(mm) => new RTreePartitioner(sample, order, mm, pointsOnly)
+        case None => Some(new RTreePartitioner(sample, order, pointsOnly))
+        case Some(mm) => Some(new RTreePartitioner(sample, order, mm, pointsOnly))
       }
 
-
+    case NoPartitionerStrategy() => None
   }
 }
 

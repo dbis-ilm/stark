@@ -1,0 +1,3 @@
+{ "column1": "POINT (1 1)", "column2": 24},
+{ "column1": "POINT (25 20)", "column2": 70 },
+{ "column1": "POLYGON ((-73.1 40.6, -70 40.5, -72 41, -73.1 40.6))", "column2": 43 }

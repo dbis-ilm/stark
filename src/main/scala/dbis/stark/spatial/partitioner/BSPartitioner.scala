@@ -111,7 +111,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
 
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
-  protected[spatial] val bsp = new BSPBinaryAsync(
+  protected[spatial] val bsp = new BSP(
     start,
     cells, // for BSP we only need calculated cell sizes and their respective counts
     sideLength,
@@ -136,7 +136,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     
   override def partitionBounds(idx: Int): Cell = bsp.partitions(idx)
   override def partitionExtent(idx: Int): NRectRange = bsp.partitions(idx).extent
-  
+
+
   override def printPartitions(fName: java.nio.file.Path) {
     val list2 = bsp.partitions.map { cell => s"${cell.id};${cell.range.wkt}" }.toList
     super.writeToFile(list2, fName)
@@ -150,7 +151,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
   
   override def numPartitions: Int = bsp.partitions.length
   
-  override def getPartition(key: Any): Int = {
+  override def getPartitionId(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
     val c = Utils.getCenter(g.getGeo)
@@ -192,6 +193,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag](
     if(outside || (!pointsOnly && sampleFraction > 0)) {
       bsp.partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
     }
+
 
     partitionId
   }

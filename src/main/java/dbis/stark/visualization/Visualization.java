@@ -96,7 +96,7 @@ public class Visualization implements Serializable {
                 .forEach(tuple -> { // draw every tuple
                     try {
                         drawSTObject(tuple._1, imageGraphic, envelope, pointSize);
-                    } catch(Exception ignored) { } // in case of an error just ignore
+                    } catch(Exception ignored) { System.err.println("could not println SO: "+ignored.getMessage()); } // in case of an error just ignore
                 });
             return Collections.singletonList(new ImageSerializableWrapper(imagePartition)).iterator();
 
@@ -219,6 +219,20 @@ public class Visualization implements Serializable {
         return true;
     }
 
+    private void drawSTObjectPolygon(Polygon geo, Envelope env, Graphics2D g) {
+        Coordinate[] coordinates = geo.getCoordinates();
+        java.awt.Polygon poly = new java.awt.Polygon();
+        for(Coordinate c : coordinates) {
+            Tuple2<Integer, Integer> p = null;
+            if(worldProj) p = getMercatorProjection(c, env);
+            else p = getImageCoordinates(c, env);
+            if(p != null) poly.addPoint(p._1, p._2);
+        }
+
+        if(fillPolygon)	g.fillPolygon(poly);
+        else g.drawPolygon(poly);
+    }
+
     private void drawSTObject(STObject obj, Graphics2D g, Envelope env, int pointSize) throws Exception {
         Geometry geo = obj.getGeo();
 
@@ -228,17 +242,12 @@ public class Visualization implements Serializable {
             else p = getImageCoordinates(geo.getCoordinate(), env);
             if(p != null) drawPoint(g, p, pointSize);
         } else if(geo instanceof Polygon) {
-            Coordinate[] coordinates = geo.getCoordinates();
-            java.awt.Polygon poly = new java.awt.Polygon();
-            for(Coordinate c : coordinates) {
-                Tuple2<Integer, Integer> p = null;
-                if(worldProj) p = getMercatorProjection(c, env);
-                else p = getImageCoordinates(c, env);
-                if(p != null) poly.addPoint(p._1, p._2);
+            drawSTObjectPolygon((Polygon)geo, env, g);
+        } else if(geo instanceof MultiPolygon) {
+            MultiPolygon mp = (MultiPolygon)geo;
+            for (int i = 0; i < mp.getNumGeometries(); i++) {
+                drawSTObjectPolygon((Polygon)mp.getGeometryN(i),env,g);
             }
-
-            if(fillPolygon)	g.fillPolygon(poly);
-            else g.drawPolygon(poly);
         } else {
             throw new Exception("Unsupported spatial object type. Only supports: Point, Polygon!");
         }

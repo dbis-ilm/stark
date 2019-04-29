@@ -96,6 +96,12 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
     }.saveAsTextFile(path)
   }
 
+  def saveAsCSVFile(path: String, delimiter: String) = {
+    this.map{ t =>
+      s"${t.ulx}${delimiter}${t.uly}${delimiter}${t.width}${delimiter}${t.height}${delimiter}${t.pixelWidth}${delimiter}${t.data.mkString(",")}"
+    }.saveAsTextFile(path)
+  }
+
   def saveAsObjectFile(path: String, partitions: Int = 8): Unit = {
     val DOUBLE = 8
     val INT = 4

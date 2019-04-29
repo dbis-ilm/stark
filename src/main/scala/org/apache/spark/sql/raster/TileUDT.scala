@@ -7,12 +7,12 @@ import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, UnsafeArra
 import org.apache.spark.sql.types._
 
 @SQLUserDefinedType(udt = classOf[TileUDT])
-private[sql] class TileUDT extends UserDefinedType[Tile[Byte]] {
+class TileUDT extends UserDefinedType[Tile[Double]] {
   override def typeName = "tile"
 
   override final def sqlType: StructType = _sqlType
 
-  override def serialize(obj: Tile[Byte]): InternalRow = {
+  override def serialize(obj: Tile[Double]): InternalRow = {
     val row = new GenericInternalRow(5)
     row.setDouble(0, obj.ulx)
     row.setDouble(1, obj.uly)
@@ -22,7 +22,7 @@ private[sql] class TileUDT extends UserDefinedType[Tile[Byte]] {
     row
   }
 
-  override def deserialize(datum: Any): Tile[Byte] = {
+  override def deserialize(datum: Any): Tile[Double] = {
     datum match {
       case row: InternalRow =>
         require(row.numFields == 5,
@@ -31,14 +31,14 @@ private[sql] class TileUDT extends UserDefinedType[Tile[Byte]] {
         val uly = row.getDouble(1)
         val width = row.getInt(2)
         val height = row.getInt(3)
-        val data = row.getArray(4).toByteArray()
+        val data = row.getArray(4).toDoubleArray()//.toByteArray()
         Tile(ulx, uly, width, height, data)
     }
   }
 
   override def pyUDT: String = "pyspark.stark.raster.TileUDT"
 
-  override def userClass: Class[Tile[Byte]] = classOf[Tile[Byte]]
+  override def userClass: Class[Tile[Double]] = classOf[Tile[Double]]
 
   private[spark] override def asNullable: TileUDT = this
 

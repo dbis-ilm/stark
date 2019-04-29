@@ -44,9 +44,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
 
+
   def saveAsStarkObjectFile(path: String): Unit = self.partitioner.flatMap{
     case sp: GridPartitioner => Some(sp)
-    case _ => None
+    case _ =>
+      None
   } match {
     case Some(sp) =>
       val wkts = self.partitions.indices.map{ i =>

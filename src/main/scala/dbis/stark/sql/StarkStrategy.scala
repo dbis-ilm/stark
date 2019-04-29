@@ -46,11 +46,11 @@ object StarkStrategy extends Strategy {
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
 
-    case Filter(condition, input) => condition match {
-      case pred: STPredicate =>
-        println(pred)
-        Nil
-    }
+//    case Filter(condition, input) => condition match {
+//      case pred: STPredicate =>
+//        println(pred)
+//        Nil
+//    }
 
 
     // we only want to match INNER Joins here

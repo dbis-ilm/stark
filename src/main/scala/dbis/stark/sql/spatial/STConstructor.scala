@@ -1,9 +1,11 @@
 package dbis.stark.sql.spatial
 
 import dbis.stark.STObject
+import dbis.stark.raster.RasterUtils
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
+import org.apache.spark.sql.raster.TileUDT
 import org.apache.spark.sql.spatial.STObjectUDT
 import org.apache.spark.sql.types.{DataType, Decimal}
 import org.apache.spark.unsafe.types.UTF8String
@@ -23,6 +25,12 @@ case class STGeomFromWKT(exprs: Seq[Expression]) extends Expression
 
   override def eval(input: InternalRow) = {
     val evaled = exprs.head.eval(input)
+
+    if(evaled == null) {
+
+      sys.error(s"shit. ${input.getClass.getCanonicalName}${input.toString}  expr: ${exprs.mkString(";")}  ${exprs.head.prettyName}  cols: ${input.numFields} ")
+    }
+
     val inputString = evaled.asInstanceOf[UTF8String].toString
     val theObject = STObject(inputString)
 
@@ -34,6 +42,25 @@ case class STGeomFromWKT(exprs: Seq[Expression]) extends Expression
   override def dataType: DataType = STObjectUDT
   override def children = exprs
 }
+
+case class STGeomFromTile(exprs: Seq[Expression]) extends Expression
+  with CodegenFallback {
+  require(exprs.length == 1, s"Only one expression allowed for STGeomFromTile, but got ${exprs.length}")
+
+  override def eval(input: InternalRow) = {
+    val evaled = exprs.head.eval(input)
+    val tile = TileUDT.deserialize(evaled)
+
+    val theObject = RasterUtils.tileToGeo(tile)
+
+    STObjectUDT.serialize(theObject)
+  }
+
+  override def nullable = false
+  override def dataType: DataType = STObjectUDT
+  override def children = exprs
+}
+
 
 
 case class STPoint(private val exprs: Seq[Expression]) extends STConstructor(exprs) {

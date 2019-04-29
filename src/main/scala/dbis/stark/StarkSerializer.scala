@@ -9,6 +9,7 @@ import org.locationtech.jts.geom._
 import org.locationtech.jts.io.{WKTReader, WKTWriter}
 
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 
 class SkylineSerializer extends Serializer[Skyline[Any]] {
   val stobjectSerializer = new STObjectSerializer
@@ -624,5 +625,16 @@ class StarkSerializer extends Serializer[(STObject, Any)] {
 //    val payload = input.readInt()
 
     (so, payload)
+  }
+}
+
+class GenericSerializer[U : ClassTag] extends Serializer[U] {
+  override def write(kryo: Kryo, output: Output, obj: U) = {
+    kryo.writeClassAndObject(output, obj)
+  }
+
+
+  override def read(kryo: Kryo, input: Input, dType: Class[U]) = {
+    kryo.readClassAndObject(input).asInstanceOf[U]
   }
 }

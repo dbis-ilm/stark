@@ -220,7 +220,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 		   * matches the input format and
 		   */
 
-		  (key, Vectors.dense(c.getY, c.getX), (g,v))
+		  (key, Vectors.dense(c.getX, c.getY), (g,v))
 	  }
 
 	  // start the DBScan computation
@@ -243,7 +243,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
      * this can be used for debugging and visualization
      */
     if(outfile.isDefined)
-    points.coalesce(1).saveAsTextFile(outfile.get)
+      points.coalesce(1).saveAsTextFile(outfile.get)
 
     points.map { p => (p.payload.get._1, (p.clusterId, p.payload.get._2)) }
   }
@@ -512,7 +512,9 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     index(PartitionerFactory.get(partitionerConfig, self), indexConfig)
 
 
-  def rasterize(tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double, partitions: Int): RasterRDD[V] = {
+  def rasterize[U : ClassTag](tileWidth: Int, pixelWidth: Double, globalUlx: Double, globalUly: Double,
+                                            partitions: Int, converter: V => U)(implicit ord:Ordering[U]): RasterRDD[U] = {
+
     val parti = GridStrategy(tileWidth, pointsOnly = true, Some((-180,180,-90,90)), sampleFraction = 0)
 
     val parted = self.partitionBy(PartitionerFactory.get(parti,self).get)
@@ -530,7 +532,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val tileLengthY = tileHeight * pixelWidth
 
     parted.mapPartitionsWithIndex((tileNum, iter) => {
-      val arr = iter.map(_._2).toArray
+      val arr = iter.map(t => converter(t._2)).toArray
 
       val xTile = tileNum % numXTiles
       val yTile = tileNum / numYTiles

@@ -7,7 +7,13 @@ import org.apache.spark.TaskContext
 
 import scala.reflect.ClassTag
 
-case class RasterJoinRDD[U: ClassTag,P: ClassTag,R: ClassTag](@transient private val _left: RasterRDD[U],@transient private val _right: RasterRDD[P], predicate: JoinPredicate, combine: (U, P) => R, oneToMany: Boolean) extends JoinRDD[Tile[U], Tile[P], Tile[R]](_left, _right, oneToMany, checkParties = true) {
+case class RasterJoinRDD[U : ClassTag,P : ClassTag,R : ClassTag](@transient private val _left: RasterRDD[U],
+                                                                 @transient private val _right: RasterRDD[P],
+                                                                 predicate: JoinPredicate, combine: (U, P) => R,
+                                                                 oneToMany: Boolean)(implicit val ord1: Ordering[U],
+                                                                                     implicit val ord2: Ordering[P],
+                                                                                     implicit val ord3: Ordering[R])
+  extends JoinRDD[Tile[U], Tile[P], Tile[R]](_left, _right, oneToMany, checkParties = true) {
 
 
   override protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext): Iterator[Tile[R]] = {

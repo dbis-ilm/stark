@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.{Cell, NPoint, Utils}
+import dbis.stark.spatial.{Cell, NPoint, StarkUtils}
 
 import scala.collection.JavaConverters._
 
@@ -41,7 +41,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
 
     children.zipWithIndex.map{ case (mbr, idx) =>
 //      val mbr = child.getBounds.asInstanceOf[MBR]
-      Cell(idx, Utils.fromEnvelope(mbr))
+      Cell(idx, StarkUtils.fromEnvelope(mbr))
     }.toArray
   }
 
@@ -58,7 +58,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
   override def getPartitionId(key: Any) = {
     val g = key.asInstanceOf[STObject]
 
-    val env = Utils.fromEnvelope(g.getGeo.getEnvelopeInternal)
+    val env = StarkUtils.fromEnvelope(g.getGeo.getEnvelopeInternal)
 
     val part = partitions.find(_.extent.contains(env))
 
@@ -75,7 +75,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       var minPartitionId: Int = -1
       var first = true
 
-      val c = Utils.getCenter(g.getGeo)
+      val c = StarkUtils.getCenter(g.getGeo)
 
       val pX = c.getX
       val pY = c.getY
@@ -97,9 +97,9 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       partitions(partitionId).range = partitions(partitionId).range.extend(env)
 
 //      if(!pointsOnly)
-        partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+        partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
     } else if(!pointsOnly) {
-      partitions(partitionId).extendBy(Utils.fromGeo(g.getGeo))
+      partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
     }
 
     partitionId

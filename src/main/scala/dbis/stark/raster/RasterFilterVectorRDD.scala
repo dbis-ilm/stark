@@ -11,7 +11,7 @@ class RasterFilterVectorRDD[U : ClassTag](qry: STObject,
                                           @transient private val _parent: RasterRDD[U],
                                           predicate: JoinPredicate,
                                           pixelDefault: U
-                           ) extends RasterRDD(_parent) {
+                                         )(implicit ord: Ordering[U]) extends RasterRDD(_parent) {
 
   private val predicateFunc = JoinPredicate.spatialPredicateFunction(predicate)
   private val isIntersects = predicate == JoinPredicate.INTERSECTS

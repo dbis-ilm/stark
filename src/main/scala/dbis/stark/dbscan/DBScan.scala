@@ -2,12 +2,12 @@ package dbis.stark.dbscan
 
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd._
-
-import scala.collection.mutable
-import scala.reflect.ClassTag
 import scalax.collection.GraphEdge._
 import scalax.collection.GraphPredef._
 import scalax.collection.mutable.Graph
+
+import scala.collection.mutable
+import scala.reflect.ClassTag
 
 /**
   * A Spark implementation of DBSCAN. The implementation is a Spark adaption of the approach
@@ -142,6 +142,8 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
      */
     clusteredData.cache() // persist(StorageLevel.MEMORY_AND_DISK_SER)
 
+//    println(s"clustered data : ${clusteredData.count()}")
+
     /*
     * step 4: we identify all points assigned to multiple clusters
     *         for this purpose we have to consider only merge candidates
@@ -149,6 +151,11 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
     //logInfo("step 4: determine merge points")
     val clusterGroups = clusteredData.filter(p => p.isMerge)
                                       .map(point => (point.vec, point)).groupByKey()
+
+
+//    val s = clusterGroups.map{ case (k,v) => s"$k -> ${v.mkString(",")}" }.collect().mkString("\n")
+
+//    println(s"cluster groups: $s")
 
     /*
      * and derive a mapping for cluster ids: if there exist a point appearing multiple times

@@ -1,15 +1,13 @@
 package dbis.stark.raster
 
-import java.awt.image.BufferedImage
-
-import dbis.stark.STObject.{GeoType, MBR}
-import org.locationtech.jts.geom.GeometryFactory
-import java.awt.Graphics2D
 import java.awt.RenderingHints
+import java.awt.image.{BufferedImage, DataBufferByte}
 import java.nio.file.Path
 
+import dbis.stark.STObject.{GeoType, MBR}
 import javax.imageio.ImageIO
 import org.apache.spark.rdd.RDD
+import org.locationtech.jts.geom.GeometryFactory
 
 import scala.reflect.ClassTag
 
@@ -20,6 +18,34 @@ object RasterUtils {
 
   // used to instantiate vector geometries
   private val geoFactory = new GeometryFactory()
+
+
+  def greyScaleImgToUnsignedByteArray(bufferedImage: BufferedImage): Array[Array[Int]] = {
+    val width = bufferedImage.getWidth()
+    val pixels = bufferedImage.getRaster.getDataBuffer.asInstanceOf[DataBufferByte].getData
+    val result = Array.ofDim[Int](bufferedImage.getHeight(), bufferedImage.getWidth())
+
+    var pixel = 0
+    var row = 0
+    var col = 0
+    while ( {
+      pixel < pixels.length
+    }) {
+      //println(pixels(pixel) + ":" + (pixels(pixel) & 0xff))
+      result(row)(col) = pixels(pixel) & 0xff
+      col += 1
+      if (col == width) {
+        col = 0
+        row += 1
+      }
+
+      pixel += 1
+    }
+
+    result
+  }
+
+
 
   /**
     * Determine the pixels from a given tile that intersect or are completely contained in
@@ -35,7 +61,7 @@ object RasterUtils {
     * @tparam U The pixel type
     * @return Returns a tile containing only pixels intersecting with the given geometry
     */
-  def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U): Tile[U] = {
+  def getPixels[U : ClassTag](tile: Tile[U], geo: GeoType, isIntersects: Boolean, default: U)(implicit ord: Ordering[U]): Tile[U] = {
 
     // make the raster tile a vector rectangle
     val tileGeo = tileToGeo(tile)
@@ -132,14 +158,14 @@ object RasterUtils {
   def tileToMBR(tile: Tile[_]): MBR =
     new MBR(tile.ulx, tile.ulx + (tile.width * tile.pixelWidth), tile.uly - (tile.height * tile.pixelWidth), tile.uly)
 
-  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Double = 1): Tile[U] =
+  def mbrToTile[U : ClassTag](mbr: MBR, default: U, pixelWidth: Double = 1)(implicit ord: Ordering[U]): Tile[U] =
     new Tile[U](mbr.getMinX,mbr.getMaxY,
       math.ceil(mbr.getWidth).toInt, math.ceil(mbr.getHeight).toInt,
-      pixelWidth,
-      default
+      Array.fill(math.ceil(mbr.getWidth).toInt * math.ceil(mbr.getHeight).toInt)(default),
+      pixelWidth
     )
 
-  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Double): Tile[U] = {
+  def mbrToTile[U : ClassTag](mbr: MBR, computer: (Double, Double) => U, pixelWidth: Double)(implicit ord: Ordering[U]): Tile[U] = {
     val width = (math.ceil(mbr.getWidth) / pixelWidth).toInt
     val height = (math.ceil(mbr.getHeight) / pixelWidth).toInt
     new Tile[U](mbr.getMinX,mbr.getMaxY,
@@ -175,18 +201,25 @@ object RasterUtils {
   def rasterToImage[U](raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): BufferedImage = {
     require(!resize || (resize && imgWidth > 0 && imgHeight > 0), s"Dimensions should be > 0 resize is desired! ${this.getClass.getSimpleName}")
 
+//    val ys = raster.map(_.uly).distinct().collect()
+//      println(s"ulys: ${ys.length}")
+//      ys.foreach(println)
+
+
     val data = raster.mapPartitions(localTiles  => {
       //Collect all data of tiles in tuples of (offsetX, offsetY, data[one row of the tile])
+//      localTiles.foreach(localT => println(localT))
+//      println(localTiles.size)
       localTiles.map(tile => {
         val array = new Array[((Int, Int), Array[Int])](tile.height)
 
-        for(y <- 0 until tile.height) {
+        for(y <- array.indices) {
           val xArray = new Array[Int](tile.width)
-          for(x <- 0 until tile.width) {
-            xArray(x) = colorFunc(tile.data(y * tile.width + x))
+          for(x <- xArray.indices) {
+            xArray(x) = colorFunc(tile.valueArray(x,y))
           }
 
-          array(y) = ((tile.ulx.toInt, tile.uly.toInt - y), xArray)
+          array(y) = ((tile.ulx.toInt, math.round(tile.uly / tile.pixelWidth).toInt - y), xArray)
         }
 
         array
@@ -196,26 +229,28 @@ object RasterUtils {
     })
 
     //Calculate MinMax-Coordinates
-    var maxY = Integer.MIN_VALUE; var minY = Integer.MAX_VALUE
-    var maxX = Integer.MIN_VALUE; var minX = Integer.MAX_VALUE
-    data.foreach(p => {
-      if(p._1._2 > maxY) maxY = p._1._2
-      else if(p._1._2 < minY) minY = p._1._2
+    val (minX, maxX, minY, maxY) = data.foldLeft((Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE)){ case ((minX1,maxX1,minY1,maxY1), ((ox,oy),arr)) =>
 
-      if(p._1._1 < minX) minX = p._1._1
-      else if(p._1._1 + p._2.length > maxX) maxX = p._1._1 + p._2.length
-    })
+        val yMax = if(oy > maxY1) oy else maxY1
+        val yMin = if(oy < minY1) oy else minY1
+
+        val xMin = if(ox < minX1) ox else minX1
+        val xMax = if(ox + arr.length > maxX1) ox + arr.length else maxX1
+
+      (xMin,xMax,yMin,yMax)
+    }
+
+
 
     //Construct image from one-dimensional array of collected values
-    val tile = Tile[Int](minX, maxY, maxX - minX, (maxY - minY) + 1, new Array[Int]((1 + maxY - minY) * (maxX - minX)))
+    val tile = Tile[Int](minX, maxY, maxX - minX, (maxY - minY)+1, new Array[Int]((1 + maxY - minY) * (maxX - minX)))
     val img = new BufferedImage(tile.width, tile.height, BufferedImage.TYPE_INT_RGB)
     val imgRaster = img.getRaster
 
-    data.foreach(p => {
-      for(v <- p._2.indices) {
-        tile.set(p._1._1 + v, p._1._2, p._2(v))
-      }
-    })
+
+    data.foreach{ case ((ox,oy),arr) =>
+        tile.setRow(ox,oy, arr)
+    }
 
     imgRaster.setDataElements(0, 0, img.getWidth, img.getHeight, tile.data)
 

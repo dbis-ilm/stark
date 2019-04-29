@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import com.esotericsoftware.kryo.io.Input
 import dbis.stark.STObject._
-import dbis.stark.spatial.Utils
+import dbis.stark.spatial.StarkUtils
 import org.locationtech.jts.geom._
 import org.locationtech.jts.io.{WKTReader, WKTWriter}
 
@@ -227,7 +227,7 @@ object STObject {
   def apply(g: GeoType, time: Long): STObject = this(g, Some(Instant(time)))
   def apply(g: GeoType, start: Long, stop: Long): STObject = this(g, Some(Interval(start, stop)))
 //  def apply(g: GeoType, start: Long, stop: Option[Long]): STObject = this(g, Some(Interval(start, Instant(stop))))
-  def apply(e: MBR): STObject = this(Utils.makeGeo(e), None)
+  def apply(e: MBR): STObject = this(StarkUtils.makeGeo(e), None)
 
   def apply(x: Double, y: Double): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)))
   def apply(x: Double, y: Double, ts: Long): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)), ts)

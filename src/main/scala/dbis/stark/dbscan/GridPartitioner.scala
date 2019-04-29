@@ -52,7 +52,7 @@ class GridPartitioner extends Partitioner with java.io.Serializable{
       * @return the partition MBB
       */
     def constructMBB(p: Int, widths: Array[Double]): MBB = {
-      val indices = new Array[Int](widths.length)
+//      val indices = new Array[Int](widths.length)
       val minVals = new Array[Double](widths.length)
       val maxVals = new Array[Double](widths.length)
 

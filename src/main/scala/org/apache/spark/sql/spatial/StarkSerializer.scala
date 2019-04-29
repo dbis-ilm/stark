@@ -3,7 +3,10 @@ package org.apache.spark.sql.spatial
 import java.io._
 
 import dbis.stark.STObject
+import dbis.stark.raster.RasterUtils
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
+import org.apache.spark.sql.raster.TileUDT
 
 /**
   * Helper class providing methods the (de-)serialize STObjects
@@ -62,6 +65,12 @@ object StarkSerializer {
       }
 
       so
+    case t:TileUDT =>
+      STObject(RasterUtils.tileToGeo(t.deserialize(t)))
+    case ur: UnsafeRow =>
+      val t = new org.apache.spark.sql.raster.TileUDT()
+      val newTile = t.deserialize(ur)
+      STObject(newTile.wkt)
   }
 
 //  private val kryo = new Kryo()

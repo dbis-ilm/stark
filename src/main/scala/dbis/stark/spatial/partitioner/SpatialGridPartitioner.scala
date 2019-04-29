@@ -3,7 +3,7 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
-import dbis.stark.spatial.{Cell, NRectRange, Utils}
+import dbis.stark.spatial.{Cell, NRectRange, StarkUtils}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -77,7 +77,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
   override def getPartitionId(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
-    val center = Utils.getCenter(g.getGeo)
+    val center = StarkUtils.getCenter(g.getGeo)
 
     val id = GridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 

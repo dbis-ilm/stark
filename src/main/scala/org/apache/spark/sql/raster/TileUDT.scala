@@ -13,26 +13,29 @@ class TileUDT extends UserDefinedType[Tile[Double]] {
   override final def sqlType: StructType = _sqlType
 
   override def serialize(obj: Tile[Double]): InternalRow = {
-    val row = new GenericInternalRow(5)
+    val row = new GenericInternalRow(6)
     row.setDouble(0, obj.ulx)
     row.setDouble(1, obj.uly)
     row.setInt(2, obj.width)
     row.setInt(3, obj.height)
-    row.update(4, UnsafeArrayData.fromPrimitiveArray(obj.data))
+    row.setDouble(4, obj.pixelWidth)
+    row.update(5, UnsafeArrayData.fromPrimitiveArray(obj.data))
     row
   }
 
   override def deserialize(datum: Any): Tile[Double] = {
     datum match {
       case row: InternalRow =>
-        require(row.numFields == 5,
-          s"TileUDT.deserialize given row with length ${row.numFields} but requires length == 5")
+        require(row.numFields == 6,
+          s"TileUDT.deserialize given row with length ${row.numFields} but requires length == 6")
         val ulx = row.getDouble(0)
-        val uly = row.getDouble(1)
+        val uly = math.round(row.getDouble(1) * 10d) / 10d // fixme: correct?
+
         val width = row.getInt(2)
         val height = row.getInt(3)
-        val data = row.getArray(4).toDoubleArray()//.toByteArray()
-        Tile(ulx, uly, width, height, data)
+        val pw = row.getDouble(4)
+        val data = row.getArray(5).toDoubleArray()//.toByteArray()
+        Tile(ulx, uly, width, height, data, pw)
     }
   }
 
@@ -48,6 +51,7 @@ class TileUDT extends UserDefinedType[Tile[Double]] {
       StructField("uly", DoubleType, nullable = false),
       StructField("width", IntegerType, nullable = false),
       StructField("height", IntegerType, nullable = false),
+      StructField("pixelwidth", DoubleType, nullable = false),
       StructField("values", ArrayType(ByteType, containsNull = false), nullable = true)))
   }
 }

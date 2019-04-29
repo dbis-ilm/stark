@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 import dbis.stark.STObject
 import dbis.stark.spatial.partitioner.GridPartitioner
-import dbis.stark.spatial.{Cell, Utils}
+import dbis.stark.spatial.{Cell, StarkUtils}
 import org.apache.spark.Partition
 
 import scala.collection.mutable.ListBuffer
@@ -21,7 +21,7 @@ abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
   override def numPartitions = partitionsX * partitionsY
 
   @inline
-  def idToMBR(id: Int) = Utils.toEnvelope(idToNRectRange(id))
+  def idToMBR(id: Int) = StarkUtils.toEnvelope(idToNRectRange(id))
 
   @inline
   def idToNRectRange(id: Int) =

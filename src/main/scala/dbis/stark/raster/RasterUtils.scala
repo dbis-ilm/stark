@@ -9,6 +9,7 @@ import javax.imageio.ImageIO
 import org.apache.spark.rdd.RDD
 import org.locationtech.jts.geom.GeometryFactory
 
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 /**
@@ -45,7 +46,70 @@ object RasterUtils {
     result
   }
 
+  /**
+    * Efficient calculation of the histogram for a byte tile
+    * Actually this can be adapted for every Type that is numeric
+    */
+  def  createByteHistogram(tile: Tile[Byte], bucketCount: Int = 0, minMax: (Byte, Byte)): Seq[Bucket[Byte]] = {
+    var buckets = bucketCount
+    if(buckets <= 0) buckets = minMax._2 - minMax._1 + 1
 
+    var stepSize = Math.ceil((minMax._2.toDouble - minMax._1.toDouble) / buckets.toDouble).toInt
+    val bucketArray = Array.ofDim(buckets) : Array[Int]
+
+    tile.data.foreach {
+      i =>
+        if(i >= minMax._1 && i <= minMax._2) bucketArray((i - minMax._1) / stepSize) += 1
+    }
+
+    var res = Nil : Seq[Bucket[Byte]]
+    for(i <- bucketArray.indices) {
+      res = res :+ Bucket(bucketArray(i), Math.max(minMax._1, minMax._1 + stepSize * i).toByte, Math.min(minMax._1 + stepSize * (i + 1) - 1, minMax._2).toByte)
+    }
+
+    res
+  }
+
+  def calcByteRasterMinMax(raster: RasterRDD[Byte]): (Byte, Byte) = {
+    var minMax = raster.map(
+      _.getSMA match {
+        case Some(SMA(min, max, _)) => (min, max)
+        case None => (Byte.MaxValue, Byte.MinValue)
+      }).reduce((m1: (Byte, Byte), m2: (Byte, Byte)) => {
+      var min = Math.min(m1._1, m2._1).toByte
+      var max = Math.max(m1._2, m2._2).toByte
+      (min, max)
+    })
+
+    if(minMax._1 == Byte.MaxValue) minMax = (Byte.MinValue, Byte.MaxValue)
+
+    minMax
+  }
+
+  //Combines the histograms of tiles to one raster histogram, this requires same order and buckets
+  def combineHistograms[U](buckets: RDD[Seq[Bucket[U]]]) : Seq[Bucket[U]] = {
+    buckets.reduce((f1: Seq[Bucket[U]], f2: Seq[Bucket[U]]) => {
+      //histograms must be ordered in order to reduce them fast
+      val res = ListBuffer[Bucket[U]]()
+      for (i <- f2.indices) {
+        val bucket1 = f1(i)
+        res += Bucket[U](bucket1.values + f2(i).values, bucket1.lowerBucketBound, bucket1.upperBucketBound)
+      }
+
+      res
+    })
+  }
+
+  //Combines two histograms
+  def combineHistograms[U](buckets1: Seq[Bucket[U]], buckets2: Seq[Bucket[U]]) : Seq[Bucket[U]] = {
+    val res = ListBuffer[Bucket[U]]()
+    for (i <- buckets1.indices) {
+      val bucket1 = buckets2(i)
+      res += Bucket[U](bucket1.values + buckets1(i).values, bucket1.lowerBucketBound, bucket1.upperBucketBound)
+    }
+
+    res
+  }
 
   /**
     * Determine the pixels from a given tile that intersect or are completely contained in

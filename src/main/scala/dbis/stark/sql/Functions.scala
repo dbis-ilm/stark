@@ -32,9 +32,8 @@ object Functions {
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("height", GetHeight)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("data", GetData)
 
-
-    //    spark.udf.register("st_contains", STContains)
-//    spark.udf.register("st_containedby", STContainedBy)
-//    spark.udf.register("st_intersects", STIntersects)
+    //Raster-Functions
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("histogram", CalcTileHistogram)
+    spark.udf.register("rasterHistogram", new CalcRasterHistogram)
   }
 }

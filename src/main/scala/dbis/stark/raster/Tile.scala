@@ -67,6 +67,9 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
     case None => //computeSMA()
   }
 
+  //Used in RasterUtils.calcByteRasterMinMax
+  def getSMA = sma;
+
   lazy val center = (ulx + (width*pixelWidth)/2 , uly - (height*pixelWidth)/2)
 
   /**
@@ -189,6 +192,50 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
   def contains(t: Tile[_]): Boolean = RasterUtils.contains(this, t)
 
   lazy val wkt = RasterUtils.tileToGeo(this)
+
+  /**
+    * Calculates the histogram for this tile
+    * Notice: A very efficient version (more than twice as fast) of this calculation can be found in RasterUtils.createByteHistogram
+    * which takes the sma's min/max into effect
+    */
+  def histogram(buckets: Int = 0, minMax: (U, U) = null): Seq[Bucket[U]] = {
+    require(buckets >= 0, s"Bucket count can't be less than 0 in ${this.getClass.getSimpleName}!")
+
+    if(data.length == 0) return Nil
+
+    //Try to use fast option
+    if(data(0).isInstanceOf[Byte]) {
+      if(minMax != null) return RasterUtils.createByteHistogram(this.asInstanceOf[Tile[Byte]], buckets, minMax.asInstanceOf[(Byte, Byte)]).asInstanceOf[Seq[Bucket[U]]]
+      else sma match {
+        case Some(SMA(min, max,_)) =>
+          return RasterUtils.createByteHistogram(this.asInstanceOf[Tile[Byte]], buckets, (min.asInstanceOf[Byte], max.asInstanceOf[Byte])).asInstanceOf[Seq[Bucket[U]]]
+        case None =>
+      }
+    }
+
+    //Use generic slower version instead
+
+    var res = Nil : Seq[Bucket[U]]
+    val seq = data.groupBy(identity).mapValues(_.length).toSeq.sortBy(_._1)
+    val stepSize = if(buckets != 0) Math.ceil(seq.size.toDouble / buckets.toDouble).toInt else 1
+    val upperBound = if(buckets != 0) buckets else seq.length
+
+    def id(i: Int) = Math.min(i, seq.size - 1)
+
+    for(i <- 0 until upperBound - 1) {
+      var c = 0
+      val lower = seq(i * stepSize)._1
+      val upper = seq(id((i + 1) * stepSize - 1))._1
+
+      for(j <- (i * stepSize) to  id((i+1) * stepSize - 1)) {
+        c += seq(j)._2
+      }
+
+      res = res :+ Bucket(c, lower, upper)
+    }
+
+    res
+  }
 }
 
 object Tile {

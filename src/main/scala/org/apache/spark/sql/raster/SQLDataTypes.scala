@@ -12,4 +12,5 @@ import org.apache.spark.sql.types.DataType
 object SQLDataTypes {
 
   val TileType: DataType = new TileUDT
+  val BucketType: DataType = new BucketUDT
 }

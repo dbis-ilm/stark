@@ -269,18 +269,18 @@ object RasterUtils {
     val data = raster.mapPartitions(localTiles  => {
       //Collect all data of tiles in tuples of (offsetX, offsetY, data[one row of the tile])
       localTiles.map(tile => {
-        val array = new Array[((Int, Int), Array[Int])]((tile.height * compressionFactor).toInt)
-        val yStepSize = (tile.height / (tile.height * compressionFactor)).toInt
-        val xStepSize = (tile.width / (tile.width * compressionFactor)).toInt
+        val yStepSize = Math.ceil(tile.height.toDouble / (tile.height * compressionFactor).toInt).toInt
+        val xStepSize = Math.ceil(tile.width.toDouble / (tile.width * compressionFactor).toInt).toInt
+        val array = new Array[((Int, Int), Array[Int])](Math.ceil(tile.height.toDouble / yStepSize).toInt)
 
         for(y <- 0 until tile.height by yStepSize) {
-          val xArray = new Array[Int]((tile.width * compressionFactor).toInt)
+          val xArray = new Array[Int](Math.ceil(tile.width.toDouble  / xStepSize).toInt)
           for(x <- 0 until tile.width by xStepSize) {
             val color = colorFunc(tile.valueArray(x,y))
             xArray(x / xStepSize) = color
           }
 
-          array(y / yStepSize) = ((tile.ulx.toInt, math.round(tile.uly / tile.pixelWidth).toInt - y), xArray)
+          array(y / yStepSize) = ((Math.round(tile.ulx * compressionFactor).toInt, Math.round((Math.round(tile.uly / tile.pixelWidth).toInt - y)  / yStepSize)), xArray)
         }
 
         array

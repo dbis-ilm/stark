@@ -262,28 +262,24 @@ object RasterUtils {
     ImageIO.write(img, suffix, path.toFile)
   }
 
-  def rasterToImage[U](raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): BufferedImage = {
+  def rasterToImage[U](raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0, compressionFactor: Float = 1.0f): BufferedImage = {
     require(!resize || (resize && imgWidth > 0 && imgHeight > 0), s"Dimensions should be > 0 resize is desired! ${this.getClass.getSimpleName}")
-
-//    val ys = raster.map(_.uly).distinct().collect()
-//      println(s"ulys: ${ys.length}")
-//      ys.foreach(println)
-
+    require(compressionFactor <= 1.0f &&  compressionFactor > 0f, s"CompressionFactor should be in (0, 1]! ${this.getClass.getSimpleName}")
 
     val data = raster.mapPartitions(localTiles  => {
       //Collect all data of tiles in tuples of (offsetX, offsetY, data[one row of the tile])
-//      localTiles.foreach(localT => println(localT))
-//      println(localTiles.size)
       localTiles.map(tile => {
-        val array = new Array[((Int, Int), Array[Int])](tile.height)
+        val array = new Array[((Int, Int), Array[Int])](Int (tile.height * compressionFactor))
+        val yStepSize = Int(tile.height / (tile.height * compressionFactor))
+        val xStepSize = Int(tile.width / (tile.width * compressionFactor))
 
-        for(y <- array.indices) {
-          val xArray = new Array[Int](tile.width)
-          for(x <- xArray.indices) {
-            xArray(x) = colorFunc(tile.valueArray(x,y))
+        for(y <- tile.data.indices by yStepSize) {
+          val xArray = new Array[Int](Int (tile.width * compressionFactor))
+          for(x <- 0 until tile.width by xStepSize) {
+            xArray(x / xStepSize) = colorFunc(tile.valueArray(x,y))
           }
 
-          array(y) = ((tile.ulx.toInt, math.round(tile.uly / tile.pixelWidth).toInt - y), xArray)
+          array(y / yStepSize) = ((tile.ulx.toInt, math.round(tile.uly / tile.pixelWidth).toInt - y), xArray)
         }
 
         array

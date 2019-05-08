@@ -134,7 +134,11 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
 
   def value(i: Int): U = data(i)
 
-  def valueArray(i: Int, j: Int): U = data(j * width + i)
+  def valueArray(i: Int, j: Int): U = {
+    val idx = j * width + i
+    require(idx < data.length, s"provided index ($idx) must be < ${data.length}")
+    data(idx)
+  }
 
   /**
    * Apply a function to each raster point and return the new resulting tile.

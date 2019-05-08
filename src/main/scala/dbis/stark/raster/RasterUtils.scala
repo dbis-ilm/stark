@@ -253,10 +253,10 @@ object RasterUtils {
   def contains(left: Tile[_], right: Tile[_]): Boolean =
     tileToMBR(left).contains(tileToMBR(right))
 
-  def saveAsImage[U](path: Path, raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0): Unit = {
+  def saveAsImage[U](path: Path, raster: RDD[Tile[U]], colorFunc: U => Int, resize: Boolean = false, imgWidth: Int = 0, imgHeight: Int = 0, compressionFactor: Float = 1.0f): Unit = {
 
 
-    val img = rasterToImage(raster,colorFunc,resize,imgWidth,imgHeight)
+    val img = rasterToImage(raster,colorFunc,resize,imgWidth,imgHeight, compressionFactor)
 
     val suffix = path.getFileName.toString.split('.')(1)
     ImageIO.write(img, suffix, path.toFile)
@@ -269,14 +269,15 @@ object RasterUtils {
     val data = raster.mapPartitions(localTiles  => {
       //Collect all data of tiles in tuples of (offsetX, offsetY, data[one row of the tile])
       localTiles.map(tile => {
-        val array = new Array[((Int, Int), Array[Int])](Int (tile.height * compressionFactor))
-        val yStepSize = Int(tile.height / (tile.height * compressionFactor))
-        val xStepSize = Int(tile.width / (tile.width * compressionFactor))
+        val array = new Array[((Int, Int), Array[Int])]((tile.height * compressionFactor).toInt)
+        val yStepSize = (tile.height / (tile.height * compressionFactor)).toInt
+        val xStepSize = (tile.width / (tile.width * compressionFactor)).toInt
 
-        for(y <- tile.data.indices by yStepSize) {
-          val xArray = new Array[Int](Int (tile.width * compressionFactor))
+        for(y <- 0 until tile.height by yStepSize) {
+          val xArray = new Array[Int]((tile.width * compressionFactor).toInt)
           for(x <- 0 until tile.width by xStepSize) {
-            xArray(x / xStepSize) = colorFunc(tile.valueArray(x,y))
+            val color = colorFunc(tile.valueArray(x,y))
+            xArray(x / xStepSize) = color
           }
 
           array(y / yStepSize) = ((tile.ulx.toInt, math.round(tile.uly / tile.pixelWidth).toInt - y), xArray)

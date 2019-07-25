@@ -25,7 +25,7 @@ class RasterTest extends FlatSpec with Matchers with BeforeAndAfterAll{
       sc.stop()
   }
 
-  it should "load files into a tile RDD" in {
+  ignore should "load files into a tile RDD" in {
     val spark = dbis.stark.sql.STARKSession.builder()
       .appName("STARK Web UI")
       .master("local")

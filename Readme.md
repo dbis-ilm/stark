@@ -1,4 +1,8 @@
+
+
 # STARK - **S**patio-**T**emporal Data Analytics on Sp**ark**
+
+[![testing](https://dbgit.prakinf.tu-ilmenau.de/code/stark/badges/master/pipeline.svg)](https://dbgit.prakinf.tu-ilmenau.de/code/stark/commits/master)
 
 STARK is a framework that tightly integrates with [Apache Spark](https://spark.apache.org) and add support for spatial and temporal data types and operations.
 

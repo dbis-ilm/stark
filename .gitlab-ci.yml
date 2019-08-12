@@ -4,12 +4,12 @@
 # but an image with a JVM speeds up the build a bit.
 image: openjdk:8
 
-stages:
-  - build
-  - test
+#stages:
+#  - build
+#  - test
 
 before_script:
-  stage: build
+#  stage: build
   # Enable the usage of sources over https
   - apt-get update -yqq
   #- apt-get install apt-transport-https -yqq
@@ -23,7 +23,7 @@ before_script:
   - sbt writeSbtVersion
 
 test:
-  stage: test
+#  stage: test
   script:
     # Execute your project's tests
     #- sbt -J-Xmx6g clean coverage test coverageReport

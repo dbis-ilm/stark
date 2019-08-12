@@ -9,6 +9,9 @@ image: openjdk:8
 #  - test
 
 before_script:
+  tags: 
+    - grouprunner
+
 #  stage: build
   # Enable the usage of sources over https
   - apt-get update -yqq
@@ -23,6 +26,9 @@ before_script:
   - sbt writeSbtVersion
 
 test:
+  tags: 
+    - grouprunner
+
 #  stage: test
   script:
     # Execute your project's tests

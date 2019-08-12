@@ -20,4 +20,4 @@ before_script:
 test:
   script:
     # Execute your project's tests
-    - sbt -J-Xmx6g clean test
+    - sbt -J-Xmx6g clean coverage test coverageReport

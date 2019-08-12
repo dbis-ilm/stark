@@ -9,8 +9,6 @@ image: openjdk:8
 #  - test
 
 before_script:
-  tags: 
-    - grouprunner
 #  stage: build
   # Enable the usage of sources over https
   - apt-get update -yqq

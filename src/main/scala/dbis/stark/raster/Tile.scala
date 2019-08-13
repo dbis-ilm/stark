@@ -157,6 +157,15 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
 
   def hasValue(v: U): Boolean = accessorHelper(v,false)(_.contains(v))
 
+  def hasAllValues(min: U, max: U, vs: Seq[U]): Boolean = sma match {
+    case Some(SMA(minSMA, maxSMA,_)) =>
+      if(ord.compare(min, minSMA) >= 0 && ord.compare(max,maxSMA) <= 0)
+        vs.forall{v => data.contains(v)}
+      else
+        false
+    case None => vs.forall{v => data.contains(v)}
+  }
+
 
   private def accessorHelper[R](v: U, default: R)(f: Array[U] => R):R = sma match {
     case Some(SMA(min, max,_)) =>

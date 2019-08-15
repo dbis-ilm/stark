@@ -135,7 +135,7 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
     }.aggregate(false)((b1,b2) => b1 || b2, (b1,b2) => b1 || b2)
   }
 
-  def withValues(vs: U*): RasterRDD[U] = {
+  def withValues(vs: U*) = {
     val min = vs.min
     val max = vs.max
 

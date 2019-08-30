@@ -7,18 +7,16 @@ import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.raster.TileUDT
 import org.apache.spark.sql.types._
 
-abstract class RasterGetter
-  extends Expression
-    with CodegenFallback{
+abstract class RasterGetter(c: Expression) extends Expression with CodegenFallback{
 
-  def child: Expression
+  def child: Expression = c
 
   override def children = Seq(child)
 
   override def nullable = false
 }
 
-case class GetUlx(exprs: Seq[Expression]) extends RasterGetter {
+case class GetUlx(exprs: Seq[Expression]) extends RasterGetter(exprs.head) {
   require(exprs.length == 1, s"Exactly one expression allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
@@ -26,11 +24,10 @@ case class GetUlx(exprs: Seq[Expression]) extends RasterGetter {
     tile.ulx
   }
 
-  override def child = exprs(0)
   override def dataType = DoubleType
 }
 
-case class GetUly(exprs: Seq[Expression]) extends RasterGetter {
+case class GetUly(exprs: Seq[Expression]) extends RasterGetter(exprs.head) {
   require(exprs.length == 1, s"Exactly one expression allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
@@ -38,11 +35,10 @@ case class GetUly(exprs: Seq[Expression]) extends RasterGetter {
     tile.uly
   }
 
-  override def child = exprs(0)
   override def dataType = DoubleType
 }
 
-case class GetWidth(exprs: Seq[Expression]) extends RasterGetter {
+case class GetWidth(exprs: Seq[Expression]) extends RasterGetter(exprs.head) {
   require(exprs.length == 1, s"Exactly one expression allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
@@ -50,11 +46,10 @@ case class GetWidth(exprs: Seq[Expression]) extends RasterGetter {
     tile.width
   }
 
-  override def child = exprs(0)
   override def dataType = IntegerType
 }
 
-case class GetHeight(exprs: Seq[Expression]) extends RasterGetter {
+case class GetHeight(exprs: Seq[Expression]) extends RasterGetter(exprs.head) {
   require(exprs.length == 1, s"Exactly one expression allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
@@ -62,11 +57,10 @@ case class GetHeight(exprs: Seq[Expression]) extends RasterGetter {
     tile.height
   }
 
-  override def child = exprs(0)
   override def dataType = IntegerType
 }
 
-case class GetData(exprs: Seq[Expression]) extends RasterGetter {
+case class GetData(exprs: Seq[Expression]) extends RasterGetter(exprs.head) {
   require(exprs.length == 1, s"Exactly one expression allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
@@ -74,6 +68,5 @@ case class GetData(exprs: Seq[Expression]) extends RasterGetter {
     new GenericArrayData(tile.data)
   }
 
-  override def child = exprs(0)
   override def dataType: DataType = ArrayType(ByteType)
 }

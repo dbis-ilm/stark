@@ -50,14 +50,9 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
     val qGridPartitioner = new QuadGridPartitioner(mbb, cellSize)
     val partitionMBBs = qGridPartitioner.computePartitioning()
     
-//    log.info(s"BSPartitioner: compute histogram for ${partitionMBBs.size} cells")
-
     // then we count the points per partition
     cellHistogram = input.aggregate(CellHistogram.zero(partitionMBBs))(CellHistogram.seq, CellHistogram.combine).buckets
 
-//    logInfo(s"BSPartitioner: histogram constructed")
-    
-    
     this
   }
 
@@ -69,20 +64,10 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
   def computePartitioning(): List[MBB] = {
     require(cellHistogram.nonEmpty && maxPoints > 0)
     
-//    cellHistogram.map{ case (r,cnt) => s"${r.ll(0)}, ${r.ll(1)}, ${r.ur(0)}, ${r.ur(1)}"}.foreach(log.warn)
-    
-//    logInfo(s"produced ${cellHistogram.size} cells")
-    
-//    logInfo(s"num points according to hist: ${cellHistogram.map(_._2).sum}")
-
     val start = NRectRange(NPoint(mbb.minVec.toArray), NPoint(mbb.maxVec.toArray))
+    val a = cellHistogram.zipWithIndex.map{ case ((r,cnt),idx) => idx -> (Cell(r),cnt)}
 
-    val bsp = new BSP(/*mbb.minVec.toArray, mbb.maxVec.toArray,*/
-      start,
-      cellHistogram.map{ case (r,i) => (Cell(r),i)}, // _cellHistogram: Array[(Cell, Int)],
-      cellSize, // 2 * eps
-      maxPoints.toDouble,
-      pointsOnly = true)
+    val bsp = new BSP(start, dbis.stark.spatial.partitioner.CellHistogram(a), cellSize, _pointsOnly = true, maxPoints.toDouble, None)
 
     bsp.partitions.map{ rrange => MBB(rrange.range.ll, rrange.range.ur) }.toList
   }

@@ -12,6 +12,11 @@ import scala.util.Random
 
 class BSPTest extends FlatSpec with Matchers {
 
+//  implicit  def arrayToHisto(array: Array[(Cell, Int)]): CellHistogram = {
+//    val m = array.zipWithIndex.map{ case ((c,cnt), idx) => idx -> (c,cnt)}.toSeq
+//    CellHistogram(mutable.Map(m:_*))
+//  }
+
   private def createCells(sideLength: Double, cost: Int = 10, numXCells: Int, numYCells: Int, llStartX: Double, llStartY: Double) = {
 	  
     val histo = {
@@ -47,21 +52,13 @@ class BSPTest extends FlatSpec with Matchers {
 	  val llStartX = -18
 	  val llStartY = -11
 	  
-    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
-	  
-    val bsp = new BSP(
-      whole,
-      histo,
-      sideLength,
-      maxCost,
-      pointsOnly= false
-    )
-    
-    val cells = bsp.getCellsIn(NRectRange(NPoint(llStartX,llStartY), NPoint(llStartX+4*sideLength,llStartY+3*sideLength)))
+    val (_,_,whole,_) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+
+    val cells = GridPartitioner.getCellsIn(NRectRange(NPoint(llStartX,llStartY), NPoint(llStartX+4*sideLength,llStartY+3*sideLength)),sideLength,whole,numXCells)
     
     cells should contain only (0,1,2,3,6,7,8,9,12,13,14,15)
     
-    val cells2 = bsp.getCellsIn(NRectRange(NPoint(llStartX+4*sideLength,llStartY+3*sideLength), NPoint(llStartX+6*sideLength,llStartY+6*sideLength)))
+    val cells2 = GridPartitioner.getCellsIn(NRectRange(NPoint(llStartX+4*sideLength,llStartY+3*sideLength), NPoint(llStartX+6*sideLength,llStartY+6*sideLength)),sideLength,whole,numXCells)
     cells2 should contain only (22,23,28,29,34,35)
   }
   
@@ -74,30 +71,22 @@ class BSPTest extends FlatSpec with Matchers {
 	  val llStartX = -4
 	  val llStartY = -4
 	  
-    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    val (_,_,whole,_) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 	  
-    val bsp = new BSP(
-      whole,
-      histo,
-      sideLength,
-      maxCost,
-      pointsOnly = false
-    )
-    
-    val cells = bsp.getCellsIn(
+    val cells = GridPartitioner.getCellsIn(
         NRectRange(
             NPoint(llStartX,llStartY), 
             NPoint(llStartX+2*sideLength,llStartY+1*sideLength)
-        )
+        ),sideLength,whole,numXCells
       )
     
     cells should contain only (0,1)
     
-    val cells2 = bsp.getCellsIn(
+    val cells2 = GridPartitioner.getCellsIn(
         NRectRange(
             NPoint(llStartX,llStartY), 
             NPoint(llStartX+1*sideLength,llStartY+2*sideLength)
-        )
+        ),sideLength,whole,numXCells
       )
     
     cells2 should contain only (0,2)
@@ -119,25 +108,14 @@ class BSPTest extends FlatSpec with Matchers {
     withClue("generated ur wrong") { ur shouldBe NPoint(180, 90)  }
     withClue("generated histogram wrong") { histo.length shouldBe 360*180 }
     
-    
-    val bsp = new BSP(
-      whole,
-      histo,
-      sideLength,
-      maxCost,
-      pointsOnly = false
-    )
-    
-    val cells = bsp.getCellsIn(NRectRange(ll,ur))
 
-//    cells should contain only ((0 until histo.size):_*)
+    val cells = GridPartitioner.getCellsIn(NRectRange(ll,ur),sideLength,whole,numXCells)
+
     cells.size shouldBe histo.length
 
-    val start = System.currentTimeMillis()
-    cells.foreach { cellId => 
+    cells.foreach { cellId =>
       noException should be thrownBy histo(cellId) 
     }
-    val end = System.currentTimeMillis()
   }
 
 
@@ -150,20 +128,11 @@ class BSPTest extends FlatSpec with Matchers {
     val llStartX = -118.0374626
     val llStartY = 33.7448744
 
-    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    val (_,_,whole,_) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 
-    val bsp = new BSP(
-      whole,
-      histo,
-      sideLength,
-      maxCost,
-      pointsOnly = true
-    )
 
-    val cells = bsp.getCellsIn(whole)
+    val cells = GridPartitioner.getCellsIn(whole,sideLength,whole,numXCells)
     cells should contain theSameElementsAs (0 until numXCells * numYCells)
-
-
   }
 
 
@@ -184,30 +153,17 @@ class BSPTest extends FlatSpec with Matchers {
       range = NRectRange(NPoint(0,0), NPoint(4,4)),
       extent = NRectRange(NPoint(-1,-1), NPoint(6,6)))
       
-    val histo = Array(
-        (cell1, 10),
-        (cell2, 10),
-        (cell3, 10),
-        (cell4, 10))
-        
     val ll = NPoint(-4,-4)
     val ur = NPoint(4,4)
-    
-    val bsp = new BSP(
-        NRectRange(ll,ur),
-        histo,
-        4, //side Length
-        20,
-      pointsOnly = true
-      )
-    
+    val sideLength = 4
+
     val start = Cell(NRectRange(ll,ur))  
     
-    withClue("start") { bsp.cellsPerDimension(start.range) should contain theSameElementsAs List(2,2) }
-    withClue("cell1 +2") { bsp.cellsPerDimension(cell1.range.extend(cell2.range)) should contain theSameElementsInOrderAs List(2,1) }
-    withClue("cell3 +4") { bsp.cellsPerDimension(cell3.range.extend(cell4.range)) should contain theSameElementsInOrderAs List(2,1) }
-    withClue("cell1 +3") { bsp.cellsPerDimension(cell1.range.extend(cell3.range)) should contain theSameElementsInOrderAs List(1,2) }
-    withClue("cell2 +4") { bsp.cellsPerDimension(cell2.range.extend(cell4.range)) should contain theSameElementsInOrderAs List(1,2) }
+    withClue("start") { GridPartitioner.cellsPerDimension(start.range,sideLength) should contain theSameElementsAs List(2,2) }
+    withClue("cell1 +2") { GridPartitioner.cellsPerDimension(cell1.range.extend(cell2.range),sideLength) should contain theSameElementsInOrderAs List(2,1) }
+    withClue("cell3 +4") { GridPartitioner.cellsPerDimension(cell3.range.extend(cell4.range),sideLength) should contain theSameElementsInOrderAs List(2,1) }
+    withClue("cell1 +3") { GridPartitioner.cellsPerDimension(cell1.range.extend(cell3.range),sideLength) should contain theSameElementsInOrderAs List(1,2) }
+    withClue("cell2 +4") { GridPartitioner.cellsPerDimension(cell2.range.extend(cell4.range),sideLength) should contain theSameElementsInOrderAs List(1,2) }
     
   }
   
@@ -228,22 +184,18 @@ class BSPTest extends FlatSpec with Matchers {
       range = NRectRange(NPoint(0,0), NPoint(4,4)),
       extent = NRectRange(NPoint(-1,-1), NPoint(6,6)))
       
-    val histo = Array(
-        (cell1, 10),
-        (cell2, 10),
-        (cell3, 10),
-        (cell4, 10))
+    val buckets = mutable.Map(
+        cell1.id -> (cell1, 10),
+      cell2.id -> (cell2, 10),
+      cell3.id -> (cell3, 10),
+      cell4.id -> (cell4, 10))
+
+    val histo = CellHistogram(buckets)
         
     val ll = NPoint(-4,-4)
     val ur = NPoint(4,4)
-    
-    val bsp = new BSP(
-        NRectRange(ll,ur),
-        histo,
-        4, //side Length
-        20,
-      pointsOnly = false
-      )
+
+    val bsp = new BSP(NRectRange(ll,ur),histo,4,false,20)
     
     val start = Cell(NRectRange(ll,ur))  
     val (p1,p2) = bsp.costBasedSplit(start)
@@ -276,9 +228,15 @@ class BSPTest extends FlatSpec with Matchers {
     val llStartX = -180
     val llStartY = -90
     
-    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
-    
-    val bsp = new BSP(whole,histo,sideLength,100,true)
+    val (_,_,whole,buckets) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+
+    val m = buckets.map{ case (cell, cnt) =>
+      cell.id -> (cell,cnt)
+    }
+
+    val histo = CellHistogram(m)
+
+    val bsp = new BSP(whole,histo,sideLength,true,100)
 
     val start = System.currentTimeMillis()
     bsp.partitions.length should be > 0
@@ -324,13 +282,15 @@ class BSPTest extends FlatSpec with Matchers {
     val llStartX = -180
     val llStartY = -90
 
-    val (_,_,whole,histo) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
+    val (_,_,whole,buckets) = createCells(sideLength, maxCost, numXCells, numYCells, llStartX, llStartY)
 
-    val buckets = mutable.Map.empty[Int, (Cell, Int)]
-    histo.foreach{ case (cell, cnt) => buckets += cell.id -> (cell, cnt)}
+    val m = buckets.map{ case (cell, cnt) =>
+      cell.id -> (cell,cnt)
+    }
 
-    val bspAsync = new BSPBinaryAsync(whole,CellHistogram(buckets),sideLength,100,true)
+    val histo = CellHistogram(m)
 
+    val bspAsync = new BSPBinaryAsync(whole,histo,sideLength,100,true)
 
     val start = System.currentTimeMillis()
     bspAsync.partitions.length should be > 0
@@ -338,13 +298,25 @@ class BSPTest extends FlatSpec with Matchers {
 
     println(s"binary async: ${end - start}ms  (${bspAsync.partitions.length} partitions)")
 
-    val bsp = new BSP(whole,histo,sideLength,100,true)
+
+
+    val bsp = new BSP(whole,histo,sideLength,true,100)
+
     val startS = System.currentTimeMillis()
     bsp.partitions.length should be > 0
     val endS = System.currentTimeMillis()
 
+
     println(s"sequential: ${endS - startS}ms  (${bsp.partitions.length} partitions)")
 
+    GridPartitioner.writeToFile(bsp.partitions.map(cell => s"${cell.id};${cell.range.wkt};${cell.extent.wkt}"),
+      "/tmp/bsp_partitions")
+
+    GridPartitioner.writeToFile(bspAsync.partitions.map(cell => s"${cell.id};${cell.range.wkt};${cell.extent.wkt}"),
+      "/tmp/bsp_asnyc_partitions")
+
     (endS - startS) shouldBe > (end - start)
+
+
   }
 }

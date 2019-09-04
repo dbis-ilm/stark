@@ -2,9 +2,25 @@ package dbis.stark.spatial.partitioner
 
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 
-import scala.collection.immutable.IndexedSeq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+
+abstract class CostBasedPartitioner(val universe: NRectRange,
+                                    val cellHistogram: CellHistogram,
+                                    val sideLength: Double,
+                                    val numXCells: Int,
+                                    val maxCostPerPartition: Double,
+                                    val pointsOnly: Boolean,
+                                    val numCellThreshold: Int = -1) extends Serializable {
+
+  require(cellHistogram.nonEmpty, "cell histogram must not be empty")
+  require(maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
+  require(sideLength > 0, "cell side length must not be negative or zero")
+
+  val partitions: Array[Cell]
+
+}
+
 
 /**
  * A data class to store information about the created partitioning
@@ -45,74 +61,17 @@ case class PartitionStats(
 object BSP {
   
   val DEFAULT_PARTITION_BUFF_SIZE = 100
-  
-}
-
-/**
- * A binary space partitioning algorithm implementation based on 
- * 
- * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
- * by He, Tan, Luo, Feng, Fan 
- * 
- * @param cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
- * @param sideLength The side length of the (quadratic) cell
- * @param maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points).
- * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
- * cannot be further split.
- */
-class BSP(private val _start: NRectRange,
-          protected[stark] val cellHistogram: Array[(Cell, Int)],
-          private val sideLength: Double,
-          private val maxCostPerPartition: Double,
-          private val pointsOnly: Boolean,
-          private val numCellThreshold: Int = -1
-            ) extends Serializable {
-
-  require(cellHistogram.nonEmpty, "cell histogram must not be empty")
-  require(maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
-  require(sideLength > 0, "cell side length must not be negative or zero")
-
-  val start = Cell(0, _start)
-
-  private lazy val numXCells = cellsPerDimension(start.range)(0) //math.ceil(math.abs(ur.head - ll.head) / sideLength).toInt
-
-  protected[spatial] def cellsPerDimension(part: NRectRange): IndexedSeq[Int] = (0 until part.dim).map { dim =>
-    math.ceil(part.lengths(dim) / sideLength).toInt
-  }
-
-  protected[spatial] def cellId(p: NPoint): Int = {
-    val x = math.floor(math.abs(p(0) - start.range.ll(0)) / sideLength).toInt
-    val y = math.floor(math.abs(p(1) - start.range.ll(1)) / sideLength).toInt
-    y * numXCells + x
-  }
 
   /**
-    * Determine the IDs of the cells that are contained by the given range
-    * @param r The range
-    * @return Returns the list of Cell IDs
+    * Compute the cost for a partition, i.e. sum the cost
+    * for each cell in that partition.
+    *
+    * @param part The partition
+    * @return Returns the cost, i.e. the number of points, of the given cell
     */
-  def getCellsIn(r: NRectRange): Seq[Int] = {
-    val numCells = cellsPerDimension(r)
-
-    // the cellId of the lower left point of the given range
-    val llCellId = cellId(r.ll)
-
-    (0 until numCells(1)).flatMap { i =>
-      llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells
-    }
-  }
-
-
-
-  /**
-   * Compute the cost for a partition, i.e. sum the cost
-   * for each cell in that partition.
-   *
-   * @param part The partition
-   * @return Returns the cost, i.e. the number of points, of the given cell
-   */
-  def costEstimation(part: NRectRange): Double = {
-    val cellIds = getCellsIn(part)
+  def costEstimation(part: NRectRange, sideLength: Double, range: NRectRange, numXCells: Int,
+                     cellHistogram: CellHistogram): Int = {
+    val cellIds = GridPartitioner.getCellsIn(part,sideLength,range,numXCells)
     var i = 0
 
     var sum = 0
@@ -124,28 +83,20 @@ class BSP(private val _start: NRectRange,
       i += 1
     }
     sum
-
-//        getCellsIn(part.range).iterator
-//          .filter{id => id >= 0 && id < _cellHistogram.length && _cellHistogram(id)._2 > 0}
-//          .map{id => _cellHistogram(id)._2}
-//          .sum
   }
-
-
-
   /**
     * Determine the extent of the given range. The extent is computed by combining the extents
     * of all cotnained elements
     * @param range The range to determine the extent fr
     * @return Returns the extent
     */
-  protected[spatial] def extentForRange(range: NRectRange): NRectRange = {
-//    getCellsIn(range)
-//      .filter { id => id >= 0 && id < _cellHistogram.length } // FIXME: we should actually make sure cellInRange produces always valid cells
-//      .map { id => _cellHistogram(id)._1.extent } // get the extent for the cells
-//      .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent
+  protected[spatial] def extentForRange(range: NRectRange, sideLength: Double, numXCells: Int, cellHistogram: CellHistogram, global: NRectRange): NRectRange = {
+    //    getCellsIn(range)
+    //      .filter { id => id >= 0 && id < _cellHistogram.length } // FIXME: we should actually make sure cellInRange produces always valid cells
+    //      .map { id => _cellHistogram(id)._1.extent } // get the extent for the cells
+    //      .foldLeft(range){ (e1,e2) => e1.extend(e2) } // combine all extents to the maximum extent
 
-    val cellIds = getCellsIn(range)
+    val cellIds = GridPartitioner.getCellsIn(range, sideLength, global, numXCells)
 
     var i = 0
     var extent = range
@@ -161,6 +112,35 @@ class BSP(private val _start: NRectRange,
     extent
 
   }
+  
+}
+
+/**
+ * A binary space partitioning algorithm implementation based on 
+ * 
+ * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
+ * by He, Tan, Luo, Feng, Fan 
+ * 
+ * @param _cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
+ * @param _sideLength The side length of the (quadratic) cell
+ * @param _maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points).
+ * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
+ * cannot be further split.
+ */
+class BSP(private val _universe: NRectRange, protected[stark] val _cellHistogram: CellHistogram,
+          private val _sideLength: Double, private val _pointsOnly: Boolean, private val _maxCostPerPartition: Double,
+          private val _numXCells: Option[Int] = None, private val _numCellThreshold: Int = -1)
+  extends CostBasedPartitioner(_universe, _cellHistogram, _sideLength,
+    _numXCells.getOrElse(GridPartitioner.cellsPerDimension(_universe,_sideLength)(0)),
+  _maxCostPerPartition,_pointsOnly,_numCellThreshold) with Serializable {
+
+  def this(_universe: NRectRange,_cellHistogram: CellHistogram,_sideLength: Double,_numXCells: Int,
+            _maxCostPerPartition: Double,_pointsOnly: Boolean,_numCellThreshold: Int) {
+    this(_universe,_cellHistogram,_sideLength,_pointsOnly, _maxCostPerPartition,Some(_numXCells),_numCellThreshold)
+  }
+
+
+  val start = Cell(0, universe)
 
   /**
    * Split the given partition into two partitions so that
@@ -192,7 +172,7 @@ class BSP(private val _start: NRectRange,
      * i.e. we could split, actually
      */
 
-    cellsPerDimension(part.range).iterator.zipWithIndex      // index is the dimension -- (numCells, dim)
+    GridPartitioner.cellsPerDimension(part.range,sideLength).iterator.zipWithIndex      // index is the dimension -- (numCells, dim)
                       .filter(_._1 > 0)             // filter for number of cells
                       .foreach { case (numCells, dim) =>
 
@@ -226,7 +206,7 @@ class BSP(private val _start: NRectRange,
              */
 
             val diffRange = if(prevP1Range.isEmpty) range else range.diff(prevP1Range.get.range)
-            val diffRangeExtent = extentForRange(diffRange)
+            val diffRangeExtent = BSP.extentForRange(diffRange,sideLength,numXCells,cellHistogram,start.range)
             val extent = prevP1Range.map{ p => p.extent.extend(diffRangeExtent)}.getOrElse(diffRangeExtent)
             Cell(range, extent)
 
@@ -254,8 +234,7 @@ class BSP(private val _start: NRectRange,
           val cell = if(pointsOnly) {
             Cell(range)
           } else {
-            //            val thecells = getCellsIn(range, ll(0), ll(1))
-            val extent = extentForRange(range)
+            val extent = BSP.extentForRange(range,sideLength,numXCells,cellHistogram,start.range)
             Cell(range, extent)
           }
 
@@ -265,8 +244,8 @@ class BSP(private val _start: NRectRange,
         require(p1.range.extend(p2.range) == part.range, "created partitions must completely cover input partition")
 
         // calculate costs in each candidate partition
-        val p1Cost = costEstimation(p1.range)
-        val p2Cost = costEstimation(p2.range)
+        val p1Cost = BSP.costEstimation(p1.range,sideLength,start.range,numXCells,cellHistogram)
+        val p2Cost = BSP.costEstimation(p2.range,sideLength,start.range,numXCells,cellHistogram)
 
         // if cost difference is (currently) minimal, store this partitioning
         val diff = Math.abs( p1Cost - p2Cost )
@@ -308,12 +287,14 @@ class BSP(private val _start: NRectRange,
 //    val startTime = System.currentTimeMillis()
     val resultPartitions = new ArrayBuffer[Cell](BSP.DEFAULT_PARTITION_BUFF_SIZE)
 
-    val nonempty = cellHistogram.withFilter{ case (_, cnt) => cnt > 0 }.map(_._1)
+//    val nonempty = cellHistogram.withFilter{ case (_, cnt) => cnt > 0 }.map(_._1)
 
-    if(nonempty.length <= numCellThreshold) {
+
+    val startTime = System.currentTimeMillis()
+    if(cellHistogram.nonEmptyCells.nonEmpty && cellHistogram.nonEmptyCells.size <= numCellThreshold) {
+      val nonempty = cellHistogram.nonEmptyCells.map(_._1) //.map{ cellId => cellHistogram(cellId)._1}
       resultPartitions ++= nonempty.map(_.clone())
     } else {
-
       // add it to processing queue
       val queue = mutable.Queue(start)
 
@@ -327,10 +308,13 @@ class BSP(private val _start: NRectRange,
          * than max cost allows, however, since we cannot split a cell, we have to live with this
          */
 
-        val part = queue.dequeue()
-        if((costEstimation(part.range) > maxCostPerPartition) &&
-          /*getCellsIn(part.range).length > 1 */ part.range.lengths.exists(_ > sideLength) ) {
 
+        val part = queue.dequeue()
+        val theCost = BSP.costEstimation(part.range,sideLength,start.range,numXCells,cellHistogram)
+        val hasMoreCells = part.range.lengths.exists(_ > sideLength)
+
+
+        if((theCost > maxCostPerPartition) && hasMoreCells) {
 
           val (p1, p2) = costBasedSplit(part)
 
@@ -344,15 +328,17 @@ class BSP(private val _start: NRectRange,
           if(p1.isDefined) {
             if(p1.get != part)
           	  queue.enqueue(p1.get.clone())
-          	else
+          	else {
           	  resultPartitions += p1.get.clone()
+            }
           }
 
           if(p2.isDefined) {
             if(p2.get != part)
           	  queue.enqueue(p2.get.clone())
-          	else
+          	else {
           	  resultPartitions += p2.get.clone()
+            }
           }
 
 
@@ -367,6 +353,7 @@ class BSP(private val _start: NRectRange,
       p.id = i
     }
 
+    val endTime = System.currentTimeMillis()
     resultPartitions.toArray
 
   }
@@ -378,48 +365,49 @@ class BSP(private val _start: NRectRange,
    * However, if the partitioning was not created before this value
    * is accessed, it will trigger the partition computation
    */
-  lazy val partitionStats = {
-
-    // this will trigger the computation, in case it was not done before
-    val numParts = partitions.length
-
-    val partCounts = cellHistogram.view
-      .flatMap { case (cell, count) =>
-        partitions.view
-//          .map(_._1)
-          .filter { p => p.range.contains(cell.range) }
-          .map { p => (p, count) }
-      }
-      .groupBy(_._1)
-      .map { case (part, arr) =>
-        (part, arr.map(_._2).sum)
-      }.toList
-
-    // _2 is the count for each partition
-    val avgPoints = partCounts.view.map(_._2).sum.toDouble / partCounts.size
-    val maxPts = partCounts.view.map(_._2).max
-    val minPts = partCounts.view.map(_._2).min
-
-    val maxPoints = partCounts.filter(_._2 == maxPts)
-    val minPoints = partCounts.filter(_._2 == minPts)
-
-    val variance = partCounts.map { case (part, count) => Math.pow( count - avgPoints, 2) }.sum
-
-
-
-    val area = partitions.view.map(_.range.volume).sum
-    val avgArea = area / numParts
-    val partAreas = partCounts.map { case (part,_) => (part, part.range.volume) }
-    // _2 is the area of a partition
-    val maxA = partAreas.view.map(_._2).max
-    val minA = partAreas.view.map(_._2).min
-
-    val maxArea = partAreas.filter(_._2 == maxA)
-    val minArea = partAreas.filter(_._2 == minA)
-
-//    val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
-
-    PartitionStats(start.range.ll, start.range.ur, start,numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea, cellHistogram.length)
-  }  
+  lazy val partitionStats: PartitionStats = ???
+//  {
+//
+//    // this will trigger the computation, in case it was not done before
+//    val numParts = partitions.length
+//
+//    val partCounts = cellHistogram.view
+//      .flatMap { case (cell, count) =>
+//        partitions.view
+////          .map(_._1)
+//          .filter { p => p.range.contains(cell.range) }
+//          .map { p => (p, count) }
+//      }
+//      .groupBy(_._1)
+//      .map { case (part, arr) =>
+//        (part, arr.map(_._2).sum)
+//      }.toList
+//
+//    // _2 is the count for each partition
+//    val avgPoints = partCounts.view.map(_._2).sum.toDouble / partCounts.size
+//    val maxPts = partCounts.view.map(_._2).max
+//    val minPts = partCounts.view.map(_._2).min
+//
+//    val maxPoints = partCounts.filter(_._2 == maxPts)
+//    val minPoints = partCounts.filter(_._2 == minPts)
+//
+//    val variance = partCounts.map { case (part, count) => Math.pow( count - avgPoints, 2) }.sum
+//
+//
+//
+//    val area = partitions.view.map(_.range.volume).sum
+//    val avgArea = area / numParts
+//    val partAreas = partCounts.map { case (part,_) => (part, part.range.volume) }
+//    // _2 is the area of a partition
+//    val maxA = partAreas.view.map(_._2).max
+//    val minA = partAreas.view.map(_._2).min
+//
+//    val maxArea = partAreas.filter(_._2 == maxA)
+//    val minArea = partAreas.filter(_._2 == minA)
+//
+////    val areaVariance = partAreas.map{ case (part, area) => Math.pow( area - avgArea, 2) }.sum
+//
+//    PartitionStats(start.range.ll, start.range.ur, start,numParts, avgPoints, maxPoints, minPoints, variance, area, avgArea, maxArea, minArea, cellHistogram.length)
+//  }
     
 }

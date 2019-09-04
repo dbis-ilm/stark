@@ -51,7 +51,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
   override def partitionExtent(idx: Int) = partitions(idx).extent
 
   override def printPartitions(fName: Path): Unit =
-    writeToFile(partitions.map(_.range.wkt).zipWithIndex.map{ case (wkt, idx) => s"$idx;$wkt"}, fName)
+    GridPartitioner.writeToFile(partitions.map(_.range.wkt).zipWithIndex.map{ case (wkt, idx) => s"$idx;$wkt"}, fName)
 
   override def numPartitions = partitions.length
 

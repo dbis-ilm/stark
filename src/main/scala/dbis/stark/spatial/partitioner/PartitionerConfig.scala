@@ -22,7 +22,8 @@ case class BSPStrategy(cellSize: Double,
                        maxCost: Double,
                        pointsOnly: Boolean = false,
                        minmax: Option[(Double, Double, Double, Double)] = None,
-                       sampleFraction: Double = 0
+                       sampleFraction: Double = 0,
+                       parallel: Boolean = false
                       ) extends PartitionerConfig(PartitionStrategy.BSP, pointsOnly, minmax, sampleFraction)
 
 case class GridStrategy(partitionsPerDimensions: Int,
@@ -37,10 +38,11 @@ case class RTreeStrategy(order: Int, pointsOnly: Boolean = false,
 
 
 object PartitionerFactory {
+
   def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): GridPartitioner = strategy match {
-    case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor) => minmax match {
+    case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor,parallel) => minmax match {
       case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly)
-      case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor)
+      case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor,parallel)
     }
 
     case GridStrategy(partitionsPerDimensions, pointsOnly, minmax, sampleFraction) => minmax match {

@@ -12,11 +12,26 @@ import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.tagobjects.Slow
-import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers, Tag}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FlatSpec, Matchers, Tag}
 
 object Sampling extends Tag("dbis.stark.Sampling")
 
-class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
+trait TestTimer extends FlatSpec with BeforeAndAfter {
+  var start: Long = 0
+  before {
+    start = System.currentTimeMillis()
+  }
+
+  after {
+    if(System.getProperty("testtiming") != null) {
+      val dur = System.currentTimeMillis() - start
+
+      println(s"\t -> $dur ms")
+    }
+  }
+}
+
+class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
   
   private var sc: SparkContext = _
   
@@ -91,7 +106,13 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 //    println(s"${parti.cells.mkString("\n")}")
 
-    parti.cells.length shouldBe 9
+    val rddSize = rdd.count()
+
+    withClue("number of points does not match"){parti.histogram.map(_._2).sum shouldBe rddSize}
+
+    parti.histogram.length shouldBe 9
+
+
   }
 
   it  should "create correct cell histogram" in {
@@ -112,7 +133,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       (Cell(NRectRange(NPoint(4,4), NPoint(5,5)),NRectRange(NPoint(4,4), NPoint(5,5))), 1)  // 8
     )
 
-    parti.cells.buckets.values should contain only (shouldSizes:_*)
+    parti.histogram.buckets.values should contain only (shouldSizes:_*)
   }
 
   it should "have correct grid" in {
@@ -121,35 +142,42 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val parti = new BSPartitioner(rdd, 1, 1, pointsOnly = true)
 
     val shouldSizes = Array(
-      Cell(NRectRange(NPoint(2,2), NPoint(3,3)),NRectRange(NPoint(2,2), NPoint(3,3))), // 0
-      Cell(NRectRange(NPoint(3,2), NPoint(4,3)),NRectRange(NPoint(3,2), NPoint(4,3))), // 1
-      Cell(NRectRange(NPoint(4,2), NPoint(5,3)),NRectRange(NPoint(4,2), NPoint(5,3))), // 2
-      Cell(NRectRange(NPoint(2,3), NPoint(3,4)),NRectRange(NPoint(2,3), NPoint(3,4))), // 3
-      Cell(NRectRange(NPoint(3,3), NPoint(4,4)),NRectRange(NPoint(3,3), NPoint(4,4))), // 4
-      Cell(NRectRange(NPoint(4,3), NPoint(5,4)),NRectRange(NPoint(4,3), NPoint(5,4))), // 5
-      Cell(NRectRange(NPoint(2,4), NPoint(3,5)),NRectRange(NPoint(2,4), NPoint(3,5))), // 6
-      Cell(NRectRange(NPoint(3,4), NPoint(4,5)),NRectRange(NPoint(3,4), NPoint(4,5))), // 7
-      Cell(NRectRange(NPoint(4,4), NPoint(5,5)),NRectRange(NPoint(4,4), NPoint(5,5)))  // 8
+      (Cell(0,NRectRange(NPoint(2,2), NPoint(3,3)),NRectRange(NPoint(2,2), NPoint(3,3))),2),
+      (Cell(1,NRectRange(NPoint(3,2), NPoint(4,3)),NRectRange(NPoint(3,2), NPoint(4,3))),0),
+      (Cell(2,NRectRange(NPoint(4,2), NPoint(5,3)),NRectRange(NPoint(4,2), NPoint(5,3))),1),
+      (Cell(3,NRectRange(NPoint(2,3), NPoint(3,4)),NRectRange(NPoint(2,3), NPoint(3,4))),0),
+      (Cell(4,NRectRange(NPoint(3,3), NPoint(4,4)),NRectRange(NPoint(3,3), NPoint(4,4))),0),
+      (Cell(5,NRectRange(NPoint(4,3), NPoint(5,4)),NRectRange(NPoint(4,3), NPoint(5,4))),0),
+      (Cell(6,NRectRange(NPoint(2,4), NPoint(3,5)),NRectRange(NPoint(2,4), NPoint(3,5))),1),
+      (Cell(7,NRectRange(NPoint(3,4), NPoint(4,5)),NRectRange(NPoint(3,4), NPoint(4,5))),0),
+      (Cell(8,NRectRange(NPoint(4,4), NPoint(5,5)),NRectRange(NPoint(4,4), NPoint(5,5))),1)
     )
 
-    parti.cells.length shouldBe shouldSizes.length
-    parti.cells.buckets.values.zipWithIndex.foreach{ case ((cell,_),idx) =>
-      cell shouldBe shouldSizes(idx)
-    }
+//    parti.cells.buckets.foreach(c => println(c._2._1.range.wkt))
+//    println("---")
+//    shouldSizes.foreach(c => println(c.range.wkt))
+    parti.histogram.length shouldBe shouldSizes.length
 
+    shouldSizes.foreach{ shouldCell =>
+      withClue(s"cell ${shouldCell._1.id} did not match") { parti.histogram(shouldCell._1.id)._1 shouldBe shouldCell._1 }
+      withClue(s"count ${shouldCell._1.id} did not match") { parti.histogram(shouldCell._1.id)._2 shouldBe shouldCell._2 }
+
+    }
   }
 
 
   it  should "return the correct partition id" taggedAs Fix in {
     val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 0.1, 1, pointsOnly = true)
+    val parti = new BSPartitioner(rdd, 0.1, 1, pointsOnly = true, parallel = false)
 
     parti.printPartitions("/tmp/idtest_partitions")
     parti.printHistogram(java.nio.file.Paths.get("/tmp/idtest_histo"))
 
-    val partIds = Array(0,0,1,2,3)
+    val partIds = Array(0,3,1,2,3)
 
     val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect()
+
+    parti.printPartitions("/tmp/idtest_partitions_after")
 
     parts should contain theSameElementsInOrderAs partIds
 
@@ -228,24 +256,33 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
+    val rddSize = rdd.count()
+
     val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-    val parti = new BSPartitioner(rdd, 1, 10*1000, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
+    val parti = new BSPartitioner(rdd, 0.1, 10*1000, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0,parallel=false) // disable sampling
 
-//    parti.printHistogram(java.nio.file.Paths.get(System.getProperty("user.home"), "histo2.csv"))
-//    parti.printPartitions(java.nio.file.Paths.get(System.getProperty("user.home"), "partition2.csv"))
+    parti.printPartitions("/tmp/partitions00.wkt")
+    parti.printHistogram(java.nio.file.Paths.get("/tmp/histo00.wkt"))
 
     // make sure there are no duplicate cells, i.e. they shouldn't have the same region
-    parti.cells.buckets.values.map { case (cell, _) => cell.range }.toList.distinct.length shouldBe parti.cells.length
+    withClue("no duplicate cells"){
+      parti.histogram.buckets.values.map { case (cell, _) => cell.range }.toList.distinct.length shouldBe parti.histogram.length
+    }
 
+    withClue("histogram counts"){parti.histogram.map(_._2).sum shouldBe rddSize}
 
+    var oob = 0
     // every point must be in one partition
     rdd.collect().foreach { case (st, name) =>
       try {
         val pNum = parti.getPartition(st)
         withClue(name) { pNum should (be >= 0 and be < parti.numPartitions) }
       } catch {
+        case e: ArrayIndexOutOfBoundsException =>
+//          println(s"idx out of bounds for $st ($name)")
+          oob += 1
       case e:IllegalStateException =>
 
         val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
@@ -258,20 +295,18 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
-
-        val containingCell = parti.cells.buckets.values.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        val containingCell = parti.histogram.buckets.values.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
-          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.histogram(containingCell.get._1.id)._1.range} and count ${parti.histogram(containingCell.get._1.id)._2}")
         } else {
           println("No cell contains this point!")
         }
-
-
-
         fail(s"$name: ${e.getMessage}  xok: $xOk  yOk: $yOk")
       }
-
     }
+
+    if(oob != 0)
+      fail(s"out of bounds = $oob  (rdd size= $rddSize")
   }
 
   it should "use cells as partitions for taxi" in {
@@ -282,10 +317,12 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val minMax = GridPartitioner.getMinMax(rdd)
 
 //    BSPartitioner.numCellThreshold = -5
-    val parti = new BSPartitioner(rdd, 1, 100, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
+    val parti = new BSPartitioner(rdd, 1, 100, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0, parallel= false) // disable sampling
 
-    val nonempty = parti.cells.buckets.values.filter(_._2 > 0)
+    val nonempty = parti.histogram.buckets.values.filter(_._2 > 0)
 //    withClue("number of non empty cells") { nonempty.length shouldBe 7 }
+
+    parti.histogram.nonEmptyCells should contain theSameElementsAs nonempty
 
     val cnt = rdd.count()
 
@@ -301,7 +338,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 
 
-    withClue("number of elements in partitions") {nonempty.map(_._2).sum shouldBe cnt}
+    withClue("number of elements in partitions") {parti.histogram.nonEmptyCells.map(_._2).sum shouldBe cnt}
 
     rdd.collect().foreach { case (st, name) =>
       try {
@@ -321,9 +358,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
 
-        val containingCell = parti.cells.buckets.values.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        val containingCell = parti.histogram.buckets.values.find(cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
-          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.histogram(containingCell.get._1.id)._1.range} and count ${parti.histogram(containingCell.get._1.id)._2}")
         } else {
           println("No cell contains this point!")
         }
@@ -347,7 +384,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = -1
-    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0) // disable sampling
+    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0,parallel=false) // disable sampling
 
 
     parti.printPartitions("/tmp/taxipart.wkt")
@@ -376,9 +413,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
           println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
         }
 
-        val containingCell = parti.cells.buckets.values.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+        val containingCell = parti.histogram.buckets.values.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
         if(containingCell.isDefined) {
-          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+          println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.histogram(containingCell.get._1.id)._1.range} and count ${parti.histogram(containingCell.get._1.id)._2}")
         } else {
           println("No cell contains this point!")
         }
@@ -401,7 +438,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = -1
-    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0.1) // disable sampling
+    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0.1,parallel=false) // disable sampling
 
     parti.numPartitions should be > 0
 
@@ -427,9 +464,9 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
             println(s"${cell.id} cell: ${cell.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY))}  x: $xOk  y: $yOk")
           }
 
-          val containingCell = parti.cells.buckets.values.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
+          val containingCell = parti.histogram.buckets.values.find (cell => cell._1.range.contains(NPoint(st.getGeo.getCentroid.getX, st.getGeo.getCentroid.getY)))
           if(containingCell.isDefined) {
-            println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.cells(containingCell.get._1.id)._1.range} and count ${parti.cells(containingCell.get._1.id)._2}")
+            println(s"should be in ${containingCell.get._1.id} which has bounds ${parti.histogram(containingCell.get._1.id)._1.range} and count ${parti.histogram(containingCell.get._1.id)._2}")
           } else {
             println("No cell contains this point!")
           }
@@ -445,14 +482,14 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it  should "do yello sample" in {
-    val rdd = sc.textFile("src/test/resources/blocks.csv", 4)
+    val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-      val minMax = GridPartitioner.getMinMax(rdd)
+      val minMaxBlocks = GridPartitioner.getMinMax(rddBlocks)
       BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-      val parti = new BSPartitioner(rdd, sideLength = 0.2, maxCostPerPartition = 100,
-          pointsOnly = false, minMax = minMax, sampleFraction = 0)
+      val partiBlocks = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
+          pointsOnly = false, minMax = minMaxBlocks, sampleFraction = 0,parallel=false)
 
       val rddtaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
@@ -460,14 +497,14 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
       val minMaxTaxi = GridPartitioner.getMinMax(rddtaxi)
       val partiTaxi = new BSPartitioner(rddtaxi, sideLength = 0.1, maxCostPerPartition = 100,
-        pointsOnly = true, minMax = minMaxTaxi, sampleFraction = 0)
+        pointsOnly = true, minMax = minMaxTaxi, sampleFraction = 0,parallel=false)
 
       val matches = for(t <- partiTaxi.bsp.partitions;
-          b <- parti.bsp.partitions
+          b <- partiBlocks.bsp.partitions
                         if t.extent.intersects(b.extent)) yield (t,b)
 
       matches.length shouldBe >(0)
-//      val _ = new LiveIndexedSpatialRDDFunctions(rdd, 5).join(rddtaxi, JoinPredicate.CONTAINS, None)
+//      val _ = new LiveIndexedSpatialRDDFunctions(rddBlocks, 5).join(rddtaxi, JoinPredicate.CONTAINS, None)
   }
 
   it  should "correctly partiton random points" in {
@@ -475,7 +512,7 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 
-    val parti = new BSPartitioner(rdd, 0.5,1000, pointsOnly = true)
+    val parti = new BSPartitioner(rdd, 0.5,1000, pointsOnly = true, parallel = true)
 
     val numparts = parti.numPartitions
 
@@ -644,14 +681,14 @@ class BSPartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
 //    BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
     val partiBlocksSample = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
-      pointsOnly = false, sampleFraction = 0.1)
+      pointsOnly = false, sampleFraction = 0.1, parallel = true)
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
     val partiTaxiSample = new BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
-      pointsOnly = true, sampleFraction = 0.1)
+      pointsOnly = true, sampleFraction = 0.1, parallel = true)
 
 
     val partedBlocksSample = rddBlocks.partitionBy(partiBlocksSample).cache()

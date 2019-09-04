@@ -66,7 +66,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
 
   override def printPartitions(fName: Path): Unit = {
     val list2 = partitions.buckets.values.map { case (cell,_) => s"${cell.id};${cell.range.wkt}" }.toList
-    super.writeToFile(list2, fName)
+    GridPartitioner.writeToFile(list2, fName)
   }
 
   override def partitionBounds(idx: Int): Cell = partitions.get(idx) match {

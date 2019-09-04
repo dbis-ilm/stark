@@ -3,91 +3,14 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.{Path, Paths}
 
 import dbis.stark.STObject
-import dbis.stark.STObject.GeoType
-import dbis.stark.spatial.{Cell, NPoint, NRectRange, Utils}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.util.Try
-
-object CellHistogram {
-  def empty = CellHistogram()
-}
-
-case class CellHistogram(buckets: mutable.Map[Int, (Cell, Int)] = mutable.Map.empty,protected[stark] val nonEmptyCells: mutable.Set[Int] = mutable.Set.empty[Int]) {
-
-  def isEmpty = buckets.isEmpty
-  def nonEmpty = buckets.nonEmpty
-  def length = buckets.size
-
-  def get(cellId: Int): Option[(Cell, Int)] = buckets get cellId
-
-  def getCountOrElse(cellId: Int)(default: Int) = buckets get cellId match {
-    case None => default
-    case Some((_,cnt)) => cnt
-  }
-
-  def getExtent(cellId: Int): Option[NRectRange] = buckets get cellId match {
-    case None => None
-    case Some((Cell(_,_,extent), _)) => Some(extent)
-  }
-
-  def apply(cellId: Int) = Try(buckets(cellId)) match {
-    case scala.util.Success(value) => value
-    case scala.util.Failure(exception) =>
-      println(s"histo: ${buckets.iterator.map(_._2._1.range.wkt).mkString("\n")}")
-      throw exception
-  }
 
 
-
-  def increment(cellId: Int, cell: Cell, o: GeoType, pointsOnly: Boolean): Unit = {
-    buckets get cellId match {
-      case None =>
-        buckets += cellId -> (cell, 1)
-        nonEmptyCells += cellId
-
-      case Some((c, cnt)) =>
-        if(!pointsOnly)
-          c.extendBy(Utils.fromGeo(o))
-
-        buckets.update(cellId, (c, cnt+1))
-    }
-  }
-
-  def combine(other: CellHistogram, pointsOnly:Boolean): CellHistogram = {
-
-    val newBuckets = mutable.Map.empty[Int, (Cell, Int)]
-    val newNonEmptyCells = mutable.Set.empty[Int]
-
-    buckets.foreach{ case (i, (cell, cnt)) =>
-      newBuckets += i -> (cell.clone(), cnt)
-    }
-
-    other.buckets.foreach{ case (cellId, (cell, cnt)) =>
-
-      newBuckets get cellId match {
-        case None =>
-          newBuckets += cellId -> (cell, cnt)
-          newNonEmptyCells += cellId
-
-        case Some((c, cnt1)) =>
-          val newC = c.clone()
-          if(!pointsOnly)
-            newC.extendBy(cell.extent)
-
-          newBuckets.update(cellId, (newC, cnt + cnt1))
-      }
-    }
-
-    new CellHistogram(newBuckets, newNonEmptyCells)
-
-  }
-
-
-}
 
 trait SpatialPartitioner extends Partitioner {
 
@@ -111,8 +34,7 @@ trait SpatialPartitioner extends Partitioner {
     printPartitions(Paths.get(fName))
 
 
-  protected[stark] def writeToFile(strings: Iterable[String], fName: Path) =
-    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+
 }
 
 
@@ -122,6 +44,34 @@ trait SpatialPartitioner extends Partitioner {
 object GridPartitioner {
 
   var EPS: Double = 1 / 1000000.0
+
+  def writeToFile(strings: Iterable[String], fName: String): Unit =
+    writeToFile(strings, Paths.get(fName))
+
+  protected[stark] def writeToFile(strings: Iterable[String], fName: Path): Unit =
+    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE,
+      java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+
+  def cellsPerDimension(part: NRectRange, sideLength: Double): Array[Int] =
+    Array.tabulate(part.dim){dim =>
+      math.ceil(part.lengths(dim) / sideLength).toInt}
+
+  /**
+    * Determine the IDs of the cells that are contained by the given range
+    * @param r The range
+    * @return Returns the list of Cell IDs
+    */
+  def getCellsIn(r: NRectRange, sideLength: Double, global: NRectRange, numXCells:Int): IndexedSeq[Int] = {
+    val numCells = GridPartitioner.cellsPerDimension(r, sideLength)
+
+    // the cellId of the lower left point of the given range
+    val llCellId = GridPartitioner.getCellId(r.ll(0), r.ll(1), global.ll(0), global.ll(1), global.ur(0),
+      global.ur(1), sideLength, sideLength, numXCells)
+
+    (0 until numCells(1)).flatMap { i =>
+      llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells
+    }
+  }
 
 
   /**
@@ -210,72 +160,15 @@ object GridPartitioner {
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
                                        xLength: Double, yLength:Double): CellHistogram = {
 
-    def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
-
-      val p = Utils.getCenter(pt._1.getGeo)
-      val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-
-      val bounds = getCellBounds(cellId, numXCells, xLength, yLength,minX, minY)
-
-      histo1.increment(cellId, Cell(bounds), pt._1.getGeo, pointsOnly)
-
-      histo1
-    }
+    def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram =
+      histo1.add(pt._1.getGeo, minX, minY, maxX, maxY, xLength, yLength,numXCells, pointsOnly)
 
     def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
       histo1.combine(histo2,pointsOnly)
     }
 
-//    val histo = buildGrid(numXCells,numYCells, xLength, yLength, minX,minY)
+    rdd.aggregate(CellHistogram(minX,minY,numXCells,numYCells,xLength,yLength))(seq, combine)
 
-    rdd.aggregate(CellHistogram.empty)(seq, combine)
-
-    /* fill the array. If with extent, we need to keep the exent of each element and combine it later
-     * to create the extent of a cell based on the extents of its contained objects
-     */
-//    if(pointsOnly) {
-//      rdd.map{ case (g,_) =>
-//        val p = Utils.getCenter(g.getGeo)
-//
-//        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-//
-//        (cellId, 1)
-//      }
-//      .reduceByKey(_ + _)
-////      .collect
-//      .cache()
-//      .toLocalIterator
-//      .foreach{ case (cellId, cnt) =>
-//        histo(cellId) = (histo(cellId)._1, cnt)
-//      }
-//
-//
-//    } else {
-//      rdd.map { case (g, _) =>
-//        val p = Utils.getCenter(g.getGeo)
-////        val env = g.getEnvelopeInternal
-////        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-//        val extent = Utils.fromGeo(g.getGeo)
-//        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-//
-//        (cellId,(1, extent))
-//      }
-//      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
-//        val cnt = lCnt + rCnt
-//
-//        val extent = lExtent.extend(rExtent)
-//
-//        (cnt, extent)
-//
-//      }
-////        .collect
-//      .cache()
-//      .toLocalIterator
-//      .foreach{case (cellId, (cnt,ex)) =>
-//        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
-//      }
-//    }
-//    histo
 
   }
 

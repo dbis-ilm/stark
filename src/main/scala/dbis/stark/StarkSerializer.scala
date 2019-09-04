@@ -232,8 +232,8 @@ class HistogramSerializer extends Serializer[CellHistogram] {
       output.writeInt(cnt, true)
     }
 
-    output.writeInt(histo.nonEmptyCells.size)
-    histo.nonEmptyCells.iterator.foreach( cellId => output.writeInt(cellId, true))
+//    output.writeInt(histo.nonEmptyCells.size)
+//    histo.nonEmptyCells.iterator.foreach( cellId => output.writeInt(cellId, true))
 
   }
 
@@ -250,16 +250,16 @@ class HistogramSerializer extends Serializer[CellHistogram] {
       i += 1
     }
 
-    val numNonEmptyCells = input.readInt(true)
-    val nonEmptyCells = mutable.Set.empty[Int]
-    i = 0
-    while(i < numNonEmptyCells) {
-      val cellId = input.readInt(true)
-      nonEmptyCells += cellId
-      i += 1
-    }
+//    val numNonEmptyCells = input.readInt(true)
+//    val nonEmptyCells = mutable.Set.empty[Int]
+//    i = 0
+//    while(i < numNonEmptyCells) {
+//      val cellId = input.readInt(true)
+//      nonEmptyCells += cellId
+//      i += 1
+//    }
 
-    CellHistogram(buckets, nonEmptyCells)
+    CellHistogram(buckets)
   }
 }
 

@@ -41,12 +41,12 @@ object PartitionerFactory {
 
   def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): GridPartitioner = strategy match {
     case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor,parallel) => minmax match {
-      case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly)
+      case None => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly,sampleFraction = sampleFactor, parallel = parallel)
       case Some(mm) => new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor,parallel)
     }
 
     case GridStrategy(partitionsPerDimensions, pointsOnly, minmax, sampleFraction) => minmax match {
-      case None => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly)
+      case None => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly,sampleFraction=sampleFraction)
       case Some(mm) => new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction)
     }
 

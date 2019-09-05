@@ -173,13 +173,10 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     parti.printPartitions("/tmp/idtest_partitions")
     parti.printHistogram(java.nio.file.Paths.get("/tmp/idtest_histo"))
 
-    val partIds = Array(0,3,1,2,3)
 
-    val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect()
+    val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect().toSet
 
-    parti.printPartitions("/tmp/idtest_partitions_after")
-
-    parts should contain theSameElementsInOrderAs partIds
+    parts.size shouldBe 5
 
 
 //    rdd.collect().foreach{ case (g,id) =>
@@ -261,7 +258,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-    val parti = new BSPartitioner(rdd, 0.1, 10*1000, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0,parallel=false) // disable sampling
+    val parti = new BSPartitioner(rdd, 0.1, 10*1000, true, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0,parallel=true) // disable sampling
 
     parti.printPartitions("/tmp/partitions00.wkt")
     parti.printHistogram(java.nio.file.Paths.get("/tmp/histo00.wkt"))
@@ -384,7 +381,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = -1
-    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0,parallel=false) // disable sampling
+    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0,parallel=true) // disable sampling
 
 
     parti.printPartitions("/tmp/taxipart.wkt")
@@ -438,7 +435,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     val minMax = GridPartitioner.getMinMax(rdd)
 
     BSPartitioner.numCellThreshold = -1
-    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0.1,parallel=false) // disable sampling
+    val parti = new BSPartitioner(rdd, 0.1, 100, false, minMax._1, minMax._2, minMax._3, minMax._4, sampleFraction = 0.1,parallel=true) // disable sampling
 
     parti.numPartitions should be > 0
 
@@ -489,7 +486,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
       val minMaxBlocks = GridPartitioner.getMinMax(rddBlocks)
       BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
       val partiBlocks = new BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
-          pointsOnly = false, minMax = minMaxBlocks, sampleFraction = 0,parallel=false)
+          pointsOnly = false, minMax = minMaxBlocks, sampleFraction = 0,parallel=true)
 
       val rddtaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
@@ -497,7 +494,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
 
       val minMaxTaxi = GridPartitioner.getMinMax(rddtaxi)
       val partiTaxi = new BSPartitioner(rddtaxi, sideLength = 0.1, maxCostPerPartition = 100,
-        pointsOnly = true, minMax = minMaxTaxi, sampleFraction = 0,parallel=false)
+        pointsOnly = true, minMax = minMaxTaxi, sampleFraction = 0,parallel=true)
 
       val matches = for(t <- partiTaxi.bsp.partitions;
           b <- partiBlocks.bsp.partitions
@@ -862,6 +859,24 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     joinResPlain.length shouldBe joinResNoPart.length
 
     withClue("join part no sample does not have same results as no partitioning") { joinResPlain should contain theSameElementsAs joinResNoPart }
+  }
+
+  it should "correctly partition a file with parallel BSP2" in  {
+    val rddRaw = StarkTestUtils.createRDD(sc)
+
+    val partedRDD = rddRaw.partitionBy(BSPStrategy( cellSize = 1, maxCost =  100, pointsOnly =  true, parallel = true))
+
+    val parti = partedRDD.partitioner.get.asInstanceOf[BSPartitioner[STObject,(String,Long,String,STObject)]]
+
+    parti.printPartitions("/tmp/bsp2")
+    val partitions = parti.bsp.partitions
+    rddRaw.map(_._1).collect().foreach{ so =>
+      val p = NPoint(so.getGeo.getCentroid.getX,so.getGeo.getCentroid.getY)
+      partitions.exists(c => c.range.contains(p)) shouldBe true
+
+    }
+
+
   }
 
 }

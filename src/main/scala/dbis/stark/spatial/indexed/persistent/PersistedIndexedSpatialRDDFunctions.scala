@@ -69,8 +69,12 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 //    .map { case (g,v) => (g, (distFunc(g,qry), v)) }
 //    .sortBy(_._2._1, ascending = true)
 //    .take(k)
-      .map{ case ((g,v), dist) => (g, (dist, v))}
+      .map{ case ((g,v), dist) =>
+//        println(s"$g --> $dist")
+        (g, (dist, v))}
       .takeOrdered(k)(o)
+
+//    println(s"taken: ${nn.mkString("\n")}")
 
     self.sparkContext.parallelize(nn)
   }

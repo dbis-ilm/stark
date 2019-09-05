@@ -491,13 +491,15 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val reparted = if(partitioner.isDefined) self.partitionBy(partitioner.get) else self
 
     reparted.mapPartitions({ iter  =>
-      val tree = IndexFactory.get[G,(G,V)](indexConfig)
+      val tree = IndexFactory.get[(G,V)](indexConfig)
 
       iter.foreach{ case (g,v) => tree.insert(g, (g,v))}
       Iterator.single(tree)
     },
     preservesPartitioning = true) // preserve partitioning
   }
+
+  def index(indexConfig: IndexConfig): RDD[Index[(G,V)]] = index(indexConfig, None)
 
   def index(indexConfig: IndexConfig,config: Option[PartitionerConfig]): RDD[Index[(G,V)]] = config match {
     case None =>

@@ -88,11 +88,10 @@ object IndexFactory {
   /**
     * Return the index structure for the given configuration
     * @param conf The [[IndexConfig]] to get the corresponding structure of
-    * @tparam G The spatial type
     * @tparam V Payload data type
     * @return Returns the index that corresponds to the given configuration
     */
-  def get[G : ClassTag,V : ClassTag](conf: IndexConfig): Index[V] = conf match {
+  def get[V : ClassTag](conf: IndexConfig): Index[V] = conf match {
     case rConf: RTreeConfig => new RTree[V](capacity = rConf.order)
     case qConf: QuadTreeConfig => new QuadTree(maxDepth = qConf.maxDepth, minNum = qConf.minNum)
     case _: IntervalTreeConfig => new IntervalTree1[V]()

@@ -6,8 +6,6 @@ import java.util.concurrent.{ConcurrentLinkedQueue, ExecutorService, Executors, 
 import dbis.stark.spatial.{Cell, NRectRange}
 
 import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
-import scala.concurrent.Await
 
 /**
   * A binary space partitioning algorithm implementation based on
@@ -45,11 +43,6 @@ class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogra
       cellHistogram.nonEmptyCells.map(_._1) //.map{ cellId => cellHistogram(cellId)._1}
     } else {
 
-      /* The actual partitioning is done using a recursive split of a candidate partition
-       * The SplitTask performs the recurive binary split of the given range  (if necessary)
-       */
-
-      val queue = new ConcurrentLinkedQueue[NRectRange]()
       val result = new ConcurrentLinkedQueue[Cell]()
       val running = new AtomicInteger(0)
 
@@ -65,7 +58,6 @@ class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogra
         mutex.synchronized(mutex.wait())
       }
 
-
       active.toList.foreach(_.get())
 
       ex.shutdown()
@@ -74,11 +66,10 @@ class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogra
 
     }
 
-    println(s"# result partitions: ${resultPartitions.size}")
+//    println(s"# result partitions: ${resultPartitions.size}")
 
     resultPartitions.iterator.zipWithIndex.map{ case (cell, idx) =>
       cell.id = idx
-      println(cell)
       cell
     }.toArray
   }
@@ -120,22 +111,3 @@ class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHisto
 
   }
 }
-
-
-/*
-
-class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHistogram, maxCostPerPartition: Double,pointsOnly:Boolean) extends ForkJoinTask[List[Cell]] {
-
-  private val result = ListBuffer.empty[Cell]
-
-  override def getRawResult: List[Cell] = result.toList
-
-  override def setRawResult(value: List[Cell]): Unit = {
-    result ++= value
-  }
-
-  override def exec(): Boolean = {
-
-  }
-}
- */

@@ -142,7 +142,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
 
     val resultIter = if (indexConfig.isDefined) {
 
-      val tree = IndexFactory.get[G, (G, V)](indexConfig.get)
+      val tree = IndexFactory.get[(G, V)](indexConfig.get)
       // insert everything into the tree
       inputIter.foreach { case (g, v) => tree.insert(g, (g, v)) }
 

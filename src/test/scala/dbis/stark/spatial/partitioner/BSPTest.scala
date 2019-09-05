@@ -1,5 +1,6 @@
 package dbis.stark.spatial.partitioner
 
+import dbis.stark.StarkTestUtils
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import dbis.stark.spatial.NPoint
@@ -305,9 +306,13 @@ class BSPTest extends FlatSpec with Matchers {
     val startS = System.currentTimeMillis()
     bsp.partitions.length should be > 0
     val endS = System.currentTimeMillis()
-
-
     println(s"sequential: ${endS - startS}ms  (${bsp.partitions.length} partitions)")
+
+    val bsp2 = new BSP2(whole,histo,sideLength,true,100)
+    val start2 = System.currentTimeMillis()
+    bsp2.partitions.length should be > 0
+    val end2 = System.currentTimeMillis()
+    println(s"bsp2: ${end2 - start2}ms  (${bsp2.partitions.length} partitions)")
 
     GridPartitioner.writeToFile(bsp.partitions.map(cell => s"${cell.id};${cell.range.wkt};${cell.extent.wkt}"),
       "/tmp/bsp_partitions")
@@ -315,7 +320,11 @@ class BSPTest extends FlatSpec with Matchers {
     GridPartitioner.writeToFile(bspAsync.partitions.map(cell => s"${cell.id};${cell.range.wkt};${cell.extent.wkt}"),
       "/tmp/bsp_asnyc_partitions")
 
-    (endS - startS) shouldBe > (end - start)
+    GridPartitioner.writeToFile(bsp2.partitions.map(cell => s"${cell.id};${cell.range.wkt};${cell.extent.wkt}"),
+      "/tmp/bsp2_partitions")
+
+    withClue("async > bsp"){(endS - startS) shouldBe > (end - start)}
+    withClue("bsp2 > bsp"){(endS - startS) shouldBe > (end2 - start2)}
 
 
   }

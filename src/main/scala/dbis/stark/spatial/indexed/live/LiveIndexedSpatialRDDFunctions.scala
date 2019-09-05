@@ -15,6 +15,8 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                              indexConfig: IndexConfig
        ) extends SpatialRDDFunctions[G, V](self) with Serializable {
 
+  val o = Ordering.fromLessThan[(G,(Distance,V))](_._2._1 < _._2._1)
+
   override def intersects(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.INTERSECTS, Some(indexConfig))
 
   override def contains(qry: G) = new SpatialFilterRDD[G, V](self, qry, JoinPredicate.CONTAINS, Some(indexConfig))
@@ -31,7 +33,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 	  ): RDD[(G, V)] = self.mapPartitions { iter =>
           // we don't know how the distance function looks like and thus have to scan all partitions
 
-          val tree = IndexFactory.get[G,(G,V)](indexConfig)
+          val tree = IndexFactory.get[(G,V)](indexConfig)
 
           require(tree.isInstanceOf[WithinDistanceIndex[_]], s"index must support withinDistance, but is: ${tree.getClass}")
 
@@ -55,29 +57,38 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
 
-    implicit val ord = new Ordering[((G,V),Distance)] {
-      override def compare(x: ((G,V),Distance), y: ((G,V),Distance)) = if(x._2 < y._2) -1 else if(x._2 > y._2) 1 else 0
-    }
+//    implicit val ord = new Ordering[((G,V),Distance)] {
+//      override def compare(x: ((G,V),Distance), y: ((G,V),Distance)) = if(x._2 < y._2) -1 else if(x._2 > y._2) 1 else 0
+//    }
 
     val r = self.mapPartitionsWithIndex({ (_, iter) =>
 
-                val tree = IndexFactory.get[G,(G,V)](indexConfig)
-                require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
+      val tree = IndexFactory.get[(G,V)](indexConfig)
+      require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
 
-                val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
-                iter.foreach{ case (g,v) => tree.insert(g,(g,v)) }
+      val idxTree = tree.asInstanceOf[Index[(G,V)] with KnnIndex[(G,V)]]
+      iter.foreach{ case (g,v) =>
+        idxTree.insert(g,(g,v))
+      }
 
-                idxTree.build()
-                idxTree.kNN(qry, k, distFunc)
-            })
-        .takeOrdered(k)(ord)
+      idxTree.build()
+      idxTree.kNN(qry, k, distFunc)
 
-    self.sparkContext.parallelize(r).map{ case ((g,v),d) => (g,(d,v))}
+//      println("found:")
+//      println(found.mkString("\n"))
+//      println("-------")
+    }).map{ case ((g,v),d) =>
+//      println(s"$g --> $d")
+      (g,(d,v))
+    }
+      .takeOrdered(k)(o)
+
+    self.sparkContext.parallelize(r)
   }
 
   override def knnAgg(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
     val knns = self.mapPartitions({iter =>
-      val tree = IndexFactory.get[G,(G,V)](indexConfig)
+      val tree = IndexFactory.get[(G,V)](indexConfig)
 
       require(tree.isInstanceOf[KnnIndex[_]], s"index must support kNN, but is: ${tree.getClass}")
 

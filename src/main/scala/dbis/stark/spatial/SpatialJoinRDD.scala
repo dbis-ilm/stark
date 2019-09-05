@@ -72,7 +72,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     } else { // we should apply indexing
 
       // the index
-      val tree = IndexFactory.get[G, (G,V)](indexConfig.get)
+      val tree = IndexFactory.get[(G,V)](indexConfig.get)
 
       // insert everything into the tree
       left.iterator(partition.leftPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }
@@ -109,7 +109,7 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
     } else { // we should apply indexing
 
       // the index
-      val tree = IndexFactory.get[G, (G,V)](indexConfig.get)
+      val tree = IndexFactory.get[(G,V)](indexConfig.get)
 
       // insert everything into the tree
       left.iterator(split.leftPartition, context).foreach{ case (g, v) => tree.insert(g, (g,v)) }

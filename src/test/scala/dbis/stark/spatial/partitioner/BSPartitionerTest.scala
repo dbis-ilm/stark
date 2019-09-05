@@ -168,7 +168,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
 
   it  should "return the correct partition id" taggedAs Fix in {
     val rdd = createRDD()
-    val parti = new BSPartitioner(rdd, 0.1, 1, pointsOnly = true, parallel = false)
+    val parti = new BSPartitioner(rdd, 0.1, 1, pointsOnly = true, parallel = true)
 
     parti.printPartitions("/tmp/idtest_partitions")
     parti.printHistogram(java.nio.file.Paths.get("/tmp/idtest_histo"))

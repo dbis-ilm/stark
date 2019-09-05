@@ -100,7 +100,8 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag]private[partitioner](
   protected[spatial] val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
   protected[spatial] val bsp = if(parallel)
-    new BSPBinaryAsync(start,  histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
+    // new BSPBinaryAsync(start,  histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
+    new BSP2(start,  histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
   else
     new BSP(start,  histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
 

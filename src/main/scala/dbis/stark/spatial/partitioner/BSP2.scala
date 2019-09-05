@@ -1,46 +1,43 @@
 package dbis.stark.spatial.partitioner
 
-import java.util.concurrent.{ConcurrentLinkedQueue, ForkJoinTask}
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ConcurrentLinkedQueue, ExecutorService, Executors, Future}
 
 import dbis.stark.spatial.{Cell, NRectRange}
 
 import scala.collection.JavaConversions._
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+import scala.collection.JavaConverters._
+import scala.concurrent.Await
 
 /**
- * A binary space partitioning algorithm implementation based on 
- * 
- * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
- * by He, Tan, Luo, Feng, Fan 
- * 
- * @param cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
- * @param sideLength The side length of the (quadratic) cell
- * @param maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points).
- * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
- * cannot be further split.
- */
-class BSP2(private val universe: NRectRange,
-          protected[stark] val cellHistogram: CellHistogram,
-          private val sideLength: Double,
-          private val maxCostPerPartition: Double,
-          private val pointsOnly: Boolean,
-          private val numCellThreshold: Int = -1
-            ) extends Serializable {
+  * A binary space partitioning algorithm implementation based on
+  *
+  * MR-DBSCAN: A scalable MapReduce-based DBSCAN algorithm for heavily skewed data
+  * by He, Tan, Luo, Feng, Fan
+  *
+  * @param _cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
+  * @param _sideLength The side length of the (quadratic) cell
+  * @param _maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points).
+  * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
+  * cannot be further split.
+  */
+class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogram: CellHistogram,
+           private val _sideLength: Double, private val _pointsOnly: Boolean, private val _maxCostPerPartition: Double,
+           private val _numXCells: Option[Int] = None, private val _numCellThreshold: Int = -1)
+  extends CostBasedPartitioner(_universe, _cellHistogram, _sideLength,
+    _numXCells.getOrElse(GridPartitioner.cellsPerDimension(_universe,_sideLength)(0)),
+    _maxCostPerPartition,_pointsOnly,_numCellThreshold) with Serializable {
 
-  require(cellHistogram.nonEmpty, "cell histogram must not be empty")
-  require(maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
-  require(sideLength > 0, "cell side length must not be negative or zero")
-
-
+  def this(_universe: NRectRange,_cellHistogram: CellHistogram,_sideLength: Double,_numXCells: Int,
+           _maxCostPerPartition: Double,_pointsOnly: Boolean,_numCellThreshold: Int) {
+    this(_universe,_cellHistogram,_sideLength,_pointsOnly, _maxCostPerPartition,Some(_numXCells),_numCellThreshold)
+  }
 
   /**
-   * Compute the partitioning using the cost based BSP algorithm
-   *
-   * This is a lazy value
-   */
+    * Compute the partitioning using the cost based BSP algorithm
+    *
+    * This is a lazy value
+    */
   lazy val partitions: Array[Cell] = {
 
     //return the non-empty cells or compute the actual partitioning
@@ -52,31 +49,80 @@ class BSP2(private val universe: NRectRange,
        * The SplitTask performs the recurive binary split of the given range  (if necessary)
        */
 
-      val queue = new ConcurrentLinkedQueue[Future[Unit]]()
-      val result = ListBuffer.empty[Cell]
+      val queue = new ConcurrentLinkedQueue[NRectRange]()
+      val result = new ConcurrentLinkedQueue[Cell]()
+      val running = new AtomicInteger(0)
 
-      compute(universe, queue, result)
+      val active = new ConcurrentLinkedQueue[Future[_]]()
+      val mutex = new Object()
 
-      val f = Future.sequence(queue.toList)
+      val ex = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
+      val baseTask = new SplitTaskR(universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly, running, result,ex,mutex,active)
+      val f = ex.submit(baseTask)
+      active.add(f)
 
-      Await.result(f, Duration.Inf)
-      result
+      while(!f.isDone || running.get() > 0) {
+        mutex.synchronized(mutex.wait())
+      }
+
+
+      active.toList.foreach(_.get())
+
+      ex.shutdown()
+
+      result.toList
+
     }
 
-//    println(s"# result partitions: ${resultPartitions.size}")
-
+    println(s"# result partitions: ${resultPartitions.size}")
 
     resultPartitions.iterator.zipWithIndex.map{ case (cell, idx) =>
       cell.id = idx
+      println(cell)
       cell
     }.toArray
   }
-
-
-  def compute(range: NRectRange, queue: ConcurrentLinkedQueue[Future[Unit]], result: ListBuffer[Cell]): Unit = {
-
-    }
 }
+
+class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHistogram,maxCostPerPartition: Double, pointsOnly: Boolean, running: AtomicInteger, result: ConcurrentLinkedQueue[Cell], ex: ExecutorService, mutex: Object, active:ConcurrentLinkedQueue[Future[_]]) extends Runnable {
+  override def run(): Unit = {
+    try {
+      running.incrementAndGet()
+
+      val numCells = GridPartitioner.cellsPerDimension(range, sideLength)
+      val numXCells = numCells(0)
+      // if the partition to split does not exceed the maximum cost or is a single cell,
+      // return this as result partition
+      if (BSP.costEstimation(range, sideLength, range, numXCells, cellHistogram) <= maxCostPerPartition ||
+        !numCells.exists(_ > 1)) {
+        if (pointsOnly) {
+          result.add(Cell(range))
+        }
+        else {
+          result.add(Cell(range, BSP.extentForRange(range, sideLength, numXCells, cellHistogram, range)))
+        }
+
+      } else { // need to compute the split
+
+        // find the best split and ...
+        val (s1, s2) = SplitTask.findBestSplit(range, sideLength, range, numXCells, cellHistogram, maxCostPerPartition)
+
+        Iterator(s1, s2).flatten.foreach { case (r, _) =>
+          val f = ex.submit(new SplitTaskR(r, sideLength, cellHistogram,maxCostPerPartition,pointsOnly,running,result,ex, mutex,active))
+          active.add(f)
+        }
+      }
+    } finally {
+      running.decrementAndGet()
+
+      mutex.synchronized(mutex.notify())
+    }
+
+  }
+}
+
+
+/*
 
 class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHistogram, maxCostPerPartition: Double,pointsOnly:Boolean) extends ForkJoinTask[List[Cell]] {
 
@@ -89,37 +135,7 @@ class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHisto
   }
 
   override def exec(): Boolean = {
-    val numCells = GridPartitioner.cellsPerDimension(range,sideLength)
-    val numXCells = numCells(0)
-    // if the partition to split does not exceed the maximum cost or is a single cell,
-    // return this as result partition
-    if (BSP.costEstimation(range, sideLength, range, numXCells, cellHistogram) <= maxCostPerPartition ||
-      !numCells.exists(_ > 1)) {
-      if (pointsOnly) {
-        setRawResult(List(Cell(range)))
-        true
-      }
-      else {
-        setRawResult(List(Cell(range, BSP.extentForRange(range, sideLength, numXCells, cellHistogram, range))))
-        true
-      }
 
-    } else { // need to compute the split
-
-      // find the best split and ...
-      val (s1,s2) = SplitTask.findBestSplit(range,sideLength,range,numXCells,cellHistogram,maxCostPerPartition)
-
-      // start async computation
-      val subs = List(s1,s2).filter(_.isDefined)
-        .filter(_.get._2 > 0)
-        .map { case Some((r, _)) =>
-          new SplitTaskR(r,sideLength,cellHistogram,maxCostPerPartition,pointsOnly)
-        }
-
-      subs.foreach(_.fork())
-
-//      subs.foreach(j => setRawResult(j.join()))
-      true
-    }
   }
 }
+ */

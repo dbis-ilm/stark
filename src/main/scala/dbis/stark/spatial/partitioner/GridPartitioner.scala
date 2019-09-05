@@ -3,13 +3,14 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.{Path, Paths}
 
 import dbis.stark.STObject
-import dbis.stark.spatial.{Cell, NPoint, NRectRange, StarkUtils}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
-case class CellHistogram(buckets: Array[(Cell, Int)])
+
 
 trait SpatialPartitioner extends Partitioner {
 
@@ -33,8 +34,7 @@ trait SpatialPartitioner extends Partitioner {
     printPartitions(Paths.get(fName))
 
 
-  protected[stark] def writeToFile(strings: Iterable[String], fName: Path) =
-    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+
 }
 
 
@@ -44,6 +44,34 @@ trait SpatialPartitioner extends Partitioner {
 object GridPartitioner {
 
   var EPS: Double = 1 / 1000000.0
+
+  def writeToFile(strings: Iterable[String], fName: String): Unit =
+    writeToFile(strings, Paths.get(fName))
+
+  protected[stark] def writeToFile(strings: Iterable[String], fName: Path): Unit =
+    java.nio.file.Files.write(fName, strings.asJava, java.nio.file.StandardOpenOption.CREATE,
+      java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
+
+  def cellsPerDimension(part: NRectRange, sideLength: Double): Array[Int] =
+    Array.tabulate(part.dim){dim =>
+      math.ceil(part.lengths(dim) / sideLength).toInt}
+
+  /**
+    * Determine the IDs of the cells that are contained by the given range
+    * @param r The range
+    * @return Returns the list of Cell IDs
+    */
+  def getCellsIn(r: NRectRange, sideLength: Double, global: NRectRange, numXCells:Int): IndexedSeq[Int] = {
+    val numCells = GridPartitioner.cellsPerDimension(r, sideLength)
+
+    // the cellId of the lower left point of the given range
+    val llCellId = GridPartitioner.getCellId(r.ll(0), r.ll(1), global.ll(0), global.ll(1), global.ur(0),
+      global.ur(1), sideLength, sideLength, numXCells)
+
+    (0 until numCells(1)).flatMap { i =>
+      llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells
+    }
+  }
 
 
   /**
@@ -130,93 +158,34 @@ object GridPartitioner {
 
   def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int,
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
-                                       xLength: Double, yLength:Double): Array[(Cell,Int)] = {
+                                       xLength: Double, yLength:Double): CellHistogram = {
 
-    def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram = {
-
-      val p = StarkUtils.getCenter(pt._1.getGeo)
-      val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-
-      histo1.buckets(cellId) = (histo1.buckets(cellId)._1, histo1.buckets(cellId)._2 + 1)
-      if(!pointsOnly) {
-        histo1.buckets(cellId)._1.extendBy(StarkUtils.fromGeo(pt._1.getGeo))
-//        histo1.buckets(cellId)._1.extent.extend(
-      }
-//        histo1.buckets(cellId) = (), histo1.buckets(cellId)._2)
-      histo1
-    }
+    def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram =
+      histo1.add(pt._1.getGeo, minX, minY, maxX, maxY, xLength, yLength,numXCells, pointsOnly)
 
     def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
-
-      val newBuckets = histo1.buckets.iterator.zip(histo2.buckets.iterator).map{ case ((cell1, cnt1),(cell2,cnt2)) =>
-
-        val newCell = if(pointsOnly) Cell(cell1.range) else Cell(cell1.range, cell1.extent.extend(cell2.extent))
-        val newCnt = cnt1 + cnt2
-        (newCell, newCnt)
-      }.toArray
-
-
-      CellHistogram(newBuckets)
+      histo1.combine(histo2,pointsOnly)
     }
 
-    val histo = buildGrid(numXCells,numYCells, xLength, yLength, minX,minY)
+    rdd.aggregate(CellHistogram(minX,minY,numXCells,numYCells,xLength,yLength))(seq, combine)
 
-    rdd.aggregate(CellHistogram(histo))(seq, combine).buckets
-
-    /* fill the array. If with extent, we need to keep the exent of each element and combine it later
-     * to create the extent of a cell based on the extents of its contained objects
-     */
-//    if(pointsOnly) {
-//      rdd.map{ case (g,_) =>
-//        val p = Utils.getCenter(g.getGeo)
-//
-//        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-//
-//        (cellId, 1)
-//      }
-//      .reduceByKey(_ + _)
-////      .collect
-//      .cache()
-//      .toLocalIterator
-//      .foreach{ case (cellId, cnt) =>
-//        histo(cellId) = (histo(cellId)._1, cnt)
-//      }
-//
-//
-//    } else {
-//      rdd.map { case (g, _) =>
-//        val p = Utils.getCenter(g.getGeo)
-////        val env = g.getEnvelopeInternal
-////        val extent = NRectRange(NPoint(env.getMinX, env.getMinY), NPoint(env.getMaxX, env.getMaxY))
-//        val extent = Utils.fromGeo(g.getGeo)
-//        val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
-//
-//        (cellId,(1, extent))
-//      }
-//      .reduceByKey{ case ((lCnt, lExtent), (rCnt, rExtent)) =>
-//        val cnt = lCnt + rCnt
-//
-//        val extent = lExtent.extend(rExtent)
-//
-//        (cnt, extent)
-//
-//      }
-////        .collect
-//      .cache()
-//      .toLocalIterator
-//      .foreach{case (cellId, (cnt,ex)) =>
-//        histo(cellId) = (Cell(cellId, histo(cellId)._1.range, ex) , cnt)
-//      }
-//    }
-//    histo
 
   }
 
-  def buildGrid(numXCells: Int, numYCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): Array[(Cell, Int)] =
-    Array.tabulate(numXCells * numYCells){ i =>
+  def buildGrid(numXCells: Int, numYCells: Int, xLength: Double, yLength: Double, minX: Double, minY: Double): CellHistogram = {
+
+    val gridHisto = mutable.Map.empty[Int, (Cell, Int)]
+    var i = 0
+    val num = numXCells * numYCells
+    while(i < num) {
       val cellBounds = getCellBounds(i, numXCells, xLength, yLength, minX, minY)
-      (Cell(i,cellBounds), 0)
+      gridHisto += i -> (Cell(i, cellBounds), 0)
+
+      i += 1
     }
+
+    CellHistogram(gridHisto)
+  }
 
 }
 

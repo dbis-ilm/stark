@@ -1,11 +1,11 @@
 package dbis.stark.spatial
 
-import org.locationtech.jts.io.WKTReader
 import dbis.stark.STObject._
 import dbis.stark._
-import org.apache.spark.SpatialRDD._
-import dbis.stark.spatial.partitioner.SpatialGridPartitioner
+import dbis.stark.spatial.partitioner.{BSPStrategy, SpatialGridPartitioner}
 import org.apache.spark.SparkContext
+import org.apache.spark.SpatialRDD._
+import org.locationtech.jts.io.WKTReader
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 object SpatialRDDTestCase {
@@ -105,6 +105,97 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   }
 
+  it should "find the correct nearest neighbors with take" in {
+    val rdd = StarkTestUtils.createRDD(sc)
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnTake(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "find the correct nearest neighbors with BSP" in {
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false))
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "find the correct nearest neighbors with aggregate with BSP" in {
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false))
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnAgg(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "find the correct nearest neighbors with take with BSP" in {
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false))
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnTake(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "find the correct nearest neighbors with BSP parallel" in {
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true))
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "find the correct nearest neighbors with aggregate with BSP parallel" in {
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true))
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnAgg(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
+  it should "find the correct nearest neighbors with take with BSP parallel" in {
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true))
+
+    // we know that there are 5 duplicates in the data for this point.
+    // Hence, the result should contain the point itself and the 5 duplicates
+    val q: STObject = "POINT (53.483437 -2.2040706)"
+    val foundGeoms = rdd.knnTake(q, 6, Distance.seuclid).collect()
+
+    foundGeoms.length shouldBe 6
+    foundGeoms.foreach{ case (g,_) => g shouldBe q}
+
+  }
+
   it should "be faster with kNNAgg vs kNN" in {
     var rdd = StarkTestUtils.createRDD(sc)
     var i = 0
@@ -115,20 +206,20 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     val q: STObject = "POINT (53.483437 -2.2040706)"
 
-    var t0 = System.currentTimeMillis()
-    val knn = rdd.map{case (so, _) => (so,1)}.kNN(q, k = 100, Distance.seuclid).collect()
-    var t1 = System.currentTimeMillis()
-    println(s"knn:\t${t1 - t0}")
+    var knn: Array[(STObject, (Distance,Int))] = null
+    StarkTestUtils.timing("knn") {
+      knn = rdd.map { case (so, _) => (so, 1) }.kNN(q, k = 100, Distance.seuclid).collect()
+    }
 
-    t0 = System.currentTimeMillis()
-    val knnAgg = rdd.map{case (so, _) => (so,1)}.knnAgg(q, k = 100, Distance.seuclid).collect()
-    t1 = System.currentTimeMillis()
-    println(s"knn Agg:\t${t1 - t0}")
+    var knnAgg: Array[(STObject, (Distance,Int))] = null
+    StarkTestUtils.timing("knn agg") {
+      knnAgg = rdd.map{case (so, _) => (so,1)}.knnAgg(q, k = 100, Distance.seuclid).collect()
+    }
 
-    t0 = System.currentTimeMillis()
-    val knnTake = rdd.map{case (so, _) => (so,1)}.knnTake(q, k = 100, Distance.seuclid).collect()
-    t1 = System.currentTimeMillis()
-    println(s"knn Take:\t${t1 - t0}")
+    var knnTake: Array[(STObject, (Distance,Int))] = null
+    StarkTestUtils.timing("knn agg") {
+      knnTake = rdd.map{case (so, _) => (so,1)}.knnTake(q, k = 100, Distance.seuclid).collect()
+    }
 
     withClue("knn vs agg"){knn should contain theSameElementsAs knnAgg}
     withClue("knn vs take"){knn should contain theSameElementsAs knnTake}

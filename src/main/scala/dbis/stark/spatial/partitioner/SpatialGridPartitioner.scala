@@ -45,26 +45,42 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
   protected[this] val yLength: Double = math.abs(maxY - minY) / partitionsPerDimension
 
 //  new Array[Cell](numPartitions) //Map.empty[Int, Cell]
-  private[partitioner] val partitions: Array[(Cell,Int)] = {
-    if(pointsOnly) {
+  private[partitioner] val partitions: CellHistogram = {
+    val histo = if(pointsOnly) {
       GridPartitioner.buildGrid(partitionsPerDimension,partitionsPerDimension, xLength, yLength, minX,minY)
     } else {
-      val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, sampleFraction) else rdd
-      GridPartitioner.buildHistogram(theRDD,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
-
+//      val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, sampleFraction) else rdd
+      GridPartitioner.buildHistogram(rdd,pointsOnly,partitionsPerDimension,partitionsPerDimension,minX,minY,maxX,maxY,xLength,yLength)
     }
+
+//    histo.buckets.values.map(_._1).zipWithIndex.map{case (cell, i) =>
+//      cell.id = i
+//      cell
+//    }
+
+    histo
+
   }
+
+  require(partitions.nonEmpty, "need at least some partitions!")
 
   override def printPartitions(fName: Path): Unit = {
-    val list2 = partitions.map { case (cell, _) => s"${cell.id};${cell.range.wkt}" }.toList
-    super.writeToFile(list2, fName)
+    val list2 = partitions.buckets.values.map { case (cell,_) => s"${cell.id};${cell.range.wkt}" }.toList
+    GridPartitioner.writeToFile(list2, fName)
   }
 
-  override def partitionBounds(idx: Int): Cell = partitions(idx)._1 //getCellBounds(idx)
+  override def partitionBounds(idx: Int): Cell = partitions.get(idx) match {
+    case None =>
+      val range = GridPartitioner.getCellBounds(idx, partitionsPerDimension, xLength, yLength, minX, minY)
+      Cell(idx, range)
+    case Some((cell, _)) => cell
+  }
+
+//    partitions(idx)._1 //getCellBounds(idx)
 
   override def partitionExtent(idx: Int): NRectRange = partitions(idx)._1.extent
 
-  override def numPartitions: Int = Math.pow(partitionsPerDimension,dimensions).toInt
+  override def numPartitions: Int = partitions.length //Math.pow(partitionsPerDimension,dimensions).toInt
 
   /**
    * Compute the partition for an input key.
@@ -81,7 +97,7 @@ class SpatialGridPartitioner[G <: STObject : ClassTag, V: ClassTag]
 
     val id = GridPartitioner.getCellId(center.getX, center.getY, minX, minY, maxX, maxY, xLength, yLength, partitionsPerDimension)
 
-    require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id")
+    require(id >= 0 && id < numPartitions, s"Cell ID out of bounds (0 .. $numPartitions): $id  for input $key ($g) with center $center")
 
     id
   }

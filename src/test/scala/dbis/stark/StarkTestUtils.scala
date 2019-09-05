@@ -8,7 +8,9 @@ import dbis.stark.spatial.partitioner.BSPartitioner
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
+import org.scalatest.Tag
 
+object Fix extends Tag("dbis.stark.Fix")
 
 object StarkTestUtils {
   def createIntervalRDD(
@@ -122,7 +124,15 @@ object StarkTestUtils {
     
     val rdd = StarkTestUtils.createRDD(sc, file, sep, numParts, distinct)
     rdd.index(new BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
-  } 
+  }
+
+  def timing[R](name: String)(block: => R) = {
+    val start = System.currentTimeMillis()
+    val res = block
+    val end = System.currentTimeMillis()
+    println(s"$name took ${end - start}")
+    res
+  }
   
   def distinct[V](rdd: RDD[(STObject, V)]) = {
     
@@ -137,12 +147,5 @@ object StarkTestUtils {
         true
       }
     }
-  }
-
-  def timing(name: String)(f: => Unit): Unit = {
-    val start = System.currentTimeMillis()
-    f
-    val end = System.currentTimeMillis()
-    println(s"$name: ${end - start}ms")
   }
 }

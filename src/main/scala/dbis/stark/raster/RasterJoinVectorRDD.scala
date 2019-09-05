@@ -1,11 +1,10 @@
 package dbis.stark.raster
 
 import dbis.stark.STObject
-import dbis.stark.STObject.MBR
-import dbis.stark.spatial.{JoinPredicate, JoinRDD}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial.indexed.{IndexConfig, IndexFactory}
 import dbis.stark.spatial.partitioner.{OneToManyPartition, OneToOnePartition}
+import dbis.stark.spatial.{JoinPredicate, JoinRDD}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 
@@ -41,7 +40,7 @@ class RasterJoinVectorRDD[U<% Ordered[U]: ClassTag, P: ClassTag] (_left: RasterR
       }
 
     } else {
-      val index = IndexFactory.get[MBR, Tile[U]](indexConfig.get)
+      val index = IndexFactory.get[Tile[U]](indexConfig.get)
 
       left.iterator(partition.leftPartition, context).foreach{ t =>
         val tileMBRGeo = RasterUtils.tileToGeo(t)
@@ -80,7 +79,7 @@ class RasterJoinVectorRDD[U<% Ordered[U]: ClassTag, P: ClassTag] (_left: RasterR
         }
       }
     } else {
-      val index = IndexFactory.get[MBR, Tile[U]](indexConfig.get)
+      val index = IndexFactory.get[Tile[U]](indexConfig.get)
 
       left.iterator(partition.leftPartition, context).foreach{ t =>
         val tileMBRGeo = RasterUtils.tileToGeo(t)

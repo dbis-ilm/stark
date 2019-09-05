@@ -1,10 +1,7 @@
 package dbis.stark.spatial.partitioner
 
-import scala.collection.mutable.Queue
-import scala.collection.mutable.ListBuffer
-import dbis.stark.spatial.NRectRange
-import dbis.stark.spatial.NPoint
-import dbis.stark.spatial.Cell
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -16,10 +13,10 @@ import scala.collection.mutable.ArrayBuffer
  * by He, Tan, Luo, Feng, Fan 
  * 
  * @param _ll The lower left point of the data space, i.e. min value in all dimensions
- * @param ur The upper right point of the data space, i.e. max value in all dimensions
- * @param cellHistogram A list of all cells and the number of points in them. Empty cells can be left out
- * @param sideLength The side length of the (quadratic) cell
- * @param maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points). 
+ * @param _ur The upper right point of the data space, i.e. max value in all dimensions
+ * @param histogram A list of all cells and the number of points in them. Empty cells can be left out
+ * @param _sideLength The side length of the (quadratic) cell
+ * @param _maxCostPerPartition The maximum cost that one partition should have to read (currently: number of points).
  * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
  * cannot be further split.   
  */
@@ -33,10 +30,10 @@ class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
   ) extends Serializable {
 
   require(depth > 0, "depth must be > 0")
-  require(_ll.size > 0, "zero dimension is not supported")
-  require(_ll.size == _ur.size, "Equal number of dimension required")
+  require(_ll.length > 0, "zero dimension is not supported")
+  require(_ll.length == _ur.size, "Equal number of dimension required")
   require(_maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
-  require(histogram.size > 0, "hisogram must not be empty")  
+  require(histogram.length > 0, "hisogram must not be empty")
   require(_sideLength > 0, "cell side length must be > 0")
     
   

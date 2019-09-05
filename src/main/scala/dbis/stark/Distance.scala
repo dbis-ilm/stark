@@ -86,6 +86,13 @@ case class IntervalDistance(private val min: Double, private val max: Double) ex
   */
 class ScalarDistance(val value: Double) extends IntervalDistance(value,value) with Serializable {
   override def toString: String = s"$value"
+
+  override def equals(obj: Any): Boolean = obj match {
+    case IntervalDistance(v,_) => v == value
+    case v: Double => v == value
+    case v: Int => v.toDouble == value
+    case _ => false
+  }
 }
 
 object ScalarDistance {

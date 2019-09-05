@@ -18,13 +18,12 @@ abstract class PartitionerConfig(val strategy: PartitionStrategy,
                                  sampleFraction: Double = 0
                                 ) extends Serializable
 
-case class NoPartitionerStrategy() extends PartitionerConfig(PartitionStrategy.NONE, false, None)
-
 case class BSPStrategy(cellSize: Double,
                        maxCost: Double,
                        pointsOnly: Boolean = false,
                        minmax: Option[(Double, Double, Double, Double)] = None,
-                       sampleFraction: Double = 0
+                       sampleFraction: Double = 0,
+                       parallel: Boolean = false
                       ) extends PartitionerConfig(PartitionStrategy.BSP, pointsOnly, minmax, sampleFraction)
 
 case class GridStrategy(partitionsPerDimensions: Int,
@@ -37,16 +36,18 @@ case class RTreeStrategy(order: Int, pointsOnly: Boolean = false,
                          minmax: Option[(Double, Double, Double, Double)] = None,
                          sampleFraction: Double = 0) extends PartitionerConfig(PartitionStrategy.RTREE, pointsOnly, minmax,sampleFraction)
 
+case class NoPartitionerStrategy() extends PartitionerConfig(PartitionStrategy.NONE,true,None,0)
+
 
 object PartitionerFactory {
   def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): Option[GridPartitioner] = strategy match {
-    case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor) => minmax match {
-      case None => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly))
-      case Some(mm) => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor))
+    case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor,parallel) => minmax match {
+      case None => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly,sampleFraction = sampleFactor, parallel = parallel))
+      case Some(mm) => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor,parallel))
     }
 
     case GridStrategy(partitionsPerDimensions, pointsOnly, minmax, sampleFraction) => minmax match {
-      case None => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly))
+      case None => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly,sampleFraction=sampleFraction))
       case Some(mm) => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction))
     }
 

@@ -1,13 +1,13 @@
 package dbis.stark.spatial.indexed
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-
-import scala.collection.JavaConversions.asScalaBuffer
-import dbis.stark.STObject
+import dbis.stark.StarkTestUtils.makeTimeStamp
+import dbis.stark.{Distance, STObject, ScalarDistance}
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.index.strtree.STRtree
 import org.locationtech.jts.io.WKTReader
+import org.scalatest.{FlatSpec, Matchers}
+
+import scala.collection.JavaConversions.asScalaBuffer
 
 class RTreeTest extends FlatSpec with Matchers {
   
@@ -199,5 +199,62 @@ class RTreeTest extends FlatSpec with Matchers {
     val res = tree.query(q).map(_._1).toList
 
     res should contain theSameElementsAs entries
+  }
+
+  it should "find all nearest neighbors if order is smaller than number of duplicates" in {
+    val entries = Array(
+      STObject("POINT(1 1)"),
+      STObject("POINT(1 2)"),
+      STObject("POINT(2 1)"),
+      STObject("POINT(2 2)"),
+      STObject("POINT(2 1)"),
+      STObject("POINT(2 1)"),
+
+      STObject("POINT(10 10)"),
+      STObject("POINT(10 20)"),
+      STObject("POINT(20 10)"),
+      STObject("POINT(20 20)")
+    )
+
+    val k = 3
+    val tree = new RTree[(STObject, Int)](k-1)
+    entries.zipWithIndex.foreach{ case (stobject,i) => tree.insert(stobject, (stobject,i)) }
+
+    val q = STObject("POINT(2 1)")
+
+    val res = tree.kNN(q,k,Distance.seuclid).toList
+
+    res.size shouldBe k
+    res.map(_._2).zipWithIndex.foreach{case (d,idx) => withClue(s"$idx"){d.asInstanceOf[ScalarDistance].value shouldBe 0.0}}
+    res.map(_._1._1).foreach(_ shouldBe q)
+//    res should contain theSameElementsAs entries
+  }
+
+  it should "find knn from larger DS when tree order < k" in {
+
+    val k = 6
+
+    val tree = new RTree[(STObject, Long)](k-2)
+
+    val src = scala.io.Source.fromFile("src/test/resources/new_eventful_flat_1000.csv")
+    src.getLines().map { line =>line.split(",") }
+      .map { arr =>
+        val ts = makeTimeStamp(arr(1).toInt, arr(2).toInt, arr(3).toInt)
+        // we don't add the ts directly to STObject to allow tests without a temporal component
+        (STObject(arr(7)), ts)
+      }.foreach{ case (so, ts) => tree.insert(so, (so,ts))}
+    src.close()
+
+    tree.build()
+
+    println(s"depth: ${tree.depth()}")
+    println(s"items: ${tree.size()}")
+
+    val q: STObject = STObject("POINT (53.483437 -2.2040706)")
+    val res = tree.kNN(q,k,Distance.seuclid).toList
+
+    res.size shouldBe k
+    res.map(_._2).zipWithIndex.foreach{case (d,idx) => withClue(s"$idx"){d.asInstanceOf[ScalarDistance].value shouldBe 0.0}}
+    res.map(_._1._1).foreach(_ shouldBe q)
   }
 }

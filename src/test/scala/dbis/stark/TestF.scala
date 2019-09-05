@@ -70,7 +70,7 @@ object TestF extends Serializable {
 
   def getf(indexConfig: IndexConfig, order: Int, searchData: STObject): Iterator[ESTO] => Iterator[ESTO] = (s: Iterator[ESTO]) => {
 
-    val tree = IndexFactory.get[STObject, (STObject, ESTO)](indexConfig)
+    val tree = IndexFactory.get[(STObject, ESTO)](indexConfig)
 
     s.foreach{x =>
       val ob = STObject(x.stob, Interval(x.start, x.end))

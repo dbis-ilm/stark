@@ -83,7 +83,7 @@ class RasterGridPartitioner(_partitionsX: Int, partitionsY: Int,
 
   override def printPartitions(fName: Path): Unit = {
     val strings = (0 until numPartitions).iterator.map(i => partitionExtent(i).wkt).toIterable
-    writeToFile(strings, fName)
+    GridPartitioner.writeToFile(strings, fName)
   }
 }
 

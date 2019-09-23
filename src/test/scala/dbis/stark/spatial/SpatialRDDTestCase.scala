@@ -474,7 +474,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", Instant(StarkTestUtils.makeTimeStamp(2013, 6, 1)))
 
     val start = System.currentTimeMillis()
-    val s = rdd.filter(_._1 != q).skylineAngular2(q, Distance.euclid, Skyline.centroidDominates, ppd = 10)
+    val s = rdd.filter(_._1 != q).skylineAngularNoPart(q, Distance.euclid, Skyline.centroidDominates, ppd = 10)
     val skyline = s.collect()
 
     val end = System.currentTimeMillis()
@@ -547,7 +547,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
     val skyline = rdd.skyline(q, Distance.euclid, Skyline.centroidDominates,ppD=5).collect()
     val skylineAgg = rdd.skylineAgg(q, Distance.euclid, Skyline.centroidDominates).collect()
     val skylineAngular = rdd.skylineAngular(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
-    val skylineAngular2 = rdd.skylineAngular2(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
+    val skylineAngular2 = rdd.skylineAngularNoPart(q, Distance.euclid, Skyline.centroidDominates, ppd = 10).collect()
 
     withClue("skyline vs agg"){skyline should contain theSameElementsAs skylineAgg}
     withClue("skyline vs angular"){skyline should contain theSameElementsAs skylineAngular}

@@ -2,12 +2,12 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
+import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
 import dbis.stark.spatial.partitioner.GridPartitioner
-import dbis.stark.spatial._
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.{SpatialRDD, TaskContext}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{SpatialRDD, TaskContext}
 
 import scala.reflect.ClassTag
 
@@ -34,6 +34,32 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToMany: Boolean) =
     new PersistentIndexedSpatialJoinRDD(self, other, pred, oneToMany)
 
+  /**
+    * Performs a broadcast join. The relation "other" is broadcasted to all partitions of this RDD and thus, "other"
+    * should be the smaller one and fit into memory!
+    * @param other The smaller relation to join with - will be broadcasted
+    * @param pred The join predicate
+    * @tparam V2 Payload type in second relation
+    * @return Returns an RDD with payload values from left and right
+    */
+  override def broadcastJoin[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+    val otherArray = other.collect()
+    val otherBC = self.sparkContext.broadcast(otherArray)
+
+    self.mapPartitions{ iter =>
+      val predFunc = JoinPredicate.predicateFunction(pred)
+      val otherArr = otherBC.value
+      iter.flatMap{ idx =>
+        otherArr.iterator.flatMap { right =>
+          idx.query(right._1)
+            .filter{case (lg,_) => predFunc(lg, right._1)}
+            .map{ case (_,lv) => (lv,right._2)}
+        }
+      }
+    }
+  }
+
+  def broadcastJoinWithIndex[V2 : ClassTag](other: RDD[Index[(G,V2)]], pred: JoinPredicate): RDD[(V, V2)] = ???
 
   override def join[V2: ClassTag](right: RDD[(G, V2)], predicate: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false): RDD[(V, V2)] = {
 

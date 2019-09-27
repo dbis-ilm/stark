@@ -169,6 +169,47 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         pred, oneToMany = oneToMany)
   }
 
+  /**
+    * Performs a broadcast join. The relation "other" is broadcasted to all partitions of this RDD and thus, "other"
+    * should be the smaller one and fit into memory!
+    * @param other The smaller relation to join with - will be broadcasted
+    * @param pred The join predicate
+    * @tparam V2 Payload type in second relation
+    * @return Returns an RDD with payload values from left and right
+    */
+  override def broadcastJoin[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+    val otherArray = other.collect()
+    val otherBC = self.sparkContext.broadcast(otherArray)
+
+    self.mapPartitions{iter =>
+      val predFunc = JoinPredicate.predicateFunction(pred)
+      val otherArr = otherBC.value
+      iter.flatMap{ left =>
+        otherArr.iterator.filter{ right =>
+          predFunc(left._1, right._1)
+        }.map{ case (_,v2) => (left._2, v2) }
+      }
+    }
+  }
+
+  def broadcastJoinWithIndex[V2 : ClassTag](other: RDD[Index[(G,V2)]], pred: JoinPredicate): RDD[(V, V2)] = {
+    val otherArray = other.collect()
+    val otherBC = self.sparkContext.broadcast(otherArray)
+
+    self.mapPartitions{iter =>
+      val predFunc = JoinPredicate.predicateFunction(pred)
+      val otherArr = otherBC.value
+
+      iter.flatMap{ left =>
+        otherArr.iterator.flatMap{ idx =>
+          idx.query(left._1)
+            .filter{ case (g,_) => predFunc(left._1, g) }
+            .map{ case (_,v2) => (left._2, v2) }
+        }
+      }
+    }
+  }
+
   override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)] = self.withScope {
     new SpatialKnnJoinRDD(self, other, k, distFunc)
   }

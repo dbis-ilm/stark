@@ -6,19 +6,17 @@ import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, StarkUtils}
 
-import scala.collection.JavaConverters._
-
-class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
+class RTreePartitioner[G <: STObject,V](samples: Array[(G,V)],
                                         _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                         maxCost: Int, pointsOnly: Boolean)
   extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
 
   require(maxCost > 0)
 
-  def this(samples: Seq[(G,V)], maxCost: Int, minMax: (Double, Double, Double, Double), pointsOnly: Boolean) =
+  def this(samples: Array[(G,V)], maxCost: Int, minMax: (Double, Double, Double, Double), pointsOnly: Boolean) =
     this(samples, minMax._1, minMax._2, minMax._3, minMax._4, maxCost, pointsOnly)
 
-  def this(samples: Seq[(G,V)], maxCost: Int, pointsOnly: Boolean = true) =
+  def this(samples: Array[(G,V)], maxCost: Int, pointsOnly: Boolean = true) =
     this(samples, maxCost, GridPartitioner.getMinMax(samples.iterator), pointsOnly)
 
   protected[spatial] val partitions: Array[Cell] = {
@@ -28,21 +26,22 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
     val capacity = math.max(samples.length / maxCost, 2)
     val tree = new RTree[Byte](capacity)
 
-    samples.foreach { case (g, _) =>
-      tree.insert(g.getGeo, dummy)
+    var i = 0
+    while(i < samples.length) {
+      val g = samples(i)._1
+      tree.insert(g, dummy)
+      i += 1
     }
 
-//    require(tree.depth() > 0, s"depth of partitioning tree must be > 0, but is ${tree.depth()}")
+    val children = tree.queryBoundary() // is a Java ArrayList!
 
-    //val children = tree.getRoot.getChildBoundables.iterator().asScala
-//    val children = tree.lastLevelNodes
-
-    val children = tree.queryBoundary().asScala
-
-    children.zipWithIndex.map{ case (mbr, idx) =>
-//      val mbr = child.getBounds.asInstanceOf[MBR]
-      Cell(idx, StarkUtils.fromEnvelope(mbr))
-    }.toArray
+    val result = new Array[Cell](children.size())
+    i = 0
+    while(i < children.size()) {
+      result(i) = Cell(i, StarkUtils.fromEnvelope(children.get(i)))
+      i += 1
+    }
+    result
   }
 
 
@@ -80,6 +79,7 @@ class RTreePartitioner[G <: STObject,V](samples: Seq[(G,V)],
       val pX = c.getX
       val pY = c.getY
       val pc = NPoint(pX, pY)
+
 
       for(partition <- partitions) {
         val dist = partition.range.dist(pc)

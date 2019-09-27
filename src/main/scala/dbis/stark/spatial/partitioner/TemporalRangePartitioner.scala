@@ -1,6 +1,7 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.{Interval, STObject, TemporalExpression}
+import dbis.stark.spatial.StarkUtils
+import dbis.stark.{Instant, Interval, STObject, TemporalExpression}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -12,13 +13,18 @@ import scala.reflect.ClassTag
 
 object TemporalRangePartitioner {
 
-  def getCellId(start: Long, cells: Array[Long], partitions: Int): Int = {
-    for (i <- 1 until partitions) {
+  def getCellId(start: Long, cells: Array[Long]): Int = {
+
+    var i = 0
+    while(i < cells.length) {
       if (cells(i) > start) {
         return i - 1
       }
+
+      i += 1
     }
-    partitions - 1
+
+    cells.length - 1
   }
 
   def getCellId(start: Long, minT: Long, maxT: Long, partitions: Int): Int = {
@@ -36,54 +42,70 @@ object TemporalRangePartitioner {
     res
   }
 
+  def autoRange(sample: IndexedSeq[Instant], numPartitions: Int): Array[Long] = {
+    val sorted = sample.sortBy(_.value)
+    val maxitems = Math.round(sorted.length / numPartitions)
+
+
+    val arr = new Array[Long](numPartitions)
+    arr(0) = 0
+
+    var i = 1
+    while(i < arr.length) {
+      arr(i) = sorted(i * maxitems).value
+      i += 1
+    }
+
+    arr
+  }
+
+  def fixedRange(minT: Long, maxT: Long, numPartitions: Int): Array[Long] = {
+    val arr = new Array[Long](numPartitions)
+    val range = maxT - minT
+    val dist = Math.round(range / numPartitions)
+
+    arr(0) = 0
+
+    var i = 1
+    while(i < arr.length) {
+      arr(i) = minT + i * dist
+      i += 1
+    }
+
+    arr
+  }
 
 }
 
 
 class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G, V)],
                                                                       partitions: Int, autoRange: Boolean,
-                                                                       _minT: Long, _maxT: Long, sampelsize: Double)
+                                                                       _minT: Long, _maxT: Long, sampelsize: Double, instantsOnly: Boolean = false)
   extends TemporalPartitioner(_minT, _maxT) {
 
 
 
   //new Array[Long](partitions)
   private val cells: Array[Long] = {
-    val arr = Array.fill[Long](partitions)(0)
 
-    if (autoRange) {
-      val sample = rdd.sample(withReplacement = false, sampelsize).map(x => x._1.getTemp.get.start)
-      val sorted = sample.sortBy(k => k.value).collect()
-
-//      println("autorange from Temporalpartitioner is on | sampelfaktor: " + sampelsize + " | sampelsize: " + sorted.length)
-
-      val maxitems = Math.round(sorted.length / partitions)
-
-      arr(0) = 0
-      for (i <- 1 until partitions) {
-        // println(i*maxitems +" " +(sorted(i*maxitems).value))
-        arr(i) = sorted(i * maxitems).value
-      }
-
+    val array = if (autoRange) {
+      val sample = rdd.sample(withReplacement = false, sampelsize).map(x => x._1.getTemp.get.start).collect()
+      TemporalRangePartitioner.autoRange(sample, partitions)
     } else {
-      val range = maxT - minT
-      val dist = Math.round(range / partitions)
-      arr(0) = 0
-      for (i <- 1 until partitions) {
-        arr(i) = minT + i * dist
-      }
+      TemporalRangePartitioner.fixedRange(minT,maxT,partitions)
     }
 
-    arr
+    array
 
   }
 
-  val bounds: Array[Long] = {
+  val bounds: Array[Long] = if(instantsOnly) cells else {
     val arr = new Array[Long](partitions)
     rdd.map { case (g, _) =>
-      val end = g.getTemp.get.end.get.value
+      val end = g.getTemp.get.end.getOrElse(StarkUtils.MAX_LONG_INSTANT).value
       val start = g.getTemp.get.start.value
-      val id = TemporalRangePartitioner.getCellId(start, cells, partitions)
+
+      val id = TemporalRangePartitioner.getCellId(start, cells)
 
       //        println(s"$center --> $id")
       (id, end)
@@ -148,7 +170,7 @@ class TemporalRangePartitioner[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(
     var id = 0
     // if(autoRange){
 
-    id = TemporalRangePartitioner.getCellId(start, cells, partitions)
+    id = TemporalRangePartitioner.getCellId(start, cells)
     /*}else {
       id = TemporalRangePartitioner.getCellId(start, minT, maxT, partitions)
     }*/

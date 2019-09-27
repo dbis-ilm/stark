@@ -413,10 +413,10 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     self.sparkContext.parallelize(skyline.skylinePoints.map(_._2))
   }
 
-  def skylineAngular2(ref: STObject,
-                      distFunc: (STObject, STObject) => (Distance, Distance),
-                      dominatesRel: (STObject, STObject) => Boolean,
-                      ppd: Int): RDD[(G,V)] = {
+  def skylineAngularNoPart(ref: STObject,
+                           distFunc: (STObject, STObject) => (Distance, Distance),
+                           dominatesRel: (STObject, STObject) => Boolean,
+                           ppd: Int): RDD[(G,V)] = {
 
     // for each partition (NOT necessarily spatial partition)
     self.mapPartitions{ iter =>

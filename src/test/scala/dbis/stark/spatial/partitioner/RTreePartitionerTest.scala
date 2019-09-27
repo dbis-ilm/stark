@@ -28,7 +28,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
 
   it should "create simple partitions" in {
 
-    val data = List(
+    val data = Array(
       (STObject(1,1),1),
       (STObject(1, 100),1),
       (STObject(100, 1),1),

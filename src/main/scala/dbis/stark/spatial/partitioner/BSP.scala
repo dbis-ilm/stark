@@ -5,21 +5,7 @@ import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-abstract class CostBasedPartitioner(val universe: NRectRange,
-                                    val cellHistogram: CellHistogram,
-                                    val sideLength: Double,
-                                    val numXCells: Int,
-                                    val maxCostPerPartition: Double,
-                                    val pointsOnly: Boolean,
-                                    val numCellThreshold: Int = -1) extends Serializable {
 
-  require(cellHistogram.nonEmpty, "cell histogram must not be empty")
-  require(maxCostPerPartition > 0, "max cost per partition must not be negative or zero")
-  require(sideLength > 0, "cell side length must not be negative or zero")
-
-  val partitions: Array[Cell]
-
-}
 
 
 /**
@@ -127,6 +113,7 @@ object BSP {
  * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
  * cannot be further split.
  */
+@deprecated("this version is extremely slow and will be removed soon")
 class BSP(private val _universe: NRectRange, protected[stark] val _cellHistogram: CellHistogram,
           private val _sideLength: Double, private val _pointsOnly: Boolean, private val _maxCostPerPartition: Double,
           private val _numXCells: Option[Int] = None, private val _numCellThreshold: Int = -1)

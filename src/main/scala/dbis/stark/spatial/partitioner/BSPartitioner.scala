@@ -73,7 +73,7 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag]private[partitioner](
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
            sampleFraction: Double = 0,
-           parallel: Boolean = false) =
+           parallel: Boolean = true) =
     this(rdd, sideLength, maxCostPerPartition, pointsOnly, GridPartitioner.getMinMax(rdd), sampleFraction,parallel)
 
   protected[spatial] val numXCells: Int = {

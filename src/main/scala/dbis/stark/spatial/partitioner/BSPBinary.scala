@@ -20,6 +20,7 @@ import scala.collection.mutable.ArrayBuffer
  * This cannot be guaranteed as there may be more points in a cell than <code>maxCostPerPartition</code>, but a cell
  * cannot be further split.   
  */
+@deprecated("this class was for testing and will be removed soon")
 class BSPBinary(_ll: Array[Double], var _ur: Array[Double],
     depth: Int,
     histogram: Array[(Cell, Int)],

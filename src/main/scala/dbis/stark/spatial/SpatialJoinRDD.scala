@@ -24,10 +24,10 @@ import scala.reflect.ClassTag
   */
 class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] private (_left: RDD[(G,V)],
                                                                                    _right: RDD[(G,V2)],
-  predicateFunc: (G,G) => Boolean,
-  indexConfig: Option[IndexConfig],
-  private val checkParties: Boolean,
-  oneToMany: Boolean)  extends JoinRDD[(G,V),(G,V2),(V,V2)](_left, _right, oneToMany, checkParties) { // RDD[(V,V2)](left.context, Nil) {
+                                                                                   predicateFunc: (G,G) => Boolean,
+                                                                                   indexConfig: Option[IndexConfig],
+                                                                                   private val checkParties: Boolean,
+                                                                                   oneToMany: Boolean)  extends JoinRDD[(G,V),(G,V2),(V,V2)](_left, _right, oneToMany, checkParties) { // RDD[(V,V2)](left.context, Nil) {
 
   /**
     * Create a new join operator with the given predicate.
@@ -85,8 +85,8 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
       right.iterator(partition.rightPartition, context).flatMap { case (rg, rv) =>
         tree.query(rg) // index query
           .filter { case (lg, _) =>
-          predicateFunc(lg, rg) // candidate check and apply join condidion
-        }
+            predicateFunc(lg, rg) // candidate check and apply join condidion
+          }
           .map { case (_, lv) => (lv, rv) } // result is the combined tuple of the payload items
       }
     }
@@ -123,13 +123,11 @@ class SpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2: ClassTag] privat
         right.iterator(rp, context).flatMap { case (rg, rv) =>
           tree.query(rg) // index query
             .filter { case (lg, _) =>
-            predicateFunc(lg, rg) // candidate check and apply join condidion
-          }
+              predicateFunc(lg, rg) // candidate check and apply join condidion
+            }
             .map { case (_, lv) => (lv, rv) } // result is the combined tuple of the payload items
         }
       }
     }
   }
-
-
 }

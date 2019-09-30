@@ -1,10 +1,10 @@
 package dbis.stark.spatial
 
+import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.{GridPartitioner, OneToManyPartition, OneToOnePartition}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
@@ -91,7 +91,30 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
   override def getPartitions: Array[Partition] = {
     val parts = ListBuffer.empty[Partition]
 
-    if (leftPartitioner.isDefined && leftPartitioner == rightPartitioner) {
+    if(!checkParties || leftPartitioner.isEmpty || rightPartitioner.isEmpty) {
+      // cross product needed
+
+      if(oneToMany) {
+        var i = 0
+        val rightIDs = right.partitions.indices
+        while(i < left.partitions.length) {
+          parts += OneToManyPartition(i, left, right, i, rightIDs)
+          i += 1
+        }
+      } else {
+        var i = 0
+        var idx = 0
+        while(i < left.partitions.length) {
+          var j = 0
+          while(j < right.partitions.length) {
+            parts += OneToOnePartition(idx, left, right, i, j)
+            idx += 1
+            j += 1
+          }
+          i += 1
+        }
+      }
+    } else if (leftPartitioner == rightPartitioner) {
       left.partitions.iterator.zip(right.partitions.iterator).foreach { case (l, r) =>
         if (oneToMany)
           parts += OneToManyPartition(l.index, left, right, l.index, Seq(r.index))
@@ -100,38 +123,81 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
       }
 
     } else {
-      val checkPartitions = checkParties && leftPartitioner.isDefined && rightPartitioner.isDefined
+
+      val tree = new RTree[Int](10)
+//      val (toInsert, insertPartitioner, insertRDD, toProbe, probePartitioner, probeRDD) = if(left.getNumPartitions > right.getNumPartitions)
+//        (left.partitions, leftPartitioner.get, left, right.partitions, rightPartitioner.get, right)
+//      else (right.partitions, rightPartitioner.get, right, left.partitions, leftPartitioner.get, left)
+
+      var i = 0
+      while(i < right.partitions.length) {
+        val partitionID = right.partitions(i).index
+        val extent = rightPartitioner.get.partitionExtent(partitionID)
+        tree.insert(StarkUtils.toEnvelope(extent),partitionID)
+
+        i += 1
+      }
 
       if (oneToMany) {
+        var leftID = 0
+        var idx = 0
+        while(leftID < left.partitions.length) {
+          val probePartitionID = left.partitions(leftID).index
+          val extent = leftPartitioner.get.partitionExtent(probePartitionID)
 
-        val pairs = mutable.Map.empty[Int, ListBuffer[Int]]
-        for (
-          s1 <- left.partitions;
-          s2 <- right.partitions
-          if !checkPartitions || leftPartitioner.get.partitionExtent(s1.index).intersects(rightPartitioner.get.partitionExtent(s2.index))) {
+          val rightIDs = tree.iQuery(StarkUtils.toEnvelope(extent)).toList
+//          pairs += probePartitionID -> insertedIDs
 
-          if (pairs.contains(s1.index)) {
-            pairs(s1.index) += s2.index
-          } else
-            pairs += s1.index -> ListBuffer(s2.index)
+          if(rightIDs.nonEmpty) {
+            // a mapping from one probePartitionID to many inserted IDs
+            parts += OneToManyPartition(idx, left, right, leftID, rightIDs )
+            idx += 1
+          }
+
+          leftID += 1
         }
-
-        pairs.iterator.zipWithIndex.foreach { case ((lIdx, rights), idx) =>
-          parts += OneToManyPartition(idx, left, right, lIdx, rights)
-        }
+//        for (
+//          s1 <- left.partitions;
+//          s2 <- right.partitions
+//          if !checkPartitions || leftPartitioner.get.partitionExtent(s1.index).intersects(rightPartitioner.get.partitionExtent(s2.index))) {
+//
+//          if (pairs.contains(s1.index)) {
+//            pairs(s1.index) += s2.index
+//          } else
+//            pairs += s1.index -> ListBuffer(s2.index)
+//        }
+//        pairs.iterator.zipWithIndex.foreach { case ((lIdx, rights), idx) =>
+//          parts += OneToManyPartition(idx, left, right, lIdx, rights)
+//        }
 
       } else { // "normal" join partition
 
         var idx = 0
-        for (
-          s1 <- left.partitions;
-          s2 <- right.partitions
-          if !checkPartitions || leftPartitioner.get.partitionExtent(s1.index).intersects(rightPartitioner.get.partitionExtent(s2.index))) {
+        var leftID = 0
+        while(leftID < left.partitions.length) {
+          val probePartitionID = left.partitions(leftID).index
+          val extent = leftPartitioner.get.partitionExtent(probePartitionID)
 
-          val p = OneToOnePartition(idx, left, right, s1.index, s2.index) //, leftContainsRight, rightContainsLeft)
-          parts += p
-          idx += 1
+          val rightIDs = tree.iQuery(StarkUtils.toEnvelope(extent))
+
+          rightIDs.foreach{rightID =>
+            parts += OneToOnePartition(idx, left, right, leftID, rightID )
+            idx += 1
+          }
+
+          leftID += 1
         }
+
+
+//        for (
+//          s1 <- left.partitions;
+//          s2 <- right.partitions
+//          if !checkPartitions || leftPartitioner.get.partitionExtent(s1.index).intersects(rightPartitioner.get.partitionExtent(s2.index))) {
+//
+//          val p = OneToOnePartition(idx, left, right, s1.index, s2.index) //, leftContainsRight, rightContainsLeft)
+//          parts += p
+//          idx += 1
+//        }
       }
     }
 

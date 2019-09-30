@@ -1,6 +1,7 @@
 package dbis.stark.spatial.indexed
 
-import dbis.stark.STObject.GeoType
+import dbis.stark.STObject.{GeoType, MBR}
+import dbis.stark.spatial.StarkUtils
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
 import org.locationtech.jts.index.strtree.{AbstractNode, ItemBoundable, ItemDistance, STRtreePlus}
@@ -32,6 +33,9 @@ class RTree[D: ClassTag ](
 
   def insert(mbr: GeoType, data: D) =
     super.insert(mbr.getEnvelopeInternal, new Data(data, mbr))
+
+  def insert(mbr: MBR, data: D) =
+    super.insert(mbr, new Data(data, StarkUtils.makeGeo(mbr)))
   
   /**
    * Query the tree and find all elements in the tree that intersect
@@ -45,6 +49,9 @@ class RTree[D: ClassTag ](
 
   override def query(box: STObject): Iterator[D] =
     super.iteratorQuery(box.getGeo.getEnvelopeInternal).asScala.map(_.data)
+
+  def iQuery(mbr: MBR): Iterator[D] =
+    super.iteratorQuery(mbr).asScala.map(_.data)
 
   /**
    * A read only query variant of the tree.

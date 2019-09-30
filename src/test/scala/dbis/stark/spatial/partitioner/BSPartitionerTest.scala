@@ -713,30 +713,33 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
       pointsOnly = false, sampleFraction = 0)
 
     val tPartedNoSample = rddTaxi.partitionBy(taxiPartiNoSample)
-    val pPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
+    val bPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
 
-    val start = System.currentTimeMillis()
-    val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 50)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None)//.collect()
-    val joinResSamCnt = joinResSam.count()
-    val end = System.currentTimeMillis()
-
-
-    joinResSamCnt shouldBe > (0L)
-
-    val start2 = System.currentTimeMillis()
-    val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 50)).join(pPartedNoSample, JoinPredicate.CONTAINEDBY, None)//.collect()
-    val joinResPlainCnt = joinResPlain.count()
-    val end2 = System.currentTimeMillis()
-
-    joinResPlainCnt shouldBe > (0L)
-    joinResSamCnt should equal(joinResPlainCnt)
+    val sampleCnt = StarkTestUtils.timing("sampled join") {
+      val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 50)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None) //.collect()
+      val joinResSamCnt = joinResSam.count()
 
 
+      withClue("live indexed join partedTaxiSample w/ partedBlocksSample") {
+        joinResSamCnt should be > 0L
+      }
+      joinResSamCnt
+    }
 
+    val fullCnt = StarkTestUtils.timing("full join") {
+      val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 50)).join(bPartedNoSample, JoinPredicate.CONTAINEDBY, None) //.collect()
+      val joinResPlainCnt = joinResPlain.count()
 
+      withClue("live indexed join tPartedNoSample w/ pPartedNoSample") {
+        joinResPlainCnt should be > 0L
+      }
 
-    println(s"sampled join: ${end - start} ms")
-    println(s"plain join: ${end2 - start2} ms")
+      joinResPlainCnt
+    }
+
+    withClue("sampleCnt vs fullCnt") {
+      sampleCnt shouldBe fullCnt
+    }
 
 //    joinResSam should contain theSameElementsAs joinResPlain
   }

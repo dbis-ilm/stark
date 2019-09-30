@@ -164,7 +164,16 @@ class BSPartitioner[G <: STObject : ClassTag, V: ClassTag]private[partitioner](
       (minPartitionId, true)
     }
 
-    if(outside || (!pointsOnly && sampleFraction > 0)) {
+//    if(outside || (!pointsOnly && sampleFraction > 0)) {
+//      bsp.partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
+//    }
+
+    if(outside) {
+      bsp.partitions(partitionId).range = bsp.partitions(partitionId).range.extend(pc)
+
+      //      if(!pointsOnly)
+      bsp.partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
+    } else if(!pointsOnly) {
       bsp.partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
     }
 

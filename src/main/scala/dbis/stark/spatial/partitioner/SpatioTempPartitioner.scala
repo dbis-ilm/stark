@@ -46,7 +46,7 @@ class SpatioTempPartitioner[G <: STObject : ClassTag, T : ClassTag] private(rdd:
 
   val partitions = {
     val dummy: Byte = 0x0
-    val sample = rdd.cache().sample(withReplacement = false, fraction = 0.01).map{case (g,_) => (g,dummy)}.collect()
+    val sample = rdd.cache().sample(withReplacement = false, fraction = 0.01).map{case (g,_) => g}.collect()
 
     // spatial partitioner
     val rtreeParti = new RTreePartitioner(sample,minX, maxX, minY, maxY,10000, pointsOnly)
@@ -55,7 +55,7 @@ class SpatioTempPartitioner[G <: STObject : ClassTag, T : ClassTag] private(rdd:
     var i = 0
     val sPartitionsTempMinMax = new Array[(Instant,Instant)](rtreeParti.numPartitions)
     while(i < sample.length) {
-      val curr = sample(i)._1
+      val curr = sample(i)
       val sID = rtreeParti.getPartitionId(curr)
 
       val currTemp = curr.getTemp.get

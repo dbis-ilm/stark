@@ -52,7 +52,7 @@ object PartitionerFactory {
     }
 
     case RTreeStrategy(order, pointsOnly, minmax, sampleFactor) =>
-      val sample = if(sampleFactor > 0) rdd.sample(withReplacement = false, sampleFactor).collect() else rdd.collect()
+      val sample = if(sampleFactor > 0) rdd.sample(withReplacement = false, sampleFactor).map(_._1).collect() else rdd.map(_._1).collect()
       minmax match {
         case None => Some(new RTreePartitioner(sample, order, pointsOnly))
         case Some(mm) => Some(new RTreePartitioner(sample, order, mm, pointsOnly))

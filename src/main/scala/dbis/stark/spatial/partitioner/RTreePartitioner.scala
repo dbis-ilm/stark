@@ -6,18 +6,18 @@ import dbis.stark.STObject
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, StarkUtils}
 
-class RTreePartitioner[G <: STObject,V](samples: Array[(G,V)],
+class RTreePartitioner[G <: STObject](samples: Array[G],
                                         _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                         maxCost: Int, pointsOnly: Boolean)
   extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
 
   require(maxCost > 0)
 
-  def this(samples: Array[(G,V)], maxCost: Int, minMax: (Double, Double, Double, Double), pointsOnly: Boolean) =
+  def this(samples: Array[G], maxCost: Int, minMax: (Double, Double, Double, Double), pointsOnly: Boolean) =
     this(samples, minMax._1, minMax._2, minMax._3, minMax._4, maxCost, pointsOnly)
 
-  def this(samples: Array[(G,V)], maxCost: Int, pointsOnly: Boolean = true) =
-    this(samples, maxCost, GridPartitioner.getMinMax(samples.iterator), pointsOnly)
+  def this(samples: Array[G], maxCost: Int, pointsOnly: Boolean = true) =
+    this(samples, maxCost, GridPartitioner.getMinMax(samples), pointsOnly)
 
   protected[spatial] val partitions: Array[Cell] = {
 
@@ -28,7 +28,7 @@ class RTreePartitioner[G <: STObject,V](samples: Array[(G,V)],
 
     var i = 0
     while(i < samples.length) {
-      val g = samples(i)._1
+      val g = samples(i)
       tree.insert(g, dummy)
       i += 1
     }

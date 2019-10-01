@@ -105,23 +105,44 @@ object GridPartitioner {
     (minX, maxX + EPS, minY, maxY + EPS)
   }
 
-  def getMinMax[G <: STObject, V](samples: Iterator[(G,V)]): (Double, Double, Double, Double) = {
+  def getMinMax[G <: STObject, V](samples: Array[G]): (Double, Double, Double, Double) = {
 
-    val (minX, maxX, minY, maxY) = samples.map{ case (g,_) =>
-      val env = g.getEnvelopeInternal
+    var (minX, maxX, minY, maxY) = {
+      val env = samples(0).getEnvelopeInternal
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
-
-    }.reduce { (oldMM, newMM) =>
-      val newMinX = oldMM._1 min newMM._1
-      val newMaxX = oldMM._2 max newMM._2
-      val newMinY = oldMM._3 min newMM._3
-      val newMaxY = oldMM._4 max newMM._4
-
-      (newMinX, newMaxX, newMinY, newMaxY)
     }
 
-    // do +1 for the max values to achieve right open intervals
+    var i = 1
+    while(i < samples.length) {
+
+      val env = samples(i).getEnvelopeInternal
+
+      minX = math.min(env.getMinX, minX)
+      maxX = math.max(env.getMaxX, maxX)
+
+      minY = math.min(env.getMinY, minY)
+      maxY = math.max(env.getMaxY, maxY)
+
+      i += 1
+    }
+
     (minX, maxX + EPS, minY, maxY + EPS)
+
+//    val (minX, maxX, minY, maxY) = samples.map{ case (g,_) =>
+//      val env = g.getEnvelopeInternal
+//      (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
+//
+//    }.reduce { (oldMM, newMM) =>
+//      val newMinX = oldMM._1 min newMM._1
+//      val newMaxX = oldMM._2 max newMM._2
+//      val newMinY = oldMM._3 min newMM._3
+//      val newMaxY = oldMM._4 max newMM._4
+//
+//      (newMinX, newMaxX, newMinY, newMaxY)
+//    }
+//
+//    // do +1 for the max values to achieve right open intervals
+//    (minX, maxX + EPS, minY, maxY + EPS)
   }
 
 

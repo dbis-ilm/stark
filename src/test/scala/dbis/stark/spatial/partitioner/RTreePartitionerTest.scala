@@ -39,7 +39,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       (STObject(100, 100),2)
     )
 
-    val parti = new RTreePartitioner(data, 0, 101, 0, 101, 4, true)
+    val parti = new RTreePartitioner(data.map(_._1), 0, 101, 0, 101, 4, true)
 
 //    println("BEFORE")
 //    parti.partitions.foreach(println)
@@ -62,7 +62,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
 
     println(rdd.count())
 
-    val sample = rdd.sample(withReplacement = false, 0.1).collect()
+    val sample = rdd.sample(withReplacement = false, 0.1).map(_._1).collect()
 
     val parti = new RTreePartitioner(sample, 10, true)
 
@@ -90,7 +90,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { arr => (STObject(arr(1)), arr(0))}
 
     val minMaxBlocks = GridPartitioner.getMinMax(rddblocks)
-    val sampleBlocks = rddblocks.sample(withReplacement = false, 0.1).collect()
+    val sampleBlocks = rddblocks.sample(withReplacement = false, 0.1).map(_._1).collect()
     val partiBlocks = new RTreePartitioner(sampleBlocks, 10, minMaxBlocks, false)
 
     val rddtaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
@@ -98,7 +98,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { arr => (STObject(arr(1)), arr(0))}
 
     val minMaxTaxi = GridPartitioner.getMinMax(rddtaxi)
-    val partiTaxi = new RTreePartitioner(rddtaxi.sample(withReplacement = false, 0.1).collect(), 10, minMaxTaxi, false)
+    val partiTaxi = new RTreePartitioner(rddtaxi.sample(withReplacement = false, 0.1).map(_._1).collect(), 10, minMaxTaxi, false)
 
     val matches = for(t <- partiTaxi.partitions;
                       b <- partiBlocks.partitions
@@ -113,7 +113,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1))).cache()
 
-    val parti = new RTreePartitioner(rdd.sample(withReplacement = false, 0.1).collect(), 100, true)
+    val parti = new RTreePartitioner(rdd.sample(withReplacement = false, 0.1).map(_._1).collect(), 100, true)
 
     val numparts = parti.numPartitions
 
@@ -137,7 +137,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map(_.split(";"))
       .map(arr => (STObject(arr(0)),arr(1)))
 
-    val parti = new RTreePartitioner(rdd.sample(withReplacement = false, 0.1).collect(), 100, true)
+    val parti = new RTreePartitioner(rdd.sample(withReplacement = false, 0.1).map(_._1).collect(), 100, true)
 
     val numparts = parti.numPartitions
 
@@ -166,10 +166,10 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsParti = new RTreePartitioner(pointsRDD.collect(), 10, true)
+    val pointsParti = new RTreePartitioner(pointsRDD.map(_._1).collect(), 10, true)
     val pointsPart = pointsRDD.partitionBy(pointsParti)
 
-    val polygonsParti = new RTreePartitioner(polygonsRDD.collect(), 10, true)
+    val polygonsParti = new RTreePartitioner(polygonsRDD.map(_._1).collect(), 10, true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsParti)
 
     val joined = polygonsPart.join(pointsPart, JoinPredicate.CONTAINS)
@@ -187,10 +187,10 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsParti = new RTreePartitioner(pointsRDD.collect(), 10, true)
+    val pointsParti = new RTreePartitioner(pointsRDD.map(_._1).collect(), 10, true)
     val pointsPart = pointsRDD.partitionBy(pointsParti)
 
-    val polygonsParti = new RTreePartitioner(polygonsRDD.collect(), 10, true)
+    val polygonsParti = new RTreePartitioner(polygonsRDD.map(_._1).collect(), 10, true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsParti)
 
     val joined = pointsPart.join(polygonsPart, JoinPredicate.CONTAINEDBY)
@@ -208,10 +208,10 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsParti = new RTreePartitioner(pointsRDD.collect(), 10, true)
+    val pointsParti = new RTreePartitioner(pointsRDD.map(_._1).collect(), 10, true)
     val pointsPart = pointsRDD.partitionBy(pointsParti)
 
-    val polygonsParti = new RTreePartitioner(polygonsRDD.collect(), 10, true)
+    val polygonsParti = new RTreePartitioner(polygonsRDD.map(_._1).collect(), 10, true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsParti)
 
     val joined = pointsPart.join(polygonsPart, JoinPredicate.INTERSECTS)
@@ -229,10 +229,10 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
         "77.8436279296875 22.857194700969636, 77.2723388671875 22.857194700969636, 77.2723388671875 23.332168306311473, " +
         "77.2723388671875 23.332168306311473))"),1)))
 
-    val pointsParti = new RTreePartitioner(pointsRDD.collect(), 10, true)
+    val pointsParti = new RTreePartitioner(pointsRDD.map(_._1).collect(), 10, true)
     val pointsPart = pointsRDD.partitionBy(pointsParti)
 
-    val polygonsParti = new RTreePartitioner(polygonsRDD.collect(), 10, true)
+    val polygonsParti = new RTreePartitioner(polygonsRDD.map(_._1).collect(), 10, true)
     val polygonsPart = polygonsRDD.partitionBy(polygonsParti)
 
     val joined = polygonsPart.join(pointsPart, JoinPredicate.INTERSECTS)
@@ -247,7 +247,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
 
 
 
-    val partiTaxi = new RTreePartitioner(rddTaxi.sample(withReplacement = false,0.1).collect(), 100, true)
+    val partiTaxi = new RTreePartitioner(rddTaxi.sample(withReplacement = false,0.1).map(_._1).collect(), 100, true)
 
     val partedTaxi = rddTaxi.partitionBy(partiTaxi)
 
@@ -266,8 +266,8 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val partiBlocksSample = new RTreePartitioner(rddBlocks/*.sample(withReplacement = false, 0.1)*/.collect(), 10, false)
-    val partiTaxiSample = new RTreePartitioner(rddTaxi/*.sample(withReplacement = false, 0.8)*/.collect(), 10, true)
+    val partiBlocksSample = new RTreePartitioner(rddBlocks/*.sample(withReplacement = false, 0.1)*/.map(_._1).collect(), 10, false)
+    val partiTaxiSample = new RTreePartitioner(rddTaxi/*.sample(withReplacement = false, 0.8)*/.map(_._1).collect(), 10, true)
 
     val partedTaxi = rddTaxi.partitionBy(partiTaxiSample).cache()
     val partedBlocks = rddBlocks.partitionBy(partiBlocksSample).cache()
@@ -321,14 +321,14 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
     //    BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-    val partiBlocksSample = new RTreePartitioner(rddBlocks/*.sample(withReplacement = false, 0.1)*/.collect(), 10, false)
+    val partiBlocksSample = new RTreePartitioner(rddBlocks/*.sample(withReplacement = false, 0.1)*/.map(_._1).collect(), 10, false)
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
 
-    val partiTaxiSample = new RTreePartitioner(rddTaxi/*.sample(withReplacement = false, 0.8)*/.collect(), 10, true)
+    val partiTaxiSample = new RTreePartitioner(rddTaxi/*.sample(withReplacement = false, 0.8)*/.map(_._1).collect(), 10, true)
 
     val partedBlocksSample = rddBlocks.partitionBy(partiBlocksSample).cache()
     println(s"blocks done: ${partedBlocksSample.count()}")

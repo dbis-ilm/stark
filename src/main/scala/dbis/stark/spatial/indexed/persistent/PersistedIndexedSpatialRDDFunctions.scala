@@ -1,5 +1,7 @@
 package dbis.stark.spatial.indexed.persistent
 
+import java.nio.file.Paths
+
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
@@ -238,5 +240,22 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   override def cluster[KeyType](minPts: Int, epsilon: Double, keyExtractor: ((G,V)) => KeyType,
                         includeNoise: Boolean = true, maxPartitionCost: Int = 10,outfile: Option[String] = None) : RDD[(G, (Int, V))] = ???
 
+
+
+  def saveAsStarkObjectFile(path: String): Unit = self.partitioner.flatMap{
+    case sp: GridPartitioner => Some(sp)
+    case _ =>
+      None
+  } match {
+    case Some(sp) =>
+      val wkts = self.partitions.indices.map{ i =>
+        Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+      }
+
+      self.saveAsObjectFile(path)
+      self.sparkContext.parallelize(wkts).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+    case _ =>
+      self.saveAsObjectFile(path)
+  }
 
 }

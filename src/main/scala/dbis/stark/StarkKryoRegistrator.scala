@@ -2,9 +2,8 @@ package dbis.stark
 
 import com.esotericsoftware.kryo.Kryo
 import dbis.stark.raster.{SMA, Tile}
-import dbis.stark.spatial.indexed.RTree
-import dbis.stark.spatial.partitioner.{CellHistogram, OneToManyPartition}
 import dbis.stark.spatial._
+import dbis.stark.spatial.partitioner.{CellHistogram, OneToManyPartition}
 import org.apache.spark.serializer.KryoRegistrator
 import org.locationtech.jts.geom._
 
@@ -56,7 +55,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
     //
     kryo.register(classOf[Skyline[_]], new SkylineSerializer)
     //
-    kryo.register(classOf[RTree[_]], new RTreeSerializer)
+//    kryo.register(classOf[RTree[_]], new RTreeSerializer)
 
     //    kryo.register(classOf[STObject], new STObjectSerializerBuffer)
     //    kryo.register(classOf[ScalarDistance], new ScalarDistanceSerializerBuffer)

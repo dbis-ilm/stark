@@ -5,8 +5,8 @@ import java.nio.file.Paths
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
-import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
-import dbis.stark.spatial.partitioner.GridPartitioner
+import dbis.stark.spatial.indexed.{Index, IndexFactory, KnnIndex, WithinDistanceIndex}
+import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialGridPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SpatialRDD, TaskContext}
@@ -60,6 +60,30 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       }
     }
   }
+
+  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+    println(self.partitioner)
+    println(other.partitioner)
+
+    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G,_]],"zip join only for spatial grid partitioners")
+    //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
+
+    println("zip join")
+
+    self.zipPartitions(other, preservesPartitioning = true){ (left,right) =>
+
+      val predFunc = JoinPredicate.predicateFunction(pred)
+
+      left.flatMap { tree =>
+        right.flatMap { case (rg, rv) =>
+          tree.query(rg)
+            .filter { case (lg, _) => predFunc(lg, rg) }
+            .map { case (_, lv) => (lv, rv) }
+        }
+      }
+    }
+  }
+
 
   def broadcastJoinWithIndex[V2 : ClassTag](other: RDD[Index[(G,V2)]], pred: JoinPredicate): RDD[(V, V2)] = ???
 

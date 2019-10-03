@@ -3,7 +3,7 @@ package dbis.stark.spatial.indexed.live
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
-import dbis.stark.spatial.partitioner.GridPartitioner
+import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialGridPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.SpatialFilterRDD
 import org.apache.spark.rdd.RDD
@@ -174,6 +174,27 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         Some(indexConfig), oneToMany = oneToMany)
 //    }
   }
+
+  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G,_]],"zip join only for spatial grid partitioners")
+//    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
+
+    self.zipPartitions(other, preservesPartitioning = true){ (left,right) =>
+      val tree = IndexFactory.get[(G,V)](indexConfig)
+
+      left.foreach{ case (g,v) => tree.insert(g,(g,v))}
+      tree.build()
+
+      val predFunc = JoinPredicate.predicateFunction(pred)
+
+      right.flatMap{ case (rg,rv) =>
+        tree.query(rg)
+          .filter{ case (lg,_) => predFunc(lg,rg)}
+          .map{ case (_,lv) => (lv,rv)}
+      }
+    }
+  }
+
 
   /**
     * Performs a broadcast join. The relation "other" is broadcasted to all partitions of this RDD and thus, "other"

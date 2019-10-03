@@ -5,14 +5,17 @@ import java.nio.file.Paths
 
 import com.esotericsoftware.kryo.io.Input
 import dbis.stark.raster.{RasterRDD, RasterUtils, SMA, Tile}
+import dbis.stark.spatial.indexed.{IndexConfig, RTree}
+import dbis.stark.spatial.partitioner.{OneToManyPartition, PartitionerConfig, PartitionerFactory}
 import dbis.stark.{Instant, Interval, STObject}
 import javax.imageio.ImageIO
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{Partition, SparkConf, SparkContext}
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 
 
@@ -62,6 +65,84 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     else
       super.objectFile[T](partitionstoLoad, minPartitions)
   }
+
+  def jointextFiles[V1 : ClassTag, V2: ClassTag](leftPath: String, rightPath: String, qry:Option[STObject],
+                                                 pred: JoinPredicate.JoinPredicate,
+                                                 partitioner: Option[PartitionerConfig], indexer: IndexConfig,
+                                                 lMapper: String => (STObject, V1),
+                                                 rMapper: String => (STObject, V2)
+                                                 ): RDD[(V1, V2)] = {
+
+    val lp = Paths.get(leftPath)
+    val lInfoFile = lp.resolve(STSparkContext.PARTITIONINFO_FILE).toString
+    val lIsDir = dfs.isDirectory(new Path(leftPath))
+
+    val rp = Paths.get(rightPath)
+    val rInfoFile = rp.resolve(STSparkContext.PARTITIONINFO_FILE).toString
+    val rIsDir = dfs.isDirectory(new Path(rightPath))
+
+    if(!(lIsDir && dfs.exists(new Path(lInfoFile))) || !(rIsDir && dfs.exists(new Path(rInfoFile)))) {
+      val l = super.textFile(leftPath).map(lMapper)
+      val r = super.textFile(rightPath).map(rMapper)
+
+      val parti = partitioner.flatMap(c => PartitionerFactory.get(c, l))
+
+      l.liveIndex(parti, indexer).join(r,pred,parti, oneToMany = true)
+    } else {
+
+      val tree = new RTree[String](10)
+      metaInfo(lInfoFile).collect().foreach{ case (so, file) =>
+        tree.insert(so,file)
+      }
+      tree.build()
+
+      val depMap = mutable.Map.empty[String, mutable.Set[String]]
+
+      var i = 0
+      val rightParts = metaInfo(rInfoFile).collect()
+      while(i < rightParts.length) {
+
+        val intersecting = tree.query(rightParts(i)._1)
+
+        if(intersecting.nonEmpty) {
+
+          intersecting.foreach{ lFile =>
+
+            if(depMap.contains(lFile))
+              depMap(lFile).add(rightParts(i)._2)
+            else
+              depMap += lFile -> mutable.Set(rightParts(i)._2)
+          }
+        }
+        i += 1
+      }
+
+      val lSortedNames = depMap.keys.toList.sorted
+      val rSortedNames = depMap.valuesIterator.reduce(_ union _).toList.sorted
+
+      val lDict = lSortedNames.zipWithIndex.toMap
+      val rDict = rSortedNames.zipWithIndex.toMap
+
+
+      val lFiles = lSortedNames.map(f => Paths.get(leftPath, f))
+      val rFiles = rSortedNames.map(f => Paths.get(rightPath, f))
+
+
+      val lRDD = super.textFile(lFiles.mkString(","), lFiles.length).map(lMapper)
+      val rRDD = super.textFile(rFiles.mkString(","), rFiles.length).map(rMapper)
+
+      val thePartitions: Array[Partition] = depMap.iterator.zipWithIndex.map{ case ((lName, rNames),idx) =>
+        val lID = lDict(lName)
+        val rIDs = rNames.map(rDict).toList
+        OneToManyPartition(idx,lRDD,rRDD,lID,rIDs)
+      }.toArray
+
+      new SpatialJoinRDD[STObject, V1,V2](lRDD, rRDD,pred,Some(indexer),true) {
+        override def getPartitions: Array[Partition] = thePartitions
+      }
+    }
+  }
+
 
   def tileFile[U: ClassTag](file: String, partitions: Int, qry: Option[STObject],f: String => U)(implicit ord: Ordering[U]): RasterRDD[U] = {
 
@@ -223,6 +304,30 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
           }
   }
 
+  private[stark] def metaInfo(infoFile: String) = {
+    super.textFile(infoFile) // load info file
+      .map(_.split(STSparkContext.PARTITIONINFO_DELIM))
+      .map { arr =>
+        val stobj = {
+          val interval = if (arr(1).isEmpty)
+            None
+          else {
+            if (arr(2).isEmpty)
+              Some(Interval(Instant(arr(1).toLong), None))
+            else
+              Some(Interval(Instant(arr(1).toLong), Instant(arr(2).toLong)))
+          }
+
+          if (interval.isDefined)
+            STObject(arr(0), interval.get)
+          else
+            STObject(arr(0))
+        }
+
+        (stobj, arr(3))
+      } // (STObject, path)
+  }
+
   private[stark] def getPartitionsToLoad(path: String, qry: Option[STObject]): String = {
     val p = Paths.get(path)
     // the path to the info file
@@ -231,27 +336,7 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     val isDir = dfs.isDirectory(new Path(path))
     val partitionsToLoad = if (qry.isDefined && isDir && dfs.exists(new Path(infoFile))) {
       val query = qry.get
-      super.textFile(infoFile) // load info file
-        .map(_.split(STSparkContext.PARTITIONINFO_DELIM))
-        .map { arr =>
-          val stobj = {
-            val interval = if (arr(1).isEmpty)
-              None
-            else {
-              if (arr(2).isEmpty)
-                Some(Interval(Instant(arr(1).toLong), None))
-              else
-                Some(Interval(Instant(arr(1).toLong), Instant(arr(2).toLong)))
-            }
-
-            if (interval.isDefined)
-              STObject(arr(0), interval.get)
-            else
-              STObject(arr(0))
-          }
-
-          (stobj, arr(3))
-        } // (STObject, path)
+      metaInfo(infoFile)
         .intersects(query) // find relevant partitions
         .map { case (_, file) => Paths.get(path, file).toString } // only path
         .collect() // fetch into single array

@@ -287,6 +287,7 @@ object GeometrySerializer {
   val POLYGON: Byte = 1
   val LINESTRING: Byte = 2
   val MULTIPOLYGON: Byte = 3
+  val RECTANGLE: Byte = 4
 }
 
 //class GeometryAsStringSerializer extends Serializer[Geometry] {
@@ -439,6 +440,14 @@ class GeometrySerializer extends Serializer[Geometry] {
     output.writeDouble(y)
   }
 
+  private def writeRectangle(r: Rectangle, output: Output) = {
+    val pts = r.points
+    output.writeDouble(pts(0).x)
+    output.writeDouble(pts(0).y)
+    output.writeDouble(pts(1).x)
+    output.writeDouble(pts(1).y)
+  }
+
   private def writeLineString(l: LineString, output: Output) = {
     val nPoints = l.getNumPoints
     output.writeInt(nPoints, true)
@@ -455,6 +464,16 @@ class GeometrySerializer extends Serializer[Geometry] {
     geometryFactory.createPoint(c)
   }
 
+  private def readRectangle(input: Input): Rectangle = {
+    val llx = input.readDouble()
+    val lly = input.readDouble()
+    val urx = input.readDouble()
+    val ury = input.readDouble()
+
+    new Rectangle(new Coordinate(llx, lly), new Coordinate(urx, ury))
+  }
+
+
   private def readPointInternal(input: Input): Coordinate = {
     val x = input.readDouble()
     val y = input.readDouble()
@@ -469,6 +488,9 @@ class GeometrySerializer extends Serializer[Geometry] {
     case l: LineString =>
       output.writeByte(GeometrySerializer.LINESTRING)
       writeLineString(l, output)
+    case r: Rectangle =>
+      output.writeByte(GeometrySerializer.RECTANGLE)
+      writeRectangle(r, output)
     case p: Polygon =>
       output.writeByte(GeometrySerializer.POLYGON)
       val extRing = p.getExteriorRing
@@ -504,6 +526,9 @@ class GeometrySerializer extends Serializer[Geometry] {
 
     case GeometrySerializer.LINESTRING =>
       geometryFactory.createLineString(readPoints(input))
+
+    case GeometrySerializer.RECTANGLE =>
+      readRectangle(input)
 
     case GeometrySerializer.POLYGON =>
       geometryFactory.createPolygon(readPoints(input))

@@ -23,6 +23,7 @@ class StarkKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[Point], geometrySerializer)
     kryo.register(classOf[Polygon], geometrySerializer)
     kryo.register(classOf[LineString], geometrySerializer)
+    kryo.register(classOf[Rectangle], geometrySerializer)
     kryo.register(classOf[MultiPolygon], geometrySerializer)
     //
     //    kryo.register(classOf[Point], new PointSerializer)

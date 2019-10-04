@@ -114,18 +114,11 @@ class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
   override def partitionBounds(idx: Int): Cell = partitions(idx)
   override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
 
-
   override def printPartitions(fName: java.nio.file.Path) {
     val list2 = partitions.map { cell => s"${cell.id};${cell.range.wkt};${cell.extent.wkt}" }.toList
     GridPartitioner.writeToFile(list2, fName)
   }
 
-//  def printHistogram(fName: java.nio.file.Path) {
-//
-//    val list2 = histogram.buckets.values.map{ case (cell,cnt) => s"${cell.id};${cell.range.wkt};$cnt"}.toList
-//    GridPartitioner.writeToFile(list2, fName)
-//  }
-  
   override def numPartitions: Int = partitions.length
   
   override def getPartitionId(key: Any): Int = {

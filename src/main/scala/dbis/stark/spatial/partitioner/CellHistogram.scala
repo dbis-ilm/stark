@@ -28,8 +28,8 @@ object CellHistogram {
   def apply(buckets: Seq[(Int, (Cell, Int))]): CellHistogram = CellHistogram(mutable.Map(buckets:_*))
 }
 
-case class CellHistogram private(buckets: mutable.Map[Int, (Cell, Int)] = mutable.Map.empty)
-extends Iterable[(Cell,Int)] {
+case class CellHistogram protected[partitioner](buckets: mutable.Map[Int, (Cell, Int)] = mutable.Map.empty)
+  extends Iterable[(Cell,Int)] {
 
   override def isEmpty = buckets.isEmpty
   override def nonEmpty = buckets.nonEmpty

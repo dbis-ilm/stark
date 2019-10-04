@@ -4,7 +4,7 @@ import java.nio.file.{Path, Paths}
 
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+import dbis.stark.spatial.{Cell, NPoint, NRectRange, StarkUtils}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
 import org.locationtech.jts.geom.Envelope
@@ -185,14 +185,55 @@ object GridPartitioner {
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
                                        xLength: Double, yLength:Double): CellHistogram = {
 
-    def seq(histo1: CellHistogram, pt: Envelope): CellHistogram =
-      histo1.add(pt, minX, minY, maxX, maxY, xLength, yLength,numXCells, pointsOnly)
 
-    def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
-      histo1.combine(histo2,pointsOnly)
+    val m = rdd.map{ env =>
+      val p = env.centre()
+      val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
+
+      (cellId, (StarkUtils.fromEnvelope(env),1))
+    }.reduceByKey{ case ((lr,lc),(rr,rc)) => (lr.extend(rr), lc + rc) }
+      .map{ case (id, (n,c)) =>
+        val bounds = getCellBounds(id, numXCells, xLength, yLength,minX, minY)
+        (id , (Cell(id,bounds,n),c)) }
+      .collect()
+
+    val theMap = mutable.Map.empty[Int, (Cell, Int)]
+    theMap.sizeHint(m.length)
+
+    var i = 0
+    while(i < m.length) {
+      val key = m(i)._1
+      val value = m(i)._2
+      theMap += key -> value
+      i += 1
     }
 
-    rdd.aggregate(CellHistogram(minX,minY,numXCells,numYCells,xLength,yLength))(seq, combine)
+    var y = 0
+    while(y < numYCells) {
+      var x = 0
+      while(x < numXCells) {
+
+        val id = y * numXCells + x
+        if(! theMap.contains(id)) {
+          val bounds = getCellBounds(id, numXCells, xLength, yLength, minX, minY)
+          theMap += id -> (Cell(id, bounds), 0)
+
+        }
+        x += 1
+      }
+      y += 1
+    }
+
+    CellHistogram(theMap)
+
+//    def seq(histo1: CellHistogram, pt: Envelope): CellHistogram =
+//      histo1.add(pt, minX, minY, maxX, maxY, xLength, yLength,numXCells, pointsOnly)
+//
+//    def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
+//      histo1.combine(histo2,pointsOnly)
+//    }
+//
+//    rdd.aggregate(CellHistogram(minX,minY,numXCells,numYCells,xLength,yLength))(seq, combine)
 
 
   }

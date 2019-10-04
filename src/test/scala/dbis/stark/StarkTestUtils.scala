@@ -130,7 +130,7 @@ object StarkTestUtils {
     val start = System.currentTimeMillis()
     val res = block
     val end = System.currentTimeMillis()
-    println(s"$name took ${end - start}")
+    println(s"$name took ${end - start} ms")
     res
   }
   

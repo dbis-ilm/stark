@@ -436,7 +436,6 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     val parti = BSPartitioner(rdd, 0.1, 100, pointsOnly = false, minMax, sampleFraction = 0.1,parallel=true) // disable sampling
 
     parti.numPartitions should be > 0
-
     val end = System.currentTimeMillis()
     println(s"sample version: ${end - start} ms")
 

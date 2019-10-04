@@ -82,17 +82,21 @@ class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHisto
 
       val numCells = GridPartitioner.cellsPerDimension(range, sideLength)
       val numXCells = numCells(0)
-      // if the partition to split does not exceed the maximum cost or is a single cell,
-      // return this as result partition
-      if (BSP.costEstimation(range, sideLength, range, numXCells, cellHistogram) <= maxCostPerPartition ||
-        !numCells.exists(_ > 1)) {
+      /*
+       if the partition to split does not exceed the maximum cost or is a single cell,
+       return this as result partition
+       Note: it may happen that the cost == 0, i.e. we think the partition is empty. However, when we are sampling,
+       the partition might be empty only for the sample. To avoid expensive calculations to assign a point to its
+       closest partition, we add empty partitions here too.
+       */
+      val currCost = BSP.costEstimation(range, sideLength, range, numXCells, cellHistogram)
+      if (( currCost <= maxCostPerPartition) || !numCells.exists(_ > 1)) {
         if (pointsOnly) {
           result.add(Cell(range))
         }
         else {
           result.add(Cell(range, BSP.extentForRange(range, sideLength, numXCells, cellHistogram, range)))
         }
-
       } else { // need to compute the split
 
         // find the best split and ...

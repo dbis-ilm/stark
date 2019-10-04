@@ -668,22 +668,26 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
   it should "produce same join results with sampling as without" taggedAs (Sampling,Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
-      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+      .map { arr => (STObject(arr(1)), arr(0))}
+
 
     //    BSPartitioner.numCellThreshold = Runtime.getRuntime.availableProcessors()
-    val partiBlocksSample = BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
-      pointsOnly = false, sampleFraction = 0.1, parallel = true)
+    val partiBlocksSample = BSPartitioner(rddBlocks, sideLength = 0.002, maxCostPerPartition = 100,
+      pointsOnly = false, sampleFraction = 0.5, parallel = true)
 
     val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
 
     val partiTaxiSample = BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
-      pointsOnly = true, sampleFraction = 0.1, parallel = true)
-
+      pointsOnly = true, sampleFraction = 0.5, parallel = true)
 
     val partedBlocksSample = rddBlocks.partitionBy(partiBlocksSample).cache()
     println(s"blocks done: ${partedBlocksSample.count()}")
+
+    partiBlocksSample.printPartitions("/tmp/blocks_sample.wkt")
+    partiTaxiSample.printPartitions("/tmp/taxi_sample.wkt")
+
 
     val partedTaxiSample = rddTaxi.partitionBy(partiTaxiSample).cache()
 

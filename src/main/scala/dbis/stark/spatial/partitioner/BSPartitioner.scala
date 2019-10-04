@@ -69,8 +69,8 @@ object BSPartitioner {
       val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
       val bsp = if (parallel)
-      // new BSPBinaryAsync(start,  histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
         new BSP2(start, histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
+//        new BSP3(start, histogram, sideLength, numXCells, maxCostPerPartition.toInt, pointsOnly, BSPartitioner.numCellThreshold)
       else
         new BSP(start, histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
 

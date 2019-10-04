@@ -96,8 +96,8 @@ case class STObject(
   lazy val getMinX = this.g.getCoordinates.iterator.map(c => c.x).min
   lazy val getMaxY = this.g.getCoordinates.iterator.map(c => c.y).max
   lazy val getMinY = this.g.getCoordinates.iterator.map(c => c.y).min
-  lazy val getMinZ = this.g.getCoordinates.iterator.map(c => c.z).min
-  lazy val getMaxZ = this.g.getCoordinates.iterator.map(c => c.z).max
+  lazy val getMinZ = this.g.getCoordinates.iterator.map(c => c.getZ).min
+  lazy val getMaxZ = this.g.getCoordinates.iterator.map(c => c.getZ).max
 
   def getMinMaxXY = this.g.getCoordinates.iterator.map(c => (c.x, c.y, c.x,c.y)).reduce( (l,r) => {
     val minX = math.min(l._1, r._1)
@@ -235,9 +235,11 @@ object STObject {
   def apply(x: Double, y: Double, z: Double, ts: Long): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y,z)), ts)
 
   implicit def getInternal(s: STObject): GeoType = s.g
-  
+  implicit def getMBR(s: STObject): MBR = s.getGeo.getEnvelopeInternal
   implicit def makeSTObject(g: GeoType): STObject = STObject(g)
-  
+
+
+
   /**
 	 * Convert a string into a geometry object. The String must be a valid WKT representation
 	 * 
@@ -320,7 +322,7 @@ object STObject {
 
         Some(Interval(start, end))
 
-      case _ => error(s"unknown time id: $timeID")
+      case _ => sys.error(s"unknown time id: $timeID")
     }
 
 

@@ -67,7 +67,8 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "find all elements that contain a given point with spatial partitioner" in {
     val rdd1 = StarkTestUtils.createRDD(sc)
 
-    val rdd = rdd1.partitionBy(new SpatialGridPartitioner(rdd1,10, false))
+    val parti = SpatialGridPartitioner(rdd1,3, pointsOnly = false)
+    val rdd = rdd1.partitionBy(parti)
 
     // we look for all elements that contain a given point.
     // thus, the result should be all points in the RDD with the same coordinates

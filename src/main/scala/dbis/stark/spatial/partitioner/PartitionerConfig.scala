@@ -42,20 +42,23 @@ case class NoPartitionerStrategy() extends PartitionerConfig(PartitionStrategy.N
 object PartitionerFactory {
   def get[G <: STObject : ClassTag, V : ClassTag](strategy: PartitionerConfig, rdd: RDD[(G, V)]): Option[GridPartitioner] = strategy match {
     case BSPStrategy(cellSize, maxCost, pointsOnly, minmax, sampleFactor,parallel) => minmax match {
-      case None => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly,sampleFraction = sampleFactor, parallel = parallel))
-      case Some(mm) => Some(new BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor,parallel))
+      case None => Some(BSPartitioner(rdd, cellSize, maxCost, pointsOnly,sampleFraction = sampleFactor, parallel = parallel))
+      case Some(mm) => Some(BSPartitioner(rdd, cellSize, maxCost, pointsOnly, mm, sampleFactor,parallel))
     }
 
     case GridStrategy(partitionsPerDimensions, pointsOnly, minmax, sampleFraction) => minmax match {
-      case None => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly,sampleFraction=sampleFraction))
-      case Some(mm) => Some(new SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction))
+      case None => Some(SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly,sampleFraction=sampleFraction))
+      case Some(mm) => Some(SpatialGridPartitioner(rdd, partitionsPerDimensions, pointsOnly, mm, dimensions = 2, sampleFraction))
     }
 
     case RTreeStrategy(order, pointsOnly, minmax, sampleFactor) =>
-      val sample = if(sampleFactor > 0) rdd.sample(withReplacement = false, sampleFactor).map(_._1).collect() else rdd.map(_._1).collect()
+      val sample = if(sampleFactor > 0) rdd.sample(withReplacement = false, sampleFactor)
+                    .map(_._1.getGeo.getEnvelopeInternal).collect()
+                  else rdd.map(_._1.getGeo.getEnvelopeInternal).collect()
+
       minmax match {
-        case None => Some(new RTreePartitioner(sample, order, pointsOnly))
-        case Some(mm) => Some(new RTreePartitioner(sample, order, mm, pointsOnly))
+        case None => Some(RTreePartitioner(sample, order, pointsOnly))
+        case Some(mm) => Some(RTreePartitioner(sample, order, mm, pointsOnly))
       }
 
     case NoPartitionerStrategy() => None

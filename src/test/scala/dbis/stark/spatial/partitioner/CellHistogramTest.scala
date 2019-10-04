@@ -30,7 +30,7 @@ class CellHistogramTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it should "correctly add new point to empty" in {
     var histo = CellHistogram.empty
-    histo = histo.add(STObject("POINT(0 0)").getGeo, 0,0,9,9,3,3,3,
+    histo = histo.add(STObject("POINT(0 0)"), 0,0,9,9,3,3,3,
       pointsOnly = true)
 
 
@@ -42,13 +42,13 @@ class CellHistogramTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   it should "correctly add new point to non-empty" in {
     var histo = CellHistogram.empty
-    histo = histo.add(STObject("POINT(0 0)").getGeo, 0,0,9,9,3,3,3,
+    histo = histo.add(STObject("POINT(0 0)"), 0,0,9,9,3,3,3,
       pointsOnly = true)
 
-    histo = histo.add(STObject("POINT(0 0)").getGeo, 0,0,9,9,3,3,3,
+    histo = histo.add(STObject("POINT(0 0)"), 0,0,9,9,3,3,3,
       pointsOnly = true)
 
-    histo = histo.add(STObject("POINT(4 4)").getGeo, 0,0,9,9,3,3,3,
+    histo = histo.add(STObject("POINT(4 4)"), 0,0,9,9,3,3,3,
       pointsOnly = true)
 
 
@@ -64,7 +64,7 @@ class CellHistogramTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "be built correctly from RDD" in {
     val rdd = createRDD()
 
-    val histo = GridPartitioner.buildHistogram(rdd, pointsOnly = true, 3,3,0,
+    val histo = GridPartitioner.buildHistogram(rdd.map(_._1.getGeo.getEnvelopeInternal), pointsOnly = true, 3,3,0,
                               0,9,9,3,3)
 
     histo.buckets.size shouldBe 9

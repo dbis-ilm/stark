@@ -3,9 +3,11 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.{Path, Paths}
 
 import dbis.stark.STObject
+import dbis.stark.STObject.MBR
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.Partitioner
 import org.apache.spark.rdd.RDD
+import org.locationtech.jts.geom.Envelope
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -21,6 +23,8 @@ trait SpatialPartitioner extends Partitioner {
 
   @inline
   def getPartitionId(key: Any): Int
+
+//  def getAllPartitions(key: Any): List[Int]
 
   override final def getPartition(key: Any) = {
     val id = getPartitionId(key)
@@ -73,6 +77,8 @@ object GridPartitioner {
     }
   }
 
+//  def getMinMax[G<: STObject,V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) =
+//    getMinMax(rdd.map(_._1.getGeo.getEnvelopeInternal))
 
   /**
     * Determine the min/max extents of a given RDD
@@ -80,23 +86,21 @@ object GridPartitioner {
     * Since we use right-open intervals in [[NRectRange]] we add [[EPS]] to the both max values
     *
     * @param rdd The RDD
-    * @tparam G The data type representing spatio-temporal data
-    * @tparam V The type for payload data
     * @return Returns a 4-tuple for min/max values in the two dimensions in the form <code>(min-x, max-x, min-y, max-y)</code>
     */
-  def getMinMax[G <: STObject, V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) = {
+  def getMinMax(rdd: RDD[Envelope]): (Double, Double, Double, Double) = {
 
 //    val theRDD = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
 
-    val (minX, maxX, minY, maxY) = rdd.map{ case (g,_) =>
-      val env = g.getEnvelopeInternal
+    val (minX, maxX, minY, maxY) = rdd.map{ env =>
+//      val env = g.getEnvelopeInternal
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
 
     }.reduce { (oldMM, newMM) =>
-      val newMinX = oldMM._1 min newMM._1
-      val newMaxX = oldMM._2 max newMM._2
-      val newMinY = oldMM._3 min newMM._3
-      val newMaxY = oldMM._4 max newMM._4
+      val newMinX = math.min(oldMM._1,newMM._1)
+      val newMaxX = math.max(oldMM._2 , newMM._2)
+      val newMinY = math.min(oldMM._3 , newMM._3)
+      val newMaxY = math.max(oldMM._4 , newMM._4)
 
       (newMinX, newMaxX, newMinY, newMaxY)
     }
@@ -105,17 +109,17 @@ object GridPartitioner {
     (minX, maxX + EPS, minY, maxY + EPS)
   }
 
-  def getMinMax[G <: STObject, V](samples: Array[G]): (Double, Double, Double, Double) = {
+  def getMinMax(samples: Array[MBR]): (Double, Double, Double, Double) = {
 
     var (minX, maxX, minY, maxY) = {
-      val env = samples(0).getEnvelopeInternal
+      val env = samples(0)
       (env.getMinX, env.getMaxX, env.getMinY, env.getMaxY)
     }
 
     var i = 1
     while(i < samples.length) {
 
-      val env = samples(i).getEnvelopeInternal
+      val env = samples(i)
 
       minX = math.min(env.getMinX, minX)
       maxX = math.max(env.getMaxX, maxX)
@@ -177,12 +181,12 @@ object GridPartitioner {
   }
 
 
-  def buildHistogram[G <: STObject, V](rdd: RDD[(G,V)], pointsOnly: Boolean, numXCells: Int, numYCells: Int,
+  def buildHistogram[G <: STObject, V](rdd: RDD[Envelope], pointsOnly: Boolean, numXCells: Int, numYCells: Int,
                                        minX: Double, minY: Double, maxX: Double, maxY: Double,
                                        xLength: Double, yLength:Double): CellHistogram = {
 
-    def seq(histo1: CellHistogram, pt: (G,V)): CellHistogram =
-      histo1.add(pt._1.getGeo, minX, minY, maxX, maxY, xLength, yLength,numXCells, pointsOnly)
+    def seq(histo1: CellHistogram, pt: Envelope): CellHistogram =
+      histo1.add(pt, minX, minY, maxX, maxY, xLength, yLength,numXCells, pointsOnly)
 
     def combine(histo1: CellHistogram, histo2: CellHistogram): CellHistogram = {
       histo1.combine(histo2,pointsOnly)

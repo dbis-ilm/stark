@@ -2,6 +2,7 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Path
 
+import dbis.stark.STObject.MBR
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, StarkUtils}
 import dbis.stark.{Instant, STObject}
 import org.apache.spark.rdd.RDD
@@ -29,27 +30,14 @@ object SpatioTempPartitioner {
     // do +1 for the max values to achieve right open intervals
     (minX, maxX + GridPartitioner.EPS, minY, maxY + GridPartitioner.EPS, start, end)
   }
-}
 
-class SpatioTempPartitioner[G <: STObject : ClassTag, T : ClassTag] private(rdd: RDD[(G,T)],
-                                                                 _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
-                                                                 start: Long, end: Long,
-                                                                 pointsOnly: Boolean)
-  extends GridPartitioner(_minX, _maxX, _minX, _maxY) {
+  def apply[G <: STObject : ClassTag, T : ClassTag](rdd: RDD[(G,T)], minmax: (Double, Double, Double, Double, Long, Long),
+                                                    pointsOnly: Boolean): SpatioTempPartitioner[G] = {
 
-  def this(rdd: RDD[(G,T)], minmax: (Double, Double, Double, Double, Long, Long), pointsOnly: Boolean) =
-    this(rdd, minmax._1, minmax._2, minmax._3, minmax._4, minmax._5, minmax._6, pointsOnly)
-
-
-  def this(rdd: RDD[(G,T)], pointsOnly: Boolean = true) =
-    this(rdd, SpatioTempPartitioner.getMinMax(rdd), pointsOnly)
-
-  val partitions = {
-    val dummy: Byte = 0x0
     val sample = rdd.cache().sample(withReplacement = false, fraction = 0.01).map{case (g,_) => g}.collect()
-
+    val sampleEnvs: Array[MBR] = sample.map(_.getGeo.getEnvelopeInternal)
     // spatial partitioner
-    val rtreeParti = new RTreePartitioner(sample,minX, maxX, minY, maxY,10000, pointsOnly)
+    val rtreeParti: RTreePartitioner = RTreePartitioner(sampleEnvs, 10000, (minmax._1, minmax._2, minmax._3, minmax._4), pointsOnly)
 
     // assign ever element in the sample to a spatial partition and record the min and max temp value for each partition
     var i = 0
@@ -72,20 +60,31 @@ class SpatioTempPartitioner[G <: STObject : ClassTag, T : ClassTag] private(rdd:
 
 
     i = 0
-    val result = new Array[(Cell, Array[Long])](sPartitionsTempMinMax.length)
+    val partitions = new Array[(Cell, Array[Long])](sPartitionsTempMinMax.length)
     while(i < sPartitionsTempMinMax.length) {
       val (start,end) = sPartitionsTempMinMax(i)
       val tempPartitions = TemporalRangePartitioner.fixedRange(start.value,end.value, 10)
 
       val sCell = rtreeParti.partitionBounds(i)
-      result(i) = (sCell, tempPartitions)
+      partitions(i) = (sCell, tempPartitions)
 
       i += 1
     }
 
-    result
-
+    new SpatioTempPartitioner[G](partitions, minmax._1, minmax._2, minmax._3, minmax._4, pointsOnly)
   }
+
+
+  def apply[G <: STObject : ClassTag, T : ClassTag](rdd: RDD[(G,T)], pointsOnly: Boolean = true): SpatioTempPartitioner[G] =
+    SpatioTempPartitioner(rdd, SpatioTempPartitioner.getMinMax(rdd), pointsOnly)
+
+
+}
+
+class SpatioTempPartitioner[G <: STObject : ClassTag] private(partitions: Array[(Cell, Array[Long])],
+                                                              _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
+                                                              pointsOnly: Boolean)
+  extends GridPartitioner(_minX, _maxX, _minX, _maxY) {
 
   private val _numPartitions = {
     var sum = 0

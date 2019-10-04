@@ -123,7 +123,7 @@ object StarkTestUtils {
       order: Int = 10) = {
     
     val rdd = StarkTestUtils.createRDD(sc, file, sep, numParts, distinct)
-    rdd.index(new BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
+    rdd.index(BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
   }
 
   def timing[R](name: String)(block: => R) = {

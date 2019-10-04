@@ -1,8 +1,8 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.STObject.GeoType
 import dbis.stark.spatial.partitioner.GridPartitioner.{getCellBounds, getCellId}
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, StarkUtils}
+import org.locationtech.jts.geom.Envelope
 
 import scala.collection.mutable
 import scala.util.Try
@@ -57,7 +57,7 @@ extends Iterable[(Cell,Int)] {
       throw exception
   }
 
-  def increment(cellId: Int, cell: Cell, o: GeoType, pointsOnly: Boolean): Unit = {
+  def increment(cellId: Int, cell: Cell, o: Envelope, pointsOnly: Boolean): Unit = {
     buckets get cellId match {
       case None =>
         buckets += cellId -> (cell, 1)
@@ -65,7 +65,7 @@ extends Iterable[(Cell,Int)] {
 
       case Some((c, cnt)) =>
         if(!pointsOnly)
-          c.extendBy(StarkUtils.fromGeo(o))
+          c.extendBy(StarkUtils.fromEnvelope(o))
 
         buckets.update(cellId, (c, cnt+1))
     }
@@ -100,9 +100,10 @@ extends Iterable[(Cell,Int)] {
 
   }
 
-  def add(pt: GeoType, minX:Double, minY:Double, maxX: Double, maxY: Double,xLength: Double, yLength:Double,
+  def add(pt: Envelope, minX:Double, minY:Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double,
           numXCells: Int, pointsOnly: Boolean): CellHistogram ={
-    val p = StarkUtils.getCenter(pt)
+//    val p = StarkUtils.getCenter(pt)
+    val p = pt.centre()
     val cellId = getCellId(p.getX, p.getY,minX, minY, maxX, maxY, xLength, yLength, numXCells)
 
     val bounds = getCellBounds(cellId, numXCells, xLength, yLength,minX, minY)

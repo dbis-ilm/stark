@@ -3,23 +3,16 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
+import dbis.stark.STObject.MBR
 import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, StarkUtils}
 
-class RTreePartitioner[G <: STObject](samples: Array[G],
-                                        _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
-                                        maxCost: Int, pointsOnly: Boolean)
-  extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
 
-  require(maxCost > 0)
+object RTreePartitioner {
 
-  def this(samples: Array[G], maxCost: Int, minMax: (Double, Double, Double, Double), pointsOnly: Boolean) =
-    this(samples, minMax._1, minMax._2, minMax._3, minMax._4, maxCost, pointsOnly)
+  def apply(samples: Array[MBR], maxCost: Int, minMax: (Double, Double, Double, Double), pointsOnly: Boolean): RTreePartitioner = {
 
-  def this(samples: Array[G], maxCost: Int, pointsOnly: Boolean = true) =
-    this(samples, maxCost, GridPartitioner.getMinMax(samples), pointsOnly)
-
-  protected[spatial] val partitions: Array[Cell] = {
+    require(maxCost > 0)
 
     val dummy: Byte = 0x0
 
@@ -35,15 +28,32 @@ class RTreePartitioner[G <: STObject](samples: Array[G],
 
     val children = tree.queryBoundary() // is a Java ArrayList!
 
-    val result = new Array[Cell](children.size())
+    val partitions = new Array[Cell](children.size())
     i = 0
     while(i < children.size()) {
-      result(i) = Cell(i, StarkUtils.fromEnvelope(children.get(i)))
+      partitions(i) = Cell(i, StarkUtils.fromEnvelope(children.get(i)))
       i += 1
     }
-    result
+
+    new RTreePartitioner(partitions, minMax._1, minMax._2, minMax._3, minMax._4, pointsOnly)
   }
 
+  def apply(samples: Array[MBR], maxCost: Int, pointsOnly: Boolean = true): RTreePartitioner =
+    RTreePartitioner(samples, maxCost, GridPartitioner.getMinMax(samples), pointsOnly)
+}
+
+
+class RTreePartitioner private(val partitions: Array[Cell],
+                               _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
+                               pointsOnly: Boolean)
+  extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
+
+//  override def getAllPartitions(key: Any): List[Int] = {
+//    val g = key.asInstanceOf[STObject]
+//    partitions.iterator.filter{ case Cell(_,_,extent) =>
+//      extent.intersects(StarkUtils.fromEnvelope(g.getGeo.getEnvelopeInternal))
+//    }.map(_.id).toList
+//  }
 
   override def partitionBounds(idx: Int) = partitions(idx)
 

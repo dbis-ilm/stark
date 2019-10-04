@@ -175,8 +175,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 //    }
   }
 
+
   def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
-    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G,_]],"zip join only for spatial grid partitioners")
+    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
 //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
 
     self.zipPartitions(other, preservesPartitioning = true){ (left,right) =>

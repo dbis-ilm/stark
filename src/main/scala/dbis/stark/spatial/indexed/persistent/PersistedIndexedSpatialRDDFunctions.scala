@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
-import dbis.stark.spatial.indexed.{Index, IndexFactory, KnnIndex, WithinDistanceIndex}
+import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
 import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialGridPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
@@ -65,7 +65,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     println(self.partitioner)
     println(other.partitioner)
 
-    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G,_]],"zip join only for spatial grid partitioners")
+    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
     //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
 
     println("zip join")

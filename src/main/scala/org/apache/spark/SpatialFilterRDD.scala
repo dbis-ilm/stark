@@ -38,7 +38,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
     *
     * This will always be set to the parent's partitioner
     */
-//  override val partitioner: Option[Partitioner] = parent.partitioner
+  //  override val partitioner: Option[Partitioner] = parent.partitioner
 
   /**
     * Return the partitions that have to be processed.
@@ -51,6 +51,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
     */
   override def getPartitions: Array[Partition] = {
     val parent = firstParent[(G,V)]
+//    println(s"in filterrdd: $partitioner $checkParties")
     partitioner.map{
       // check if this is a spatial partitioner
       case sp: GridPartitioner if checkParties =>
@@ -77,6 +78,8 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
           parentPartiId += 1
         }
 
+//        println(s"spatial parts: ${spatialParts.size}")
+//        spatialParts.foreach(println)
         spatialParts.toArray
       case tp: TemporalPartitioner =>
 
@@ -120,10 +123,14 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
         }
         spatialParts.toArray
       case _ =>
+        // other (unknown) partitioner
         parent.partitions
 
-    }.getOrElse(parent.partitions)
-  } // no partitioner
+    }.getOrElse{
+      // no partitioner
+      parent.partitions
+    }
+  }
 
 
 
@@ -133,8 +140,10 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
     /* determine the split to process. If a spatial partitioner was applied, the actual
      * partition/split is encapsulated
      */
+
     val split = inputSplit match {
-      case sp: SpatialPartition => sp.parentPartition
+      case sp: SpatialPartition =>
+        sp.parentPartition
       case _ => inputSplit
     }
 
@@ -150,7 +159,11 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
       tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
 
     } else {
-      inputIter.filter { case (g, _) => predicateFunc(g, qry) }
+      inputIter.filter { case (g, _) =>
+        val res = predicateFunc(g, qry)
+//        println(s"checking $predicate $g -- $qry : $res")
+        res
+      }
     }
     new InterruptibleIterator(context, resultIter)
 //    resultIter

@@ -241,6 +241,7 @@ class HistogramSerializer extends Serializer[CellHistogram] {
   override def read(kryo: Kryo, input: Input, `type`: Class[CellHistogram]) = {
     val num = input.readInt(true)
     val buckets = mutable.Map.empty[Int, (Cell, Int)]
+
     var i = 0
     while(i < num) {
       val cell = kryo.readObject(input, classOf[Cell], cellSerializer)

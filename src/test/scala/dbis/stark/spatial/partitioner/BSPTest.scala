@@ -1,11 +1,7 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.StarkTestUtils
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import dbis.stark.spatial.NPoint
-import dbis.stark.spatial.Cell
-import dbis.stark.spatial.NRectRange
+import dbis.stark.spatial.{Cell, NPoint, NRectRange}
+import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.tagobjects.Slow
 
 import scala.collection.mutable
@@ -275,7 +271,7 @@ class BSPTest extends FlatSpec with Matchers {
 //    histo.map(_._1.range.wkt).foreach(println)
   }
 
-  it should "be faster than sequential" taggedAs Slow in {
+  ignore should "be faster than sequential" taggedAs Slow in {
     val sideLength = 0.1
     val maxCost = 10
     val numXCells = 500

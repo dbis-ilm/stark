@@ -65,7 +65,7 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
   def visualize(imageWidth: Int, imageHeight: Int,
                 path: String,
                 fileExt: String = "png",
-                range: (Double,Double,Double,Double) = GridPartitioner.getMinMax(rdd),
+                range: (Double,Double,Double,Double) = GridPartitioner.getMinMax(rdd.map(_._1.getGeo.getEnvelopeInternal)),
                 flipImageVert: Boolean = false,
                 bgImagePath: String = null,
                 pointSize: Int = 1,

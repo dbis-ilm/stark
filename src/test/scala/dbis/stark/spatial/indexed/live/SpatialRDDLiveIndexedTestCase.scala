@@ -36,7 +36,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   "A LIVE indexed SpatialRDD" should "find the correct intersection result for points with grid partitioning" in { 
     
     val rddRaw = StarkTestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5, true),10)
+    val rdd = rddRaw.liveIndex(SpatialGridPartitioner(rddRaw, 5, pointsOnly = true),10)
     
     val foundPoints = rdd.intersects(qry).collect()
     
@@ -48,7 +48,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   it should "find all elements contained by a query with grid partitioning"  in { 
     val rddRaw = StarkTestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5, false),10)
+    val rdd = rddRaw.liveIndex(SpatialGridPartitioner(rddRaw, 5, pointsOnly = false),10)
     
     val foundPoints = rdd.containedby(qry).collect()
     
@@ -57,7 +57,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   it should "find all elements that contain a given point" in { 
 	  val rddRaw = StarkTestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 5, true),10)
+    val rdd = rddRaw.liveIndex(SpatialGridPartitioner(rddRaw, 5, pointsOnly = true),10)
 	  
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
@@ -71,7 +71,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   it should "find the correct nearest neighbors with grid partitioning" in { 
     val rddRaw = StarkTestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, partitionsPerDimension = 5, pointsOnly = true), order= 5)
+    val rdd = rddRaw.liveIndex(SpatialGridPartitioner(rddRaw, partitionsPerDimension = 5, pointsOnly = true), order= 5)
 	  
 	  // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -214,7 +214,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 
   it should "find the correct within distance filter result with FixedGrid" in {
     val rddRaw = StarkTestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new SpatialGridPartitioner(rddRaw, 10, true), order = 3)
+    val rdd = rddRaw.liveIndex(SpatialGridPartitioner(rddRaw, 10, pointsOnly = true), order = 3)
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -227,7 +227,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 
   it should "find the correct within distance filter result with BSP" in {
     val rddRaw = StarkTestUtils.createRDD(sc)
-    val rdd = rddRaw.liveIndex(new BSPartitioner(rddRaw, 1, 50, true), order = 3)
+    val rdd = rddRaw.liveIndex(BSPartitioner(rddRaw, 1, 50, pointsOnly = true), order = 3)
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -243,7 +243,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = StarkTestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true),10)
+    val rdd1 = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true),10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -256,7 +256,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd.map{ case (st, v) => (st.toText, 1) }
+    val rdd2 = rdd.map{ case (st, _) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -270,7 +270,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = StarkTestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true),10)
+    val rdd1 = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true),10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -283,7 +283,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd.map{ case (st, v) => (st.toText, 1) }
+    val rdd2 = rdd.map{ case (st, _) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -297,7 +297,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val rdd = StarkTestUtils.createRDD(sc, distinct = true).cache()
     
-    val rdd1 = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true), 10)
+    val rdd1 = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true), 10)
 
     /* perform the spatial join with intersects predicate
      * and then map the result to the STObject element (which is the same for left and right input)
@@ -310,7 +310,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
      * STObject's text/string representation as join key and a simple 1 as payload.
      * We also map the result to just the text of the respective STObject. 
      */
-    val rdd2 = rdd.map{ case (st, v) => (st.toText, 1) }
+    val rdd2 = rdd.map{ case (st, _) => (st.toText, 1) }
     val plainJoinResult = rdd2.join(rdd2).map(_._1).collect() // plain join
     
     // first of all, both sizes should be the same
@@ -324,8 +324,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   
   ignore should "return a cluster result with all points with grid partitioning" in {
     val rdd1 = StarkTestUtils.createRDD(sc)
-    val rdd = rdd1.liveIndex(new SpatialGridPartitioner(rdd1, 5, true), 10)
-    
+
     val f = new java.io.File("clusterresult")
     StarkTestUtils.rmrf(f) // delete output directory if existing to avoid write problems
 
@@ -349,7 +348,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val qryT = STObject(qry.getGeo, Interval(StarkTestUtils.makeTimeStamp(2013, 1, 1), StarkTestUtils.makeTimeStamp(2013, 1, 31)))
     
-    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true), 10).intersects(qryT)
+    val res = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true), 10).intersects(qryT)
     
     res.count() shouldBe 1    
   }
@@ -360,7 +359,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", StarkTestUtils.makeTimeStamp(2013, 6, 8))
     
-    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true), 10).contains(q)
+    val res = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true), 10).contains(q)
     
     res.count() shouldBe 2
   }
@@ -371,7 +370,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", StarkTestUtils.makeTimeStamp(2013, 6, 8))
     
-    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true), 10).containedby(q)
+    val res = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true), 10).containedby(q)
     
     res.count() shouldBe 2
   }
@@ -382,7 +381,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     
     val q: STObject = STObject("POINT (53.483437 -2.2040706)", Interval(StarkTestUtils.makeTimeStamp(2013, 6, 1),StarkTestUtils.makeTimeStamp(2013, 6, 30) ))
     
-    val res = rdd.liveIndex(new SpatialGridPartitioner(rdd, 5, true), 10).containedby(q)
+    val res = rdd.liveIndex(SpatialGridPartitioner(rdd, 5, pointsOnly = true), 10).containedby(q)
     
     res.count() shouldBe 4
   }

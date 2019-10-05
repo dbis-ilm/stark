@@ -40,14 +40,6 @@ class Rectangle(val points: Array[Coordinate])
     getEnvelope.equalsExact(other,tolerance)
   }
 
-  override def apply(filter: CoordinateFilter): Unit = ???
-
-  override def apply(filter: CoordinateSequenceFilter): Unit = ???
-
-  override def apply(filter: GeometryFilter): Unit = ???
-
-  override def apply(filter: GeometryComponentFilter): Unit = ???
-
   override def copyInternal(): Rectangle = {
     val ll = new Coordinate(points(0))
     val ur = new Coordinate(points(1))

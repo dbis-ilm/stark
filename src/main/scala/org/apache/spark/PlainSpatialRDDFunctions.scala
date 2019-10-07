@@ -2,6 +2,7 @@ package org.apache.spark
 
 import java.nio.file.Paths
 
+import dbis.stark.STObject.MBR
 import dbis.stark.dbscan.{ClusterLabel, DBScan}
 import dbis.stark.raster.{RasterRDD, Tile}
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
@@ -25,6 +26,9 @@ import scala.reflect.ClassTag
 class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
                                                                        self: RDD[(G,V)]
   ) extends SpatialRDDFunctions[G,V](self) with Serializable {
+
+  val o = Ordering.fromLessThan[(G,(Distance,V))](_._2._1 < _._2._1)
+
 
   def saveAsStarkTextFile(path: String, formatter: ((G,V)) => String): Unit =
     self.partitioner.flatMap{
@@ -124,8 +128,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     self.sparkContext.parallelize(knn)
   }
 
+  override def knnAgg2Iter(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance,V))] = {
+    knnAggIter(ref, k, distFunc)
+  }
 
-  override def knnAgg(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance,V))] = {
+  override def knnAggIter(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance,V))] = {
     type Data = (G,V)
     def combine(knn: KNN[Data], tuple: Data) = {
       val dist = distFunc(ref, tuple._1)
@@ -140,11 +147,65 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val empty = new KNN[Data](k)
 
     val knn = self.aggregate(empty)(combine, merge)
-
-    self.sparkContext.parallelize(knn.iterator.map{ case (dist,(g,v)) => (g,(dist,v)) }.toSeq)
-
+    knn.iterator.map{ case (dist,(g,v)) => (g,(dist,v)) }
   }
 
+  override def knnAgg(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G, (Distance,V))] =
+    self.sparkContext.parallelize(knnAggIter(ref,k,distFunc).toSeq)
+
+  override def knn2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G,(Distance, V))] = self.partitioner match {
+    case Some(p: GridPartitioner) =>
+
+      val partitionOfQry = p.getPartition(qry)
+
+      def blubb(context: TaskContext, iter: Iterator[(G,V)]): (Iterator[(Distance,(G,V))],Int) = {
+        if(iter.nonEmpty && context.partitionId() == partitionOfQry) {
+          val knnS = new KNN[(G, V)](k)
+          iter.foreach{o =>
+            val dist = distFunc(qry, o._1)
+            knnS.insert(dist, o)
+          }
+          (knnS.iterator, knnS.size)
+        }
+        else
+          (Iterator.empty,0)
+      }
+
+      val (knnsInPart,num) = self.sparkContext.runJob(self, blubb _,Seq(partitionOfQry)).apply(0)
+
+      if(num == k) {
+        knnsInPart.map { case (d,(g,v)) => (g,(d,v))}
+      } else if(num > k) {
+        knnsInPart.toStream.sortBy(_._1.minValue).map { case (d,(g,v)) => (g,(d,v))}.iterator
+      } else {
+
+        val maxDist = if (num <= 0) 0.0
+          else if (knnsInPart.length == 1) knnsInPart.take(1).toSeq.head._1.minValue
+          else knnsInPart.toStream.maxBy(_._1)._1.minValue //tail.head._2.minValue
+
+        if (maxDist <= 0.0) {
+          // for maxDist == 0 the box would be a point and not find any addtitional kNNs
+          // we maybe should iteratively increase the box size
+          //        println("fallback to knnAgg")
+          knnAggIter(qry, k, distFunc)
+        }
+        else {
+          println("found only myself in partition. perform global search!")
+          val qryPoint = qry.getGeo.getCentroid.getCoordinate
+          val env = StarkUtils.makeGeo(
+            new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist))
+          val knns = this.containedby(STObject(env).asInstanceOf[G])
+            .map { case (g, v) => (g, (distFunc(qry, g), v)) }
+            .takeOrdered(k)(o.reverse)
+          val result = (knns ++ knnsInPart.map { case (d,(g, v)) => (g, (d, v)) }).toStream.sorted(o).iterator.take(k)
+          result
+        }
+      }
+
+    case _ =>
+      println("no partitioner set")
+      knnAggIter(qry,k,distFunc)
+  }
 
   /**
    * Join this SpatialRDD with another (spatial) RDD.<br><br>

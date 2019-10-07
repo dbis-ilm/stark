@@ -13,6 +13,8 @@ import org.apache.spark.{SpatialRDD, TaskContext}
 
 import scala.reflect.ClassTag
 
+
+
 class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     @transient private val self: RDD[Index[(G,V)]]) extends SpatialRDDFunctions[G,V](self.flatMap(_.items)) with Serializable {
 
@@ -203,6 +205,12 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
       val knnsInPart = self.sparkContext.runJob(self, blubb _,Seq(partitionOfQry)).flatten
 
+      if(knnsInPart.length == k) {
+        return knnsInPart.iterator.map { case ((g,v),d) => (g,(d,v))}
+      } else if(knnsInPart.length > k) {
+        return knnsInPart.toStream.sortBy(_._2.minValue).iterator.map { case ((g,v),d) => (g,(d,v))}
+      }
+
 //      val knnsInPart = self.mapPartitionsWithIndex({(idx, iter) =>
 //        if(idx == partitionOfQry) {
 //          iter.flatMap{ index => index.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)}
@@ -224,17 +232,11 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
         knnAgg2Iter(qry, k, distFunc)
       }
       else {
-
-
         val qryPoint = qry.getGeo.getCentroid.getCoordinate
-
         val env = StarkUtils.makeGeo(new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist))
-
         val knns = this.containedby(STObject(env).asInstanceOf[G]).map { case (g, v) => (g, (distFunc(qry, g), v)) }.takeOrdered(k)(o.reverse)
-
         val result = (knns ++ knnsInPart.map{case ((g,v),d) => (g,(d,v))}).sorted(o).take(k)
 
-//        self.sparkContext.parallelize(knns)
         result.iterator
       }
 

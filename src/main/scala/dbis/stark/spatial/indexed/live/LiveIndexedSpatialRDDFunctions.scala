@@ -286,5 +286,9 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
     ???
   }
+
+  override def knnAggIter(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance, V))] = ???
+  override def knnAgg2Iter(ref: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance, V))] = ???
+  override def knn2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G, (Distance, V))] = ???
 }
 

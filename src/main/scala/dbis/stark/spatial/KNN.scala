@@ -18,6 +18,8 @@ case class KNN[PayloadT](k: Int) extends Serializable with Cloneable with Iterab
   def full = m >= k
   def empty = m < 0
 
+  override def size = if(full) k else m + 1
+
   protected[spatial] def set(nns: IndexedSeq[(Distance, PayloadT)]) = {
 //    require(nns.length == k, "provided list must have exactly length k")
 

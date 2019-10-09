@@ -1,9 +1,8 @@
-package dbis.stark.spatial.indexed
+package org.locationtech.jts.index.strtree
 
 import dbis.stark.StarkTestUtils.makeTimeStamp
 import dbis.stark.{Distance, STObject, ScalarDistance}
 import org.locationtech.jts.geom.Geometry
-import org.locationtech.jts.index.strtree.STRtree
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -11,7 +10,8 @@ import scala.collection.JavaConversions.asScalaBuffer
 
 class RTreeTest extends FlatSpec with Matchers {
   
-  def loadFile() = scala.io.Source.fromFile("src/test/resources/new_eventful_flat_1000.csv")
+  def loadFile() =
+    scala.io.Source.fromFile("src/test/resources/new_eventful_flat_1000.csv")
           .getLines()
           .map { line => line.split(',') }
           .map { arr => (arr(0), arr(1).toInt, arr(2), STObject(arr(7))) } 

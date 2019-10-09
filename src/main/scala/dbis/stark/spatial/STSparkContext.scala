@@ -5,7 +5,7 @@ import java.nio.file.Paths
 
 import com.esotericsoftware.kryo.io.Input
 import dbis.stark.raster.{RasterRDD, RasterUtils, SMA, Tile}
-import dbis.stark.spatial.indexed.{IndexConfig, RTree}
+import dbis.stark.spatial.indexed.IndexConfig
 import dbis.stark.spatial.partitioner.{OneToManyPartition, PartitionerConfig, PartitionerFactory}
 import dbis.stark.{Instant, Interval, STObject}
 import javax.imageio.ImageIO
@@ -14,6 +14,7 @@ import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{Partition, SparkConf, SparkContext}
+import org.locationtech.jts.index.strtree.RTree
 
 import scala.collection.mutable
 import scala.reflect.ClassTag

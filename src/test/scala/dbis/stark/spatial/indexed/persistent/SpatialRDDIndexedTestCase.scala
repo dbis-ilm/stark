@@ -1,14 +1,18 @@
 package dbis.stark.spatial.indexed.persistent
 
+import java.nio.file.{Files, Paths}
+
 import dbis.stark.STObject.{fromWKT, getInternal, makeSTObject}
 import dbis.stark._
-import dbis.stark.spatial.indexed.{RTree, RTreeConfig}
-import dbis.stark.spatial.partitioner.{BSPStrategy, BSPartitioner, GridStrategy, SpatialGridPartitioner}
+import dbis.stark.spatial.indexed.{Index, RTreeConfig}
+import dbis.stark.spatial.partitioner.{BSPStrategy, BSPartitioner, GridStrategy, PartitionerFactory, SpatialGridPartitioner}
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import org.apache.spark.SpatialRDD._
+import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
+import org.locationtech.jts.index.strtree.RTree
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
@@ -21,6 +25,7 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     conf.set("spark.serializer", classOf[KryoSerializer].getName)
     conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
+//    sc = new STSparkContext(conf)
   }
   
   override def afterAll() {
@@ -439,6 +444,77 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
     
     spatialJoinResult.foreach{ case ((_, _, _, lLoc), (_, _, _, rLoc)) => 
       lLoc shouldBe rLoc // we joined on points with "intersects", hence they should be equal
+    }
+  }
+
+  it should "repartition 10M points with BSP in acceptable time" in {
+    val inputFile = Paths.get("/home/hage/data/points_10M.csv")
+    val rdd2 = sc.textFile(inputFile.toString)
+      .map{line =>
+        val arr = line.split(",")
+        (STObject(arr(0).toDouble, arr(1).toDouble), line.length)
+      }
+
+    val strategy = BSPStrategy(0.1, 10000, pointsOnly = true)
+    StarkTestUtils.timing("BSP on 10M points") {
+      val parti = PartitionerFactory.get(strategy, rdd2)
+      println(parti.get.numPartitions)
+      parti.get.printPartitions("/tmp/partis_10m.wkt")
+    }
+  }
+
+  ignore should "materialize the index " in {
+
+    val inputFile = Paths.get("/home/hage/data/points_10M.csv")
+
+
+    // some arbitrary query polygon
+    val qry = STObject("POLYGON((40 10, 50 10, 50 20, 40 20, 40 10))")
+
+    val rdd2 = sc.textFile(inputFile.toString)
+      .map{line =>
+        val arr = line.split(",")
+        (STObject(arr(0).toDouble, arr(1).toDouble), line.length)
+      }.repartition(100)
+
+    println(s"num partitions: ${rdd2.getNumPartitions}")
+
+    val indexed = rdd2.index(RTreeConfig(5))
+
+
+    val theFile = Paths.get("/tmp/materializedidx")
+    if(!Files.exists(theFile)) {
+      println(s"writing indexed rdd to: ${theFile.toString}")
+      indexed.saveAsObjectFile(theFile.toString)
+    }
+
+
+    val sourceFileSize = StarkTestUtils.du(inputFile)
+    val indexedFileSize = StarkTestUtils.du(theFile)
+
+    println(s"source file has ${StarkTestUtils.toHuman(sourceFileSize)} bytes  vs ${StarkTestUtils.toHuman(indexedFileSize)} bytes in Index!")
+
+
+    val plainResCnt = rdd2.intersects(qry).count()
+
+    var indexedResCnt = 0L
+    StarkTestUtils.timing("indexed query") {
+      indexedResCnt = indexed.intersects(qry).count()
+      withClue("plain vs index") {
+        plainResCnt shouldBe indexedResCnt
+      }
+    }
+
+    var loadedIdxResCnt = 0L
+    val loadedIdx: RDD[Index[(STObject,Int)]] = sc.objectFile[Index[(STObject,Int)]](theFile.toString)
+    println(s"loaded idx partitions: ${loadedIdx.getNumPartitions}")
+    StarkTestUtils.timing("load index)") {
+
+      loadedIdxResCnt = loadedIdx.intersects(qry).count()
+
+      withClue("indexed vs loaded") {
+        indexedResCnt shouldBe loadedIdxResCnt
+      }
     }
   }
   

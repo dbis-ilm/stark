@@ -4,8 +4,8 @@ import java.nio.file.Path
 
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
-import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.{Cell, NPoint, StarkUtils}
+import org.locationtech.jts.index.strtree.RTree
 
 
 object RTreePartitioner {

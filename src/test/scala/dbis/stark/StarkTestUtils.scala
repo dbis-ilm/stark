@@ -1,13 +1,16 @@
 package dbis.stark
 
 import java.io.File
+import java.nio.file.{Files, Path}
 import java.time.LocalDate
 
-import org.apache.spark.SpatialRDD._
+import scala.collection.JavaConverters._
+
 import dbis.stark.spatial.partitioner.BSPartitioner
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
+import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.Tag
 
 object Fix extends Tag("dbis.stark.Fix")
@@ -50,6 +53,21 @@ object StarkTestUtils {
     if (!file.delete) throw FileOperationError(s"Deleting $file failed!")
 
   def mkdir(path: String): Unit = new File(path).mkdirs
+
+  def toHuman(bytes: Long): String = {
+    val names = Array("Bytes", "KiB", "MiB", "GiB", "TB")
+    var idx = 0
+    var b = bytes
+    while(b >= 1024 && idx < names.length) {
+      b /= 1024
+      idx += 1
+    }
+
+    s"$b ${names(idx)}"
+  }
+
+  def du(path: Path): Long =
+    Files.walk(path).iterator().asScala.map(Files.size).sum
 
   def createSparkContext(name: String, parallel: Int = 4) = {
     val conf = new SparkConf().setMaster(s"local[$parallel]").setAppName(name)

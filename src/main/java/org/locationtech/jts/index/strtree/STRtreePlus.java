@@ -65,26 +65,26 @@ import java.util.*;
  *  <li> Make STRtree generic to avoid having to cast to correct type in calling functions
  *  <li> k nearest neighbor search returns list of T instead of only the Envelope so that we obtain the data and not only useless bounds
  * </ul>
- * 
+ *
  * @version 1.7
  */
 public class STRtreePlus<T> extends STRtree
 {
 
   /**
-   * 
+   *
    */
   private static final long serialVersionUID = 259274702368956900L;
-  
+
 
   private static final int DEFAULT_NODE_CAPACITY = 10;
-  
+
   /**
    * Constructs an STRtree with the default node capacity.
    */
-  public STRtreePlus() 
-  { 
-    this(DEFAULT_NODE_CAPACITY); 
+  public STRtreePlus()
+  {
+    this(DEFAULT_NODE_CAPACITY);
   }
 
   /**
@@ -92,17 +92,19 @@ public class STRtreePlus<T> extends STRtree
    * a node may have.
    * <p>
    * The minimum recommended capacity setting is 4.
-   * 
+   *
    */
   public STRtreePlus(int nodeCapacity) {
     super(nodeCapacity);
   }
 
-
+  public void setRoot(AbstractNode root) {
+    super.root = root;
+  }
 
   public ResultIterator<T> iteratorQuery(Envelope env) {
-      super.build();
-      return new ResultIterator<>(this, env);
+    super.build();
+    return new ResultIterator<>(this, env);
   }
 
   /**
@@ -115,7 +117,7 @@ public class STRtreePlus<T> extends STRtree
    * contained in the tree, but it does 
    * have to be compatible with the <tt>itemDist</tt> 
    * distance metric. 
-   * 
+   *
    * @param env the envelope of the query item
    * @param item the item to find the nearest neighbour of
    * @param itemDist a distance metric applicable to the items in this tree and the query item
@@ -128,17 +130,17 @@ public class STRtreePlus<T> extends STRtree
     BoundablePair bp = new BoundablePair(this.getRoot(), bnd, itemDist);
     return nearestNeighbour(bp,k);
   }
-  
+
   private List<Tuple2<T,Double>> nearestNeighbour(BoundablePair initBndPair, int k)
   {
     return nearestNeighbour(initBndPair, Double.POSITIVE_INFINITY,k);
   }
-  
+
   @SuppressWarnings("unchecked")
   private List<Tuple2<T,Double>> nearestNeighbour(BoundablePair initBndPair, double maxDistance, int k)
   {
     double distanceLowerBound = maxDistance;
-    
+
     // initialize internal structures
     PriorityQueue priQ = new PriorityQueue();
 
@@ -151,8 +153,8 @@ public class STRtreePlus<T> extends STRtree
       // pop head of queue and expand one side of pair
       BoundablePair bndPair = (BoundablePair) priQ.poll();
       double currentDistance = bndPair.getDistance();
-      
-      
+
+
       /*
        * If the distance for the first node in the queue
        * is >= the current maximum distance in the k queue , all other nodes
@@ -162,67 +164,67 @@ public class STRtreePlus<T> extends STRtree
        */
 
       if (currentDistance >= distanceLowerBound && kNearestDistances.size()>=k){
-    	  break;  
+        break;
       }
 
       /*
        * If the pair members are leaves
        * then their distance is the exact lower bound.
        * Update the distanceLowerBound to reflect this
-       * (which must be smaller, due to the test 
-       * immediately prior to this). 
+       * (which must be smaller, due to the test
+       * immediately prior to this).
        */
       if (bndPair.isLeaves()) {
         // assert: currentDistance < minimumDistanceFound
-    	
+
         //distanceLowerBound = currentDistance;
-    	  if(kNearestDistances.size()>0 && kNearestDistances.size()<k){
+        if(kNearestDistances.size()>0 && kNearestDistances.size()<k){
 
-    		  int position=Collections.binarySearch(kNearestDistances, currentDistance);
-	    	  	if(position<0)
-  	            {
-  	          	  position=-position-1;
-  	            }
-	    	  	kNearestNeighbors.add(position,(T)((ItemBoundable)bndPair.getBoundable(0)).getItem());
-  	        	kNearestDistances.add(position,currentDistance); 
-    	  }
-    	  else if(kNearestDistances.size()>=k)
-    	  {
+          int position=Collections.binarySearch(kNearestDistances, currentDistance);
+          if(position<0)
+          {
+            position=-position-1;
+          }
+          kNearestNeighbors.add(position,(T)((ItemBoundable)bndPair.getBoundable(0)).getItem());
+          kNearestDistances.add(position,currentDistance);
+        }
+        else if(kNearestDistances.size()>=k)
+        {
 
-  	  		if(currentDistance<kNearestDistances.get(kNearestDistances.size()-1))
-  	  		{
-  	  			int position=Collections.binarySearch(kNearestDistances, currentDistance);
-  	    	  	if(position<0)
-  	            {
-  	          	  position=-position-1;
-  	            }
-  	    	  	kNearestNeighbors.add(position,(T)((ItemBoundable)bndPair.getBoundable(0)).getItem());
-  	        	kNearestDistances.add(position,currentDistance); 
-  	        	assert kNearestNeighbors.size()>k;
-  	        	kNearestNeighbors.remove(kNearestNeighbors.size()-1);
-  	        	kNearestDistances.remove(kNearestDistances.size()-1);
-  	  		}
-    	  }
-    	  else if(kNearestDistances.size()==0)
-    	  {
-    		  kNearestNeighbors.add((T)((ItemBoundable)bndPair.getBoundable(0)).getItem());
-    		  kNearestDistances.add(currentDistance);
-    	  }
-    	  else
-    	  {
-    		  try {
-				throw new Exception("Should never reach here");
-			} catch (Exception e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-    	  }
-     	  	   	  
-    	 
+          if(currentDistance<kNearestDistances.get(kNearestDistances.size()-1))
+          {
+            int position=Collections.binarySearch(kNearestDistances, currentDistance);
+            if(position<0)
+            {
+              position=-position-1;
+            }
+            kNearestNeighbors.add(position,(T)((ItemBoundable)bndPair.getBoundable(0)).getItem());
+            kNearestDistances.add(position,currentDistance);
+            assert kNearestNeighbors.size()>k;
+            kNearestNeighbors.remove(kNearestNeighbors.size()-1);
+            kNearestDistances.remove(kNearestDistances.size()-1);
+          }
+        }
+        else if(kNearestDistances.size()==0)
+        {
+          kNearestNeighbors.add((T)((ItemBoundable)bndPair.getBoundable(0)).getItem());
+          kNearestDistances.add(currentDistance);
+        }
+        else
+        {
+          try {
+            throw new Exception("Should never reach here");
+          } catch (Exception e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+          }
+        }
+
+
         distanceLowerBound = kNearestDistances.get(kNearestDistances.size()-1);
         //System.out.println("distanceLowerBound is " + distanceLowerBound);
-        
-        
+
+
 
       }
       else {
@@ -236,7 +238,7 @@ public class STRtreePlus<T> extends STRtree
 
         /*
          * Otherwise, expand one side of the pair,
-         * (the choice of which side to expand is heuristically determined) 
+         * (the choice of which side to expand is heuristically determined)
          * and insert the new expanded pairs into the queue
          */
         bndPair.expandToQueue(priQ, distanceLowerBound);
@@ -248,63 +250,63 @@ public class STRtreePlus<T> extends STRtree
     Iterator<Double> distIter = kNearestDistances.iterator();
     List<Tuple2<T,Double>> result = new LinkedList<>();
     while(neighborIter.hasNext()) {
-        T neighbor = neighborIter.next();
-        Double dist = distIter.next();
+      T neighbor = neighborIter.next();
+      Double dist = distIter.next();
 
-        result.add(new Tuple2<>(neighbor, dist));
+      result.add(new Tuple2<>(neighbor, dist));
     }
 
     return result;
   }
 
-    /* return leaf? nodes 
-     */
-    public List<Envelope> queryBoundary()
+  /* return leaf? nodes
+   */
+  public List<Envelope> queryBoundary()
+  {
+    build();
+    List<Envelope> boundaries = new ArrayList<>();
+    if (isEmpty()) {
+      //Assert.isTrue(root.getBounds() == null);
+      //If the root is empty, we stop traversing. This should not happen.
+      return boundaries;
+    }
+
+    queryBoundary(root, boundaries);
+
+    return boundaries;
+  }
+  /**
+   * This function is to traverse the children of the root.
+   * @param node
+   * @param boundaries
+   */
+  private void queryBoundary(AbstractNode node, List<Envelope> boundaries) {
+    List childBoundables = node.getChildBoundables();
+    boolean flagLeafnode=true;
+    for (Object childBoundable2 : childBoundables) {
+      Boundable childBoundable = (Boundable) childBoundable2;
+      if (childBoundable instanceof AbstractNode) {
+        //We find this is not a leaf node.
+        flagLeafnode = false;
+        break;
+
+      }
+    }
+    if(flagLeafnode)
     {
-        build();
-        List<Envelope> boundaries = new ArrayList<>();
-        if (isEmpty()) {
-            //Assert.isTrue(root.getBounds() == null);
-            //If the root is empty, we stop traversing. This should not happen.
-            return boundaries;
-        }
-
-        queryBoundary(root, boundaries);
-
-        return boundaries;
+      boundaries.add((Envelope)node.getBounds());
     }
-    /**
-     * This function is to traverse the children of the root.
-     * @param node
-     * @param boundaries
-     */
-    private void queryBoundary(AbstractNode node, List<Envelope> boundaries) {
-        List childBoundables = node.getChildBoundables();
-        boolean flagLeafnode=true;
-        for (Object childBoundable2 : childBoundables) {
-            Boundable childBoundable = (Boundable) childBoundable2;
-            if (childBoundable instanceof AbstractNode) {
-                //We find this is not a leaf node.
-                flagLeafnode = false;
-                break;
+    else
+    {
+      for (Object childBoundable1 : childBoundables) {
+        Boundable childBoundable = (Boundable) childBoundable1;
+        if (childBoundable instanceof AbstractNode) {
+          queryBoundary((AbstractNode) childBoundable, boundaries);
+        }
 
-            }
-        }
-        if(flagLeafnode)
-        {
-            boundaries.add((Envelope)node.getBounds());
-        }
-        else
-        {
-            for (Object childBoundable1 : childBoundables) {
-                Boundable childBoundable = (Boundable) childBoundable1;
-                if (childBoundable instanceof AbstractNode) {
-                    queryBoundary((AbstractNode) childBoundable, boundaries);
-                }
-
-            }
-        }
+      }
     }
+  }
 
 }
 

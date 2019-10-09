@@ -3,9 +3,9 @@ package dbis.stark
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import dbis.stark.spatial._
-import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.CellHistogram
 import org.locationtech.jts.geom._
+import org.locationtech.jts.index.strtree.{AbstractNode, ItemBoundable, RTree}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -125,39 +125,136 @@ class KnnSerializer extends Serializer[KNN[Any]] {
   }
 }
 
+//class RTreeSerializer extends Serializer[RTree[Any]] {
+//  val soSerializer = new STObjectSerializer
+//  override def write(kryo: Kryo, output: Output, tree: RTree[Any]): Unit = {
+//    tree.build()
+//
+//    output.writeInt(tree.getNodeCapacity, true)
+//    output.writeInt(tree.size(), true)
+//
+//    tree._items.foreach{ d =>
+//      kryo.writeObject(output, d.so, soSerializer)
+//      kryo.writeClassAndObject(output, d.data)
+//    }
+//  }
+//
+//  override def read(kryo: Kryo, input: Input, dType: Class[RTree[Any]]): RTree[Any] = {
+//    val capacity = input.readInt(true)
+//    val size = input.readInt(true)
+//
+//    val tree = new RTree[Any](capacity)
+//
+//    var i = 0
+//    while(i < size) {
+//      val so = kryo.readObject(input, classOf[STObject], soSerializer)
+//      val data = kryo.readClassAndObject(input).asInstanceOf[Any]
+//
+//      tree.insert(so, data)
+//      i += 1
+//    }
+//
+//    tree.build()
+//    tree
+//  }
+//}
+
+
 class RTreeSerializer extends Serializer[RTree[Any]] {
-  val soSerializer = new STObjectSerializer
-  override def write(kryo: Kryo, output: Output, tree: RTree[Any]): Unit = {
-    tree.build()
 
-    output.writeInt(tree.getNodeCapacity, true)
-    output.writeInt(tree.size(), true)
+  private def writeTree(kryo: Kryo, output: Output, node: AbstractNode): Unit = {
+    output.writeInt(node.getLevel, true)
+    import scala.collection.JavaConverters._
+    val children = node.getChildBoundables.asScala
+    output.writeInt(children.size, true)
 
-    tree._items.foreach{ d =>
-      kryo.writeObject(output, d.so, soSerializer)
-      kryo.writeClassAndObject(output, d.data)
+    if(children.nonEmpty) {
+      /*
+       * here we have two cases for the children, they are either
+       *  1. inner nodes : AbstractNode
+       *  2. leaf nodes  : ItemBoundable
+       *
+       * We can decide based on the first child.
+       *
+       * For each inner node, we have to make a recursive call to this method and write all its children
+       */
+
+      val isInnerNode = children.head.isInstanceOf[AbstractNode]
+      output.writeBoolean(isInnerNode)
+
+      if(isInnerNode) {
+        // recursively write all of its children
+        children.foreach(child => writeTree(kryo, output, child.asInstanceOf[AbstractNode]))
+      } else {
+        // write leaf nodes
+        children.foreach{ child =>
+          val ib = child.asInstanceOf[ItemBoundable]
+          kryo.writeObject(output, ib.getBounds, new EnvelopeSerializer)
+          kryo.writeClassAndObject(output, ib.getItem)
+        }
+      }
     }
   }
 
-  override def read(kryo: Kryo, input: Input, dType: Class[RTree[Any]]): RTree[Any] = {
-    val capacity = input.readInt(true)
-    val size = input.readInt(true)
+  override def write(kryo: Kryo, output: Output, tree: RTree[Any]): Unit = {
+    output.writeInt(tree.getNodeCapacity, true)
+    val empty = tree.isEmpty
+    output.writeBoolean(empty)
 
-    val tree = new RTree[Any](capacity)
+    if(!empty) {
+      // ensure tree is built
+      tree.build()
 
-    var i = 0
-    while(i < size) {
-      val so = kryo.readObject(input, classOf[STObject], soSerializer)
-      val data = kryo.readClassAndObject(input).asInstanceOf[Any]
+      // recursively write tree
+      writeTree(kryo, output, tree.getRoot)
+    }
+  }
 
-      tree.insert(so, data)
-      i += 1
+  def readTree(kryo: Kryo, input: Input,tree: RTree[Any]): AbstractNode = {
+    val level = input.readInt(true)
+    val numChildren = input.readInt(true)
+
+    val isInnerNode = input.readBoolean()
+    val n = tree.createInnerNode(level)
+
+
+    if(isInnerNode) {
+      // recursively read every child node
+      var i = 0
+      while(i < numChildren) {
+        val child = readTree(kryo, input, tree)
+        n.addChildBoundable(child)
+        i += 1
+      }
+    } else {
+      // read the envelope and data of each leaf child
+      var i = 0
+      while(i < numChildren) {
+        val env = kryo.readObject(input, classOf[Envelope], new EnvelopeSerializer)
+        val data = kryo.readClassAndObject(input)
+        val ib = new ItemBoundable(env, data)
+        n.addChildBoundable(ib)
+        i += 1
+      }
     }
 
-    tree.build()
+    n
+  }
+
+  override def read(kryo: Kryo, input: Input, clazz: Class[RTree[Any]]): RTree[Any] = {
+    val capacity = input.readInt(true)
+    val empty = input.readBoolean()
+    val tree = new RTree[Any](capacity)
+    if(empty) {
+      tree
+    } else {
+      val root = readTree(kryo, input, tree)
+      tree.setRoot(root)
+    }
     tree
   }
 }
+
 
 class NPointSerializer extends Serializer[NPoint] {
   override def write(kryo: Kryo, output: Output, p: NPoint): Unit = {

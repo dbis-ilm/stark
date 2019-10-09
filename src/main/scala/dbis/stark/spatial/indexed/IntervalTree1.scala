@@ -46,7 +46,7 @@ class IntervalTree1[D: ClassTag ]() extends SortedPackedIntervalRTree with Index
 
   override def build(): Unit = {}
 
-  override private[indexed] def root() = ???
+  override def root() = ???
 
   override def items = {
     val visitor: InvertavlTreeVisitor = new InvertavlTreeVisitor()

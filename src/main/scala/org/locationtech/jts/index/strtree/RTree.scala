@@ -1,17 +1,16 @@
-package dbis.stark.spatial.indexed
+package org.locationtech.jts.index.strtree
 
 import dbis.stark.STObject.{GeoType, MBR}
 import dbis.stark.spatial.StarkUtils
+import dbis.stark.spatial.indexed.{Data, Index, KnnIndex, WithinDistanceIndex}
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.geom.{Coordinate, Envelope}
-import org.locationtech.jts.index.strtree.{AbstractNode, ItemBoundable, ItemDistance, STRtreePlus}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
-/*var ts: Int, */
-protected[indexed] class Data[D](val data: D, val so: STObject) extends Serializable
+
 
 /**
  * A R-Tree abstraction based on VividSolution's ST R-Tree implementation
@@ -153,13 +152,16 @@ class RTree[D: ClassTag ](
     }
   }
 
-  override private[indexed] def root() = getRoot
+  override def root() = getRoot
+
+
+  def createInnerNode(level: Int) = super.createNode(level)
 }
 
 /**
  * Companion object containing helper method
  */
-protected[stark] object DataDistance {
+object DataDistance {
 
   def getGeo(o: AnyRef): STObject = o match {
       case so: STObject => so //.getGeo
@@ -171,7 +173,7 @@ protected[stark] object DataDistance {
 /**
  * A distance metric that is used internally by the STRtree for comparing entries 
  */
-protected[stark] class DataDistance[G <: STObject,D](
+class DataDistance[G <: STObject,D](
       distFunc: (STObject, STObject) => Distance
     )extends ItemDistance {
 

@@ -1,9 +1,9 @@
 package dbis.stark.spatial
 
-import dbis.stark.spatial.indexed.RTree
 import dbis.stark.spatial.partitioner.{GridPartitioner, OneToManyPartition, OneToOnePartition}
 import org.apache.spark._
 import org.apache.spark.rdd.RDD
+import org.locationtech.jts.index.strtree.RTree
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag

@@ -3,6 +3,7 @@ package dbis.stark.spatial.partitioner
 import java.nio.file.Path
 
 import dbis.stark.STObject
+import dbis.stark.spatial.NRectRange
 
 /**
  * Represents spherical coordinates in n dimensional space
@@ -99,4 +100,5 @@ class AngularPartitioner(
 
   }
 
+  override def getIntersectingPartitionIds(range: NRectRange): Array[Int] = ???
 }

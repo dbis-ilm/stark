@@ -32,6 +32,8 @@ trait SpatialPartitioner extends Partitioner {
     id
   }
 
+  def getIntersectingPartitionIds(range: NRectRange):Array[Int]
+
   def printPartitions(fName: java.nio.file.Path): Unit
 
   def printPartitions(fName: String): Unit =
@@ -264,10 +266,13 @@ object GridPartitioner {
   * @param minY The min value in y dimension
   * @param maxY The max value in y dimension
   */
-abstract class GridPartitioner(
-    val minX: Double, var maxX: Double, val minY: Double, var maxY: Double
-  ) extends SpatialPartitioner {
+abstract class GridPartitioner(val partitions: Array[Cell],
+                              val minX: Double, var maxX: Double, val minY: Double, var maxY: Double
+                              ) extends SpatialPartitioner {
 
+  def getIntersectingPartitionIds(range: NRectRange):Array[Int] = {
+    partitions.filter(_.extent.intersects(range)).map(_.id)
+  }
 
   def partitionBounds(idx: Int): Cell
   def partitionExtent(idx: Int): NRectRange

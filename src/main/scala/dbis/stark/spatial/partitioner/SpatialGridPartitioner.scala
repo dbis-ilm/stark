@@ -53,10 +53,10 @@ object SpatialGridPartitioner {
  *
  * @author hage
  */
-class SpatialGridPartitioner[G <: STObject : ClassTag]private[partitioner](val partitions: Array[Cell],
+class SpatialGridPartitioner[G <: STObject : ClassTag]private[partitioner](_partitions: Array[Cell],
    protected val pointsOnly: Boolean,
    _minX: Double, _maxX: Double,_minY: Double,_maxY: Double,
-   xLength: Double, yLength: Double, partitionsPerDimension: Int) extends GridPartitioner(_minX, _maxX, _minY, _maxY) {
+   xLength: Double, yLength: Double, partitionsPerDimension: Int) extends GridPartitioner(_partitions, _minX, _maxX, _minY, _maxY) {
 
   require(partitions.nonEmpty, "need at least some partitions!")
 

@@ -194,50 +194,70 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   def knn2(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): Iterator[(G,(Distance, V))] = self.partitioner match {
     case Some(p: GridPartitioner) =>
 
+      // get partition of query point
       val partitionOfQry = p.getPartition(qry)
 
-      def blubb(context: TaskContext, iter: Iterator[Index[(G,V)]]) = {
+      // a function to get knnInPartition
+      def getPartitionsKNN(context: TaskContext, iter: Iterator[Index[(G,V)]]) = {
         if(iter.nonEmpty && context.partitionId() == partitionOfQry)
           iter.flatMap{ index => index.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)}.toArray
         else
           Array.empty[((G,V),Distance)]
       }
 
-      val knnsInPart = self.sparkContext.runJob(self, blubb _,Seq(partitionOfQry)).flatten
+      // the kNNs in the same partition as the reference point
+      val knnsInPart = self.sparkContext.runJob(self, getPartitionsKNN _,Seq(partitionOfQry)).apply(0)
 
-      if(knnsInPart.length == k) {
-        return knnsInPart.iterator.map { case ((g,v),d) => (g,(d,v))}
-      } else if(knnsInPart.length > k) {
-        return knnsInPart.toStream.sortBy(_._2.minValue).iterator.map { case ((g,v),d) => (g,(d,v))}
-      }
+      // get the maximum distance of all points in the ref's partition
+      val maxDist = if (knnsInPart.isEmpty) 0 // none found
+      else if (knnsInPart.length == 1)
+        knnsInPart(0)._2.maxValue // only one
+      else //order by distance to get last one. minValue is from intervaldistance
+        knnsInPart.toStream.maxBy(_._2)._2.maxValue
 
-//      val knnsInPart = self.mapPartitionsWithIndex({(idx, iter) =>
-//        if(idx == partitionOfQry) {
-//          iter.flatMap{ index => index.asInstanceOf[KnnIndex[(G,V)]].kNN(qry, k, distFunc)}
-//        } else {
-//          Iterator.empty
-//        }
-//      }, true).collect()
+      // make a box around ref point and get all intersecting partitions
+      val qryPoint = qry.getGeo.getCentroid.getCoordinate
+      val mbr = new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist)
+      val intersectinPartitions = p.getIntersectingPartitionIds(StarkUtils.fromEnvelope(mbr))
 
+      if(knnsInPart.length == k && intersectinPartitions.length == 1) {
+        // we found k points in the only partition that overlaps with the box --> final result
+        knnsInPart.iterator.map { case ((g,v),d) => (g,(d,v))}
+      } else if(knnsInPart.length > k && intersectinPartitions.length == 1) {
+        // we found more than k points in the only partition --> get first k ones
+        knnsInPart.toStream.sortBy(_._2.minValue).iterator.map { case ((g,v),d) => (g,(d,v))}
+      } else {
+        /* not enough points in current partition OR box overlaps with more partitions
+           If the maxdist is 0 then there are only duplicates of ref and we have to do another search method
+           without relying on the box
+         */
+        if (maxDist <= 0.0) {
+          // for maxDist == 0 the box would be a point and not find any addtitional kNNs
+          // we maybe should iteratively increase the box size
+          knnAgg2Iter(qry, k, distFunc)
+        }
+        else {
+          // execute query for all intersecting partitions
+          val kNNsOfIntersecting = self.sparkContext.runJob(self, getPartitionsKNN _, intersectinPartitions)
 
-//      val maxDist = knnsInPart.maxBy(_._2)._2.minValue
-      val maxDist = if(knnsInPart.isEmpty) 0
-      else if(knnsInPart.length == 1) knnsInPart.head._2.minValue
-      else knnsInPart.toStream.maxBy(_._2)._2.minValue //tail.head._2.minValue
+          val numCandidates = kNNsOfIntersecting.iterator.map(_.length).sum
 
-      if(maxDist <= 0.0) {
-        // for maxDist == 0 the box would be a point and not find any addtitional kNNs
-        // we maybe should iteratively increase the box size
-//        println("fallback to knnAgg")
-        knnAgg2Iter(qry, k, distFunc)
-      }
-      else {
-        val qryPoint = qry.getGeo.getCentroid.getCoordinate
-        val env = StarkUtils.makeGeo(new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist))
-        val knns = this.containedby(STObject(env).asInstanceOf[G]).map { case (g, v) => (g, (distFunc(qry, g), v)) }.takeOrdered(k)(o.reverse)
-        val result = (knns ++ knnsInPart.map{case ((g,v),d) => (g,(d,v))}).sorted(o).take(k)
+          val result: Iterator[(G,(Distance,V))] = if(numCandidates < k) {
+            // we still havn't found enough...
+            val env = StarkUtils.makeGeo(mbr)
+            val knns = this.containedby(STObject(env).asInstanceOf[G])
+                            .map { case (g, v) => (g, (distFunc(qry, g), v)) }
+                            .takeOrdered(k)(o.reverse)
 
-        result.iterator
+            knns.iterator
+          } else {
+
+            KNN.merge(kNNsOfIntersecting, k)
+
+          }
+
+          result
+        }
       }
 
     case _ =>

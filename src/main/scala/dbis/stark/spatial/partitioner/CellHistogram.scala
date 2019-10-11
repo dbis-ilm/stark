@@ -53,7 +53,7 @@ case class CellHistogram protected[partitioner](buckets: mutable.Map[Int, (Cell,
   def apply(cellId: Int) = Try(buckets(cellId)) match {
     case scala.util.Success(value) => value
     case scala.util.Failure(exception) =>
-      println(s"histo: ${buckets.iterator.map(_._2._1.range.wkt).mkString("\n")}")
+//      println(s"histo: ${buckets.iterator.map(_._2._1.range.wkt).mkString("\n")}")
       throw exception
   }
 

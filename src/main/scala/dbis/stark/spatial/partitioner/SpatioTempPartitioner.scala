@@ -81,24 +81,24 @@ object SpatioTempPartitioner {
 
 }
 
-class SpatioTempPartitioner[G <: STObject : ClassTag] private(partitions: Array[(Cell, Array[Long])],
+class SpatioTempPartitioner[G <: STObject : ClassTag] private(_partitions: Array[(Cell, Array[Long])],
                                                               _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                                               pointsOnly: Boolean)
-  extends GridPartitioner(_minX, _maxX, _minX, _maxY) {
+  extends GridPartitioner(_partitions.map(_._1), _minX, _maxX, _minX, _maxY) {
 
   private val _numPartitions = {
     var sum = 0
     var i = 0
     while(i < partitions.length) {
-      sum += partitions(i)._2.length
+      sum += _partitions(i)._2.length
       i += 1
     }
     sum
   }
 
-  override def partitionBounds(idx: Int): Cell = partitions(idx)._1
+  override def partitionBounds(idx: Int): Cell = partitions(idx)
 
-  override def partitionExtent(idx: Int): NRectRange = partitions(idx)._1.extent
+  override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
 
   override def getPartitionId(key: Any): Int = {
     val g = key.asInstanceOf[G]
@@ -110,20 +110,20 @@ class SpatioTempPartitioner[G <: STObject : ClassTag] private(partitions: Array[
     var minDistId = -1
     var offset = 0
     while(i < partitions.length) {
-      if(partitions(i)._1.range.contains(p)) { // FOUND a spatial partition
+      if(partitions(i).range.contains(p)) { // FOUND a spatial partition
 
         // now find a temporal partition in there that contains g's temp start
-        val tID = TemporalRangePartitioner.getCellId(g.getTemp.get.start.value, partitions(i)._2)
+        val tID = TemporalRangePartitioner.getCellId(g.getTemp.get.start.value, _partitions(i)._2)
 
         // compute the partition ID and return
         return offset + tID
 
       } else { // the current spatial partition does not contain g
 
-        offset += partitions(i)._2.length // update offset: add current number of temp partitions
+        offset += _partitions(i)._2.length // update offset: add current number of temp partitions
 
         // compute distance to nearest spatial partition - just in case no spatial partition will be found
-        val d = partitions(i)._1.range.dist(p)
+        val d = partitions(i).range.dist(p)
         if(d < minSDist || i == 0){
           minSDist = d
           minDistId = i
@@ -139,9 +139,9 @@ class SpatioTempPartitioner[G <: STObject : ClassTag] private(partitions: Array[
      * assign to the one with the smallest distance
      */
     // 1. compute offset until the minDistId Partition
-    offset = partitions.iterator.take(minDistId).map(_._2.length).sum
+    offset = _partitions.iterator.take(minDistId).map(_._2.length).sum
     // 2. find temporal partition for g
-    val tId = TemporalRangePartitioner.getCellId(g.getTemp.get.start.value, partitions(minDistId)._2)
+    val tId = TemporalRangePartitioner.getCellId(g.getTemp.get.start.value, _partitions(minDistId)._2)
 
     // 3. return the according partition id
     offset + tId

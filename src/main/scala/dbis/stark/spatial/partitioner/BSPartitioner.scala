@@ -104,12 +104,12 @@ object BSPartitioner {
   * @tparam G Geometry type
   */
 class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
-      val partitions: Array[Cell],
+      _partitions: Array[Cell],
       val pointsOnly: Boolean,
       private val _minX: Double,
       private val _maxX: Double,
       private val _minY: Double,
-      private val _maxY: Double) extends GridPartitioner(_minX, _maxX, _minY, _maxY) {
+      private val _maxY: Double) extends GridPartitioner(_partitions, _minX, _maxX, _minY, _maxY) {
 
   override def partitionBounds(idx: Int): Cell = partitions(idx)
   override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent

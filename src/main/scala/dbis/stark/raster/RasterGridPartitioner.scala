@@ -12,7 +12,7 @@ import scala.collection.mutable.ListBuffer
 case class RasterPartition(index: Int, cell: Int) extends Partition
 
 abstract class RasterPartitioner(val partitionsX: Int, val partitionsY: Int,
-                                 minX: Double, maxX: Double, minY: Double, maxY: Double) extends GridPartitioner(minX, maxX, minY, maxY) {
+                                 minX: Double, maxX: Double, minY: Double, maxY: Double) extends GridPartitioner(Array.empty, minX, maxX, minY, maxY) {
   val partitionWidth = (maxX - minX) / partitionsX
   val partitionsHeight = (maxY - minY) / partitionsY
 

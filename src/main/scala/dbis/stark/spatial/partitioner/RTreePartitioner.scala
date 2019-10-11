@@ -5,7 +5,7 @@ import java.nio.file.Path
 import dbis.stark.STObject
 import dbis.stark.STObject.MBR
 import dbis.stark.spatial.{Cell, NPoint, StarkUtils}
-import org.locationtech.jts.index.strtree.RTree
+import org.locationtech.jts.index.strtree.STRtreePlus
 
 
 object RTreePartitioner {
@@ -17,7 +17,9 @@ object RTreePartitioner {
     val dummy: Byte = 0x0
 
     val capacity = math.max(samples.length / maxCost, 2)
-    val tree = new RTree[Byte](capacity)
+//    val tree = new RTree[Byte](capacity)
+    // use STRtreePlus since it does not add geometry to payload data
+    val tree = new STRtreePlus[Byte](capacity)
 
     var i = 0
     while(i < samples.length) {
@@ -43,10 +45,10 @@ object RTreePartitioner {
 }
 
 
-class RTreePartitioner private(val partitions: Array[Cell],
+class RTreePartitioner private(_partitions: Array[Cell],
                                _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                pointsOnly: Boolean)
-  extends GridPartitioner(_minX,_maxX,_minY, _maxY) {
+  extends GridPartitioner(_partitions, _minX,_maxX,_minY, _maxY) {
 
 //  override def getAllPartitions(key: Any): List[Int] = {
 //    val g = key.asInstanceOf[STObject]

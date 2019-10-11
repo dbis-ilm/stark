@@ -158,30 +158,35 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       val partitionOfQry = p.getPartition(qry)
 
-      def blubb(context: TaskContext, iter: Iterator[(G,V)]): (Iterator[(Distance,(G,V))],Int) = {
+      def getPartitionsKNN(context: TaskContext, iter: Iterator[(G,V)]): KNN[(G,V)] = {
+        val knnS = new KNN[(G, V)](k)
         if(iter.nonEmpty && context.partitionId() == partitionOfQry) {
-          val knnS = new KNN[(G, V)](k)
           iter.foreach{o =>
             val dist = distFunc(qry, o._1)
             knnS.insert(dist, o)
           }
-          (knnS.iterator, knnS.size)
         }
-        else
-          (Iterator.empty,0)
+
+        knnS
       }
 
-      val (knnsInPart,num) = self.sparkContext.runJob(self, blubb _,Seq(partitionOfQry)).apply(0)
+      val knnsInPart = self.sparkContext.runJob(self, getPartitionsKNN _,Seq(partitionOfQry)).apply(0)
 
-      if(num == k) {
-        knnsInPart.map { case (d,(g,v)) => (g,(d,v))}
-      } else if(num > k) {
+      // get the maximum distance of all points in the ref's partition
+      val maxDist = if (knnsInPart.isEmpty) 0 // none found
+      else
+        knnsInPart.max._1.maxValue
+
+      // make a box around ref point and get all intersecting partitions
+      val qryPoint = qry.getGeo.getCentroid.getCoordinate
+      val mbr = new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist)
+      val intersectinPartitions = p.getIntersectingPartitionIds(StarkUtils.fromEnvelope(mbr))
+
+      if(knnsInPart.size == k && intersectinPartitions.length == 1) {
+        knnsInPart.iterator.map { case (d,(g,v)) => (g,(d,v))}
+      } else if(knnsInPart.size > k && intersectinPartitions.length == 1) {
         knnsInPart.toStream.sortBy(_._1.minValue).map { case (d,(g,v)) => (g,(d,v))}.iterator
       } else {
-
-        val maxDist = if (num <= 0) 0.0
-          else if (knnsInPart.length == 1) knnsInPart.take(1).toSeq.head._1.minValue
-          else knnsInPart.toStream.maxBy(_._1)._1.minValue //tail.head._2.minValue
 
         if (maxDist <= 0.0) {
           // for maxDist == 0 the box would be a point and not find any addtitional kNNs
@@ -191,13 +196,32 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
         }
         else {
           println("found only myself in partition. perform global search!")
-          val qryPoint = qry.getGeo.getCentroid.getCoordinate
-          val env = StarkUtils.makeGeo(
-            new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist))
-          val knns = this.containedby(STObject(env).asInstanceOf[G])
-            .map { case (g, v) => (g, (distFunc(qry, g), v)) }
-            .takeOrdered(k)(o.reverse)
-          val result = (knns ++ knnsInPart.map { case (d,(g, v)) => (g, (d, v)) }).toStream.sorted(o).iterator.take(k)
+
+          val kNNsOfIntersecting = self.sparkContext.runJob(self, getPartitionsKNN _, intersectinPartitions)
+          val numCandidates = kNNsOfIntersecting.iterator.map(_.size).sum
+
+          val result: Iterator[(G,(Distance,V))] = if(numCandidates < k) {
+            // we still havn't found enough...
+            val env = StarkUtils.makeGeo(mbr)
+            val knns = this.containedby(STObject(env).asInstanceOf[G])
+              .map { case (g, v) => (g, (distFunc(qry, g), v)) }
+              .takeOrdered(k)(o.reverse)
+
+            knns.iterator
+          } else {
+
+            val knnsSorted = kNNsOfIntersecting.map(b => b.sortedArray.map{case (d,gv) => (gv,d)})
+
+            KNN.merge(knnsSorted, k)
+
+          }
+//          val qryPoint = qry.getGeo.getCentroid.getCoordinate
+//          val env = StarkUtils.makeGeo(
+//            new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist))
+//          val knns = this.containedby(STObject(env).asInstanceOf[G])
+//            .map { case (g, v) => (g, (distFunc(qry, g), v)) }
+//            .takeOrdered(k)(o.reverse)
+//          val result = (knns ++ knnsInPart.map { case (d,(g, v)) => (g, (d, v)) }).toStream.sorted(o).iterator.take(k)
           result
         }
       }
@@ -484,20 +508,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
       val parti = new AngularPartitioner(dimensions = 2, ppD = ppd, firstQuadrantOnly = true)
 
-
-
-//      val externalMap = Array.tabulate(ppd){_ => new Skyline[(G,V)](dominates = dominatesRel)}
-//
-//      while(iter.hasNext) {
-//        val (g,v) = iter.next()
-//
-//        val (sDist,tDist) = distFunc(ref, g)
-//        val distSO = STObject(sDist.minValue,tDist.minValue)
-//        val id = parti.getPartition(distSO) // assign each element to its partition,
-//        externalMap(id).insert((distSO, (g,v)))
-//      }
-//      externalMap.iterator.filter(_.nonEmpty).zipWithIndex.map{ case (s,i) => (i,s)}
-
       val externalMap = SpatialRDD.createExternalSkylineMap[G,V](dominatesRel)
       val values = iter.map{ case (g,v) =>
         val (sDist,tDist) = distFunc(ref, g)
@@ -521,49 +531,11 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
        */
     }
     .reduceByKey{ (skyline1, skyline2) => skyline1.merge(skyline2) }
-//    .flatMap(_._2.iterator)
     .coalesce(1)
     .mapPartitions{ iter =>
-//      val skyline = new Skyline[(G,V)](dominates = dominatesRel)
-//      iter.foreach(skyline.insert)
-//      skyline.iterator.map(_._2)
-
       iter.map(_._2).reduce(_.merge(_)).iterator.map(_._2)
     }
   }
-
-//  def skylinePrune(ref: STObject,
-//                   distFunc: (STObject, STObject) => (Distance, Distance),
-//                   dominatesRel: (STObject, STObject) => Boolean,
-//                   ppd: Int): RDD[(G,V)] = if(self.partitioner.nonEmpty && self.partitioner.get.isInstanceOf[GridPartitioner]) {
-//
-//
-//
-//    new RDD[(G,V)](self) {
-//
-//      private val sParti = self.partitioner.get.asInstanceOf[GridPartitioner]
-//
-//      override val partitioner = self.partitioner
-//
-//      def dominates(p1: Int, p2: Int): Boolean = {
-//        val one = sParti.partitionBounds(p1)
-//        val two = sParti.partitionBounds(p2)
-//
-//        one.
-//      }
-//
-//      override protected def getPartitions: Array[Partition] = {
-//
-//      }
-//
-//
-//      override def compute(split: Partition, context: TaskContext): Iterator[(G, V)] = ???
-//    }
-//  } else
-//    skyline(ref, distFunc, dominatesRel, ppd)
-
-
-
 
   // LIVE
 

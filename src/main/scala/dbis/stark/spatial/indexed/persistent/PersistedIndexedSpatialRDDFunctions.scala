@@ -6,10 +6,10 @@ import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
-import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialGridPartitioner}
+import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, SpatialGridPartitioner, SpatialPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{SpatialRDD, TaskContext}
+import org.apache.spark.{HashPartitioner, SpatialRDD, TaskContext}
 
 import scala.reflect.ClassTag
 
@@ -265,6 +265,40 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       knnAgg2Iter(qry,k,distFunc)
   }
 
+  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate, partiConf: PartitionerConfig): RDD[(V, V2)] = {
+    //    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
+    //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
+
+    val parti = self.partitioner.get.asInstanceOf[SpatialPartitioner]
+
+    val partiBc = self.sparkContext.broadcast(parti)
+    val partitioner = new HashPartitioner(parti.numPartitions)
+
+
+    val right = other.flatMap{ case (so, v) =>
+      val mbr = StarkUtils.fromGeo(so.getGeo)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+      intersecting.iterator.map(idx => (idx, (so,v)))
+    }.partitionBy(partitioner)
+      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
+
+
+    self.zipPartitions(right, preservesPartitioning = true){ (leftIter,rightIter) =>
+
+      if(!leftIter.hasNext)
+        Iterator.empty
+      else {
+        val predFunc = JoinPredicate.predicateFunction(pred)
+        val tree = leftIter.next()
+        rightIter.flatMap { case (rg, rv) =>
+          tree.query(rg)
+            .filter { case (lg, _) => predFunc(lg, rg) }
+            .map { case (_, lv) => (lv, rv) }
+        }
+      }
+    }.distinct()
+  }
+
   override def withinDistance(qry: G, maxDist: Distance, distFunc: (STObject,STObject) => Distance) =
     self.mapPartitions({ trees =>
     trees.flatMap{ tree =>
@@ -273,6 +307,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       tree.asInstanceOf[WithinDistanceIndex[(G,V)]].withinDistance(qry, distFunc, maxDist)
     }
   }, true) // preserve partitioning
+
 
 
   override def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject, STObject) => Distance) = {

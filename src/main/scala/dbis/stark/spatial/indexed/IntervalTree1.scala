@@ -1,7 +1,7 @@
 package dbis.stark.spatial.indexed
 
 import dbis.stark.STObject
-import dbis.stark.STObject.GeoType
+import dbis.stark.STObject.{GeoType, MBR}
 import org.locationtech.jts.index.intervalrtree.SortedPackedIntervalRTree
 import utils.InvertavlTreeVisitor
 
@@ -46,7 +46,7 @@ class IntervalTree1[D: ClassTag ]() extends SortedPackedIntervalRTree with Index
 
   override def build(): Unit = {}
 
-  override def root() = ???
+  override def root():MBR = ???
 
   override def items = {
     val visitor: InvertavlTreeVisitor = new InvertavlTreeVisitor()

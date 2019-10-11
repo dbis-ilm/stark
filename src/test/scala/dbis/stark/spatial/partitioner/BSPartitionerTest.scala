@@ -665,7 +665,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     }
   }
 
-  it should "produce same join results with sampling as without" taggedAs (Sampling,Slow) in {
+  ignore should "produce same join results with sampling as without" taggedAs (Sampling,Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -694,18 +694,10 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     //    try {
 
     println(s"taxi done: ${partedTaxiSample.count()}")
-    //    } catch {
-    //      case e: Throwable =>
-    ////        import scala.collection.JavaConverters._
-    ////        val fName = Paths.get(System.getProperty("user.home"),"taxi_sample.wkt")
-    ////        val list = partiTaxiSample.theRDD.map { case (o, v) => s"${o.getGeo.toText};$v"}.collect().toList.asJava
-    ////        java.nio.file.Files.write(fName, list, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)
-    //        fail(e.getMessage)
-    //    }
 
-
-    val taxiPartiNoSample = BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
-      pointsOnly = true, sampleFraction = 0)
+    val taxiPartiNoSample = BSPStrategy(cellSize = 0.1, maxCost = 100, pointsOnly = true, sampleFraction = 0.0)
+//      BSPartitioner(rddTaxi, sideLength = 0.1, maxCostPerPartition = 100,
+//      pointsOnly = true, sampleFraction = 0)
 
     val blockPartiNoSample = BSPartitioner(rddBlocks, sideLength = 0.2, maxCostPerPartition = 100,
       pointsOnly = false, sampleFraction = 0)
@@ -714,9 +706,67 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
     val bPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
 
     val sampleCnt = StarkTestUtils.timing("sampled join") {
-      val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 50)).join(partedBlocksSample, JoinPredicate.CONTAINEDBY, None) //.collect()
+      val joinResSam = new LiveIndexedSpatialRDDFunctions(partedTaxiSample, RTreeConfig(order = 50)).zipJoin(partedBlocksSample, JoinPredicate.CONTAINEDBY, taxiPartiNoSample) //.collect()
       val joinResSamCnt = joinResSam.count()
 
+
+      withClue("live indexed join partedTaxiSample w/ partedBlocksSample") {
+        joinResSamCnt should be > 0L
+      }
+      joinResSamCnt
+    }
+
+    val fullCnt = StarkTestUtils.timing("full join") {
+      val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 50)).join(bPartedNoSample, JoinPredicate.CONTAINEDBY, None) //.collect()
+      val joinResPlainCnt = joinResPlain.count()
+
+      withClue("live indexed join tPartedNoSample w/ pPartedNoSample") {
+        joinResPlainCnt should be > 0L
+      }
+
+      joinResPlainCnt
+    }
+
+    withClue("sampleCnt vs fullCnt") {
+      sampleCnt shouldBe fullCnt
+    }
+
+    //    joinResSam should contain theSameElementsAs joinResPlain
+  }
+
+  it should "produce same join results with sampling as without with zip join" taggedAs (Sampling,Slow) in {
+    val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}
+
+    val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+
+
+    val minmaxBlocks = GridPartitioner.getMinMax(rddBlocks.map(_._1.getGeo.getEnvelopeInternal))
+    println(s"minmax blocks: $minmaxBlocks")
+
+    val minmaxTaxi = GridPartitioner.getMinMax(rddTaxi.map(_._1.getGeo.getEnvelopeInternal))
+    println(s"minmax taxi: $minmaxTaxi")
+
+
+    val partiBlocksSample = BSPStrategy(cellSize = 0.2, maxCost = 100,
+      pointsOnly = false, sampleFraction = 0.5, parallel = true)
+
+    val blockPartiNoSample = partiBlocksSample.copy(sampleFraction = 0.0)
+
+    val taxiPartiNoSample = BSPartitioner(rddTaxi, sideLength = 0.2, maxCostPerPartition = 100,
+      pointsOnly = true, sampleFraction = 0)
+
+    val tPartedNoSample = rddTaxi.partitionBy(taxiPartiNoSample)
+    val bPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
+
+    val sampleCnt = StarkTestUtils.timing("sampled zip join") {
+      val joinResSam = rddBlocks.liveIndex(order = 5).zipJoin(rddTaxi, JoinPredicate.CONTAINS, partiBlocksSample)
+      val joinResSamCnt = joinResSam.count()
+
+      println(s"sampled zip join size: $joinResSamCnt")
 
       withClue("live indexed join partedTaxiSample w/ partedBlocksSample") {
         joinResSamCnt should be > 0L

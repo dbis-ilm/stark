@@ -1,8 +1,7 @@
 package dbis.stark.spatial.indexed
 
 import dbis.stark.STObject
-import dbis.stark.STObject.GeoType
-import org.locationtech.jts.index.quadtree.NodeBase
+import dbis.stark.STObject.{GeoType, MBR}
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
@@ -15,7 +14,20 @@ class QuadTree[D: ClassTag](
   require(maxDepth > 0, "Max-Depth must be > 0")
   require(minNum > 0, "Min-Num must be > 0")
 
-  override def root(): NodeBase = ???
+  override def root(): MBR = {
+
+//    var root:Option[Root] = None
+//    val visitor = new ItemVisitor {
+//      override def visitItem(item: Any): Unit = {
+//        if(root.isEmpty && item.isInstanceOf[Root])
+//          root = Some(item.asInstanceOf[Root])
+//      }
+//    }
+//
+//    super.query(STObject(0,0).getGeo.getEnvelopeInternal, visitor)
+
+    ???
+  }
 
 
   override def insert(k: STObject, v: D): Unit =

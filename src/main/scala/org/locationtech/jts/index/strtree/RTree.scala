@@ -152,7 +152,11 @@ class RTree[D: ClassTag ](
     }
   }
 
-  override def root() = getRoot
+  override def root(): MBR = {
+    val abstractRoot = getRoot
+    val env = abstractRoot.computeBounds().asInstanceOf[MBR]
+    env
+  }
 
 
   def createInnerNode(level: Int) = super.createNode(level)

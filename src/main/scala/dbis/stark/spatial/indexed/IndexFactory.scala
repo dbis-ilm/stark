@@ -1,6 +1,6 @@
 package dbis.stark.spatial.indexed
 
-import dbis.stark.STObject.GeoType
+import dbis.stark.STObject.{GeoType, MBR}
 import dbis.stark.{Distance, STObject}
 import org.locationtech.jts.index.strtree.RTree
 
@@ -42,7 +42,7 @@ trait Index[V] {
     * @return Returns a reference to the root of the implementing tree.
     *         Users of this method need to cast to the correct type.
     */
-  def root(): Any
+  def root(): MBR
 
   def items: Iterator[V]
 }

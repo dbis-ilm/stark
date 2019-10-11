@@ -107,6 +107,8 @@ abstract class SpatialRDDFunctions[G <: STObject : ClassTag, V : ClassTag](rdd: 
 
   def knnJoin[V2: ClassTag](other: RDD[Index[V2]], k: Int, distFunc: (STObject,STObject) => Distance): RDD[(V,V2)]
 
+  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate, partiConf: PartitionerConfig): RDD[(V, V2)]
+
   def skyline(ref: STObject,
               distFunc: (STObject, STObject) => (Distance, Distance),
               dominates: (STObject, STObject) => Boolean,

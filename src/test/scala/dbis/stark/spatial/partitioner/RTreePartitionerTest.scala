@@ -1,6 +1,6 @@
 package dbis.stark.spatial.partitioner
 
-import dbis.stark.{STObject, StarkKryoRegistrator}
+import dbis.stark.{STObject, StarkKryoRegistrator, StarkTestUtils}
 import dbis.stark.spatial.JoinPredicate
 import dbis.stark.spatial.indexed.RTreeConfig
 import dbis.stark.spatial.indexed.live.LiveIndexedSpatialRDDFunctions
@@ -383,6 +383,55 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
 
     println(s"sampled join: ${end - start} ms: $joinResSamCnt")
     println(s"plain join: ${end2 - start2} ms: $joinResPlainCnt")
+
+    //    joinResSam should contain theSameElementsAs joinResPlain
+  }
+
+  it should "produce same join results with sampling as without with zip join" taggedAs (Sampling,Slow) in {
+    val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}
+
+    val rddTaxi = sc.textFile("src/test/resources/taxi_sample.csv", 4)
+      .map { line => line.split(";") }
+      .map { arr => (STObject(arr(1)), arr(0))}//.sample(withReplacement = false, 0.5)
+
+
+    val partiBlocksSample = RTreeStrategy(10, sampleFraction = 0.5)
+
+    val blockPartiNoSample = partiBlocksSample.copy(sampleFraction = 0.0)
+
+    val taxiPartiNoSample = RTreeStrategy(10, pointsOnly = true, sampleFraction = 0.0)
+
+    val tPartedNoSample = rddTaxi.partitionBy(taxiPartiNoSample)
+    val bPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
+
+    val sampleCnt = StarkTestUtils.timing("sampled zip join") {
+      val joinResSam = rddBlocks.liveIndex(order = 5).zipJoin(rddTaxi, JoinPredicate.CONTAINS, partiBlocksSample)
+      val joinResSamCnt = joinResSam.count()
+
+      println(s"sampled zip join size: $joinResSamCnt")
+
+      withClue("live indexed join partedTaxiSample w/ partedBlocksSample") {
+        joinResSamCnt should be > 0L
+      }
+      joinResSamCnt
+    }
+
+    val fullCnt = StarkTestUtils.timing("full join") {
+      val joinResPlain = new LiveIndexedSpatialRDDFunctions(tPartedNoSample, RTreeConfig(order = 50)).join(bPartedNoSample, JoinPredicate.CONTAINEDBY, None) //.collect()
+      val joinResPlainCnt = joinResPlain.count()
+
+      withClue("live indexed join tPartedNoSample w/ pPartedNoSample") {
+        joinResPlainCnt should be > 0L
+      }
+
+      joinResPlainCnt
+    }
+
+    withClue("sampleCnt vs fullCnt") {
+      sampleCnt shouldBe fullCnt
+    }
 
     //    joinResSam should contain theSameElementsAs joinResPlain
   }

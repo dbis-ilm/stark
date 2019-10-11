@@ -299,6 +299,46 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     new SpatialKnnJoinRDD(self, other, k, distFunc)
   }
 
+  override def zipJoin[V2: ClassTag](other: RDD[(G,V2)], pred: JoinPredicate.JoinPredicate, partiConf: PartitionerConfig) = {
+
+    val parti = PartitionerFactory.get(partiConf, self).get
+
+    val partiBc = self.sparkContext.broadcast(parti)
+    val partitioner = new HashPartitioner(parti.numPartitions)
+
+    val left = self.flatMap{ case (so, v) =>
+      val mbr = StarkUtils.fromGeo(so)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+      intersecting.iterator.map(idx => (idx, (so,v)))
+    }.partitionBy(partitioner)
+      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
+
+    val right = other.flatMap{ case (so, v) =>
+      val mbr = StarkUtils.fromGeo(so.getGeo)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+      intersecting.iterator.map(idx => (idx, (so,v)))
+    }.partitionBy(partitioner)
+      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
+
+    val predFunc = JoinPredicate.predicateFunction(pred)
+
+    // at this point left and right are partitioned into n non-spatial partitions
+    left.zipPartitions(right, preservesPartitioning = true){ (leftIter, rightIter) =>
+      // need to collect one into array
+      val leftArray = leftIter.toArray
+
+      rightIter.flatMap{ case(rg,rv) =>
+        leftArray.iterator
+          .filter { case (lg, _) =>
+            predFunc(lg, rg)
+          }
+          .map{ case (_,lv) =>
+            (lv,rv)
+          }
+      }
+    }.distinct()
+  }
+
   /**
    * Cluster this SpatialRDD using DBSCAN
    *

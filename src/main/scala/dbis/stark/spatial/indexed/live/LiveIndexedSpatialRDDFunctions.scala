@@ -3,10 +3,10 @@ package dbis.stark.spatial.indexed.live
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
-import dbis.stark.spatial.partitioner.{GridPartitioner, SpatialGridPartitioner}
+import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, PartitionerFactory}
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.SpatialFilterRDD
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{HashPartitioner, SpatialFilterRDD}
 
 import scala.reflect.ClassTag
 
@@ -176,24 +176,49 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
   }
 
 
-  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
-    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
+  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate, partiConf: PartitionerConfig): RDD[(V, V2)] = {
+//    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
 //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
 
-    self.zipPartitions(other, preservesPartitioning = true){ (left,right) =>
-      val tree = IndexFactory.get[(G,V)](indexConfig)
+    val parti = PartitionerFactory.get(partiConf, self).get
 
-      left.foreach{ case (g,v) => tree.insert(g,(g,v))}
-      tree.build()
+    val partiBc = self.sparkContext.broadcast(parti)
+    val partitioner = new HashPartitioner(parti.numPartitions)
 
-      val predFunc = JoinPredicate.predicateFunction(pred)
+    val left = self.flatMap{ case (so, v) =>
+      val mbr = StarkUtils.fromGeo(so)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+      intersecting.iterator.map(idx => (idx, (so,v)))
+    }.partitionBy(partitioner)
+      .mapPartitions({ iter =>
+        val index = IndexFactory.get[(G, V)](indexConfig)
+        iter.foreach { case (_, (g, v)) => index.insert(g, (g, v)) }
+        index.build()
+        Iterator.single(index)
+      }, preservesPartitioning = true)
 
-      right.flatMap{ case (rg,rv) =>
-        tree.query(rg)
-          .filter{ case (lg,_) => predFunc(lg,rg)}
-          .map{ case (_,lv) => (lv,rv)}
+    val right = other.flatMap{ case (so, v) =>
+      val mbr = StarkUtils.fromGeo(so.getGeo)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+      intersecting.iterator.map(idx => (idx, (so,v)))
+    }.partitionBy(partitioner)
+      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
+
+
+    left.zipPartitions(right, preservesPartitioning = true){ (leftIter,rightIter) =>
+
+      if(!leftIter.hasNext)
+        Iterator.empty
+      else {
+        val predFunc = JoinPredicate.predicateFunction(pred)
+        val tree = leftIter.next()
+        rightIter.flatMap { case (rg, rv) =>
+          tree.query(rg)
+            .filter { case (lg, _) => predFunc(lg, rg) }
+            .map { case (_, lv) => (lv, rv) }
+        }
       }
-    }
+    }.distinct()
   }
 
 

@@ -79,9 +79,6 @@ object GridPartitioner {
     }
   }
 
-//  def getMinMax[G<: STObject,V](rdd: RDD[(G,V)]): (Double, Double, Double, Double) =
-//    getMinMax(rdd.map(_._1.getGeo.getEnvelopeInternal))
-
   /**
     * Determine the min/max extents of a given RDD
     *

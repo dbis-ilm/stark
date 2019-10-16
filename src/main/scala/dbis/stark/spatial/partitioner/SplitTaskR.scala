@@ -5,6 +5,7 @@ import java.util.concurrent.{ConcurrentLinkedQueue, ExecutorService, Future}
 
 import dbis.stark.spatial.{Cell, NRectRange}
 
+
 object SplitTaskR {
   /*
    * Find the best split for in a given dimension
@@ -12,13 +13,13 @@ object SplitTaskR {
    * @param part the partition (candidate) to process
    * @return Returns the two created partitions along with their cost difference
    */
-  private def bestSplitInDimension(dim: Int, part: NRectRange, sideLength: Double, range: NRectRange, numXCells: Int,
+  private def bestSplitInDimension(dim: Int, part: NRectRange, sideLength: Double, universe: NRectRange, numXCells: Int,
                                    cellHistogram: CellHistogram, maxCostPerPartition: Double): (Option[(NRectRange, Int)], Option[(NRectRange,Int)], Int) = {
 
     val numCells = GridPartitioner.cellsPerDimension(part, sideLength)(dim)
 
     // there are fewer than 2 cells in the requested dimension (i.e. 0 or 1) -- we cannot further split this!
-    val cost = CostBasedPartitioner.costEstimation(part,sideLength,range,numXCells,cellHistogram)
+    val cost = CostBasedPartitioner.costEstimation(part,sideLength,universe,numXCells,cellHistogram)
     if(numCells < 2) {
       return (Some(part, cost), None, cost)
     }
@@ -27,15 +28,13 @@ object SplitTaskR {
     var r1,r2: Option[(NRectRange,Int)] = None
     var minDiff = Int.MaxValue
 
-
     var low = part.ll(dim)
     var up = part.ur(dim)
-
 
     var diff = 1.0
 //    var prevCostDiff:Option[Int] = None
 //    breakable {
-      while (diff > 0 && low <= up /*&& (minDiff > 0.1 * maxCostPerPartition)*/) {
+      while (diff > 0 && low <= up && minDiff > 1 /*&& (minDiff > 0.1 * maxCostPerPartition)*/) {
 
         // TODO: make sure to align at cells
         diff = ((up - low) / sideLength).toInt / 2
@@ -45,9 +44,11 @@ object SplitTaskR {
         val rect1 = NRectRange(part.ll, part.ur.withValue(dim, splitPos))
         val rect2 = NRectRange(part.ll.withValue(dim, splitPos), part.ur)
 
+        require(rect1.extend(rect2) == part, "rects must extend to part")
+
         // compute costs for each partitions
-        val cost1 = CostBasedPartitioner.costEstimation(rect1, sideLength, range, numXCells, cellHistogram)
-        val cost2 = CostBasedPartitioner.costEstimation(rect2, sideLength, range, numXCells, cellHistogram)
+        val cost1 = CostBasedPartitioner.costEstimation(rect1, sideLength, universe, numXCells, cellHistogram)
+        val cost2 = CostBasedPartitioner.costEstimation(rect2, sideLength, universe, numXCells, cellHistogram)
 
         require(cost1+cost2 == cost, s"cost do not match up: $cost1 + $cost2 != $cost")
 
@@ -74,7 +75,7 @@ object SplitTaskR {
         if (cost1 > cost2) {
           up = splitPos
         } else if (cost1 < cost2) {
-          low = splitPos + sideLength
+          low = splitPos // + sideLength
         } else
           diff = 0
       }
@@ -82,17 +83,15 @@ object SplitTaskR {
 
     if(r1.isEmpty && r2.isEmpty) {
       r1 = Some((part,cost))
-    } else if(r1.isDefined && r1.get._2 <= 0)
+      minDiff = cost
+    }
+
+    /*else if(r1.isDefined && r1.get._2 <= 0)
       r1 = None
 
     if(r2.isDefined && r2.get._2 <= 0)
       r2 = None
-
-    //    val partCost = costEstimation(part)
-    //    println(s"split ($dim) $part ($partCost) into \n ${r1.map(_.wkt).getOrElse("-")} ($cost1)\n ${r2.map(_.wkt).getOrElse("-")} ($cost2)")
-    //    println("")
-
-    //    require(cost1 + cost2 == partCost, s"costs do not match partCost=$partCost != cost1=$cost1 + cost2=$cost2")
+*/
 
     (r1, r2, minDiff)
 
@@ -120,17 +119,16 @@ object SplitTaskR {
   }
 }
 
-class SplitTaskR(range: NRectRange, universe:NRectRange, sideLength: Double, cellHistogram: CellHistogram,
+class SplitTaskR(range: NRectRange, rangeCost: Double, universe:NRectRange, sideLength: Double, cellHistogram: CellHistogram,
                  maxCostPerPartition: Double, pointsOnly: Boolean, universeNumXCells: Int,
                  running: AtomicInteger, result: ConcurrentLinkedQueue[Cell], ex: ExecutorService, mutex: Object,
-                 active:ConcurrentLinkedQueue[Future[_]]) extends Runnable {
+                 active:ConcurrentLinkedQueue[Future[_]]/*, todo: mutable.Queue[SplitTaskR]*/) extends Runnable {
 
   override def run(): Unit = {
     try {
       running.incrementAndGet()
 
       val numCells = GridPartitioner.cellsPerDimension(range, sideLength)
-      //      val numXCells = numCells(0)
       /*
        if the partition to split does not exceed the maximum cost or is a single cell,
        return this as result partition
@@ -138,8 +136,11 @@ class SplitTaskR(range: NRectRange, universe:NRectRange, sideLength: Double, cel
        the partition might be empty only for the sample. To avoid expensive calculations to assign a point to its
        closest partition, we add empty partitions here too.
        */
-      val currCost = CostBasedPartitioner.costEstimation(range, sideLength, range, universeNumXCells, cellHistogram)
-      if (( currCost <= maxCostPerPartition) || !numCells.exists(_ > 1)) {
+
+      if (( rangeCost <= maxCostPerPartition) || !numCells.exists(_ > 1)) {
+//        if(result.toList.exists(c => c.range == range)) {
+//          println(s"tried to add duplicate 1 $range")
+//        }
         if (pointsOnly) {
           result.add(Cell(range))
         }
@@ -151,10 +152,41 @@ class SplitTaskR(range: NRectRange, universe:NRectRange, sideLength: Double, cel
         // find the best split and ...
         val (s1, s2) = SplitTaskR.findBestSplit(range, sideLength, universe, universeNumXCells, cellHistogram, maxCostPerPartition)
 
-        Iterator(s1, s2).flatten.foreach { case (r, _) =>
-          val f = ex.submit(new SplitTaskR(r, universe, sideLength, cellHistogram,maxCostPerPartition,pointsOnly,
-            universeNumXCells,running,result,ex, mutex,active))
-          active.add(f)
+
+        require(Iterator(s1,s2).flatten.map(_._1).reduce(_.extend(_)) == range, "splits must equal parent region")
+
+        require(s1.isDefined || s2.isDefined, "At least one split should have been defined")
+
+        if(s1.isDefined && s2.isEmpty && s1.get._1 == range) {
+//          if(result.toList.exists(c => c.range == s1.get._1)) {
+//            println(s"tried to add duplicate 2 ${s1.get._1}")
+//          }
+          if (pointsOnly) {
+            result.add(Cell(s1.get._1))
+          }
+          else {
+            result.add(Cell(s1.get._1, CostBasedPartitioner.extentForRange(s1.get._1,sideLength,universe,universeNumXCells,cellHistogram)))
+          }
+        } else {
+          Iterator(s1, s2).flatten.filter{case (_,cost) => cost <= 0}.foreach { case (r,_) =>
+//            if(result.toList.exists(c => c.range == r)) {
+//              println(s"tried to add duplicate 3 $r")
+//            }
+            if (pointsOnly) {
+              result.add(Cell(r))
+            }
+            else {
+              result.add(Cell(r, CostBasedPartitioner.extentForRange(r,sideLength,universe,universeNumXCells,cellHistogram)))
+            }
+          }
+          Iterator(s1, s2).flatten.filter{case (_,cost) => cost > 0}.foreach { case (r, c) =>
+
+            val task = new SplitTaskR(r, c,universe, sideLength, cellHistogram, maxCostPerPartition, pointsOnly,
+              universeNumXCells, running, result, ex, mutex, active /*, todo*/)
+            val f = ex.submit(task)
+            active.add(f)
+//            todo += task
+          }
         }
       }
     } finally {

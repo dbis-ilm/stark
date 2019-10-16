@@ -49,7 +49,8 @@ class BSP3(private val _universe: NRectRange, protected[stark] val _cellHistogra
       val mutex = new Object()
 
       val ex = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
-      val baseTask = new SplitTaskR(universe,universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly,
+      val universeCost = cellHistogram.totalCost
+      val baseTask = new SplitTaskR(universe,universeCost,universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly,
         numXCells,running, result,ex,mutex,active)
 
       val f = ex.submit(baseTask)

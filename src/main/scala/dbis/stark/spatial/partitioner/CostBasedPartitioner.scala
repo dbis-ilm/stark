@@ -10,9 +10,9 @@ object CostBasedPartitioner {
     * @param part The partition
     * @return Returns the cost, i.e. the number of points, of the given cell
     */
-  def costEstimation(part: NRectRange, sideLength: Double, range: NRectRange, numXCells: Int,
+  def costEstimation(part: NRectRange, sideLength: Double, universe: NRectRange, numXCells: Int,
                      cellHistogram: CellHistogram): Int = {
-    val cellIds = GridPartitioner.getCellsIn(part,sideLength,range,numXCells)
+    val cellIds = GridPartitioner.getCellsIn(part,sideLength,universe,numXCells)
     var i = 0
 
     var sum = 0

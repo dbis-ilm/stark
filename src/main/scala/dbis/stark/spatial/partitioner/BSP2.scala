@@ -6,6 +6,7 @@ import java.util.concurrent.{ConcurrentLinkedQueue, Executors, Future}
 import dbis.stark.spatial.{Cell, NRectRange}
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 object BSP2 {
   val DEFAULT_PARTITION_BUFF_SIZE = 100
@@ -53,21 +54,33 @@ class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogra
       val active = new ConcurrentLinkedQueue[Future[_]]()
       val mutex = new Object()
 
-      val ex = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
-      val baseTask = new SplitTaskR(universe,universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly,
-        numXCells, running, result,ex,mutex,active)
+      val todo = mutable.Queue.empty[SplitTaskR]
+
+      val ex = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() ) //
+
+      val universeCost = cellHistogram.totalCost
+
+      val baseTask = new SplitTaskR(universe,universeCost,universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly,
+        numXCells, running, result,ex,mutex,active /*, todo*/)
+
+
+//      todo += baseTask
+//      while(todo.nonEmpty) {
+//        val nextTask = todo.dequeue()
+//        nextTask.run()
+//      }
+
       val f = ex.submit(baseTask)
       active.add(f)
 
-      while(!f.isDone || running.get() > 0) {
+      while(!f.isDone || running.get() > 0 /* || active.toList.exists(!_.isDone)*/) {
         mutex.synchronized(mutex.wait())
       }
 
       active.toList.foreach(_.get())
-
       ex.shutdown()
 
-      result.toList
+      result.toSet
 
     }
 

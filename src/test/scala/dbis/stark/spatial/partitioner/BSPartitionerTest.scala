@@ -46,7 +46,7 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
   }
 
 
-  private def createRDD(points: Seq[String] = List("POINT(2 2)", "POINT(2.5 2.5)", "POINT(2 4)", "POINT(4 2)", "POINT(4 4)")): RDD[(STObject, Long)] =
+  private def createRDD(points: Seq[String] = List("POINT(2 2)", "POINT(2.55 2.5)", "POINT(2 4)", "POINT(4 2)", "POINT(4 4)")): RDD[(STObject, Long)] =
     sc.parallelize(points,4).zipWithIndex()
       .map { case (string, id) => (new WKTReader().read(string), id) }
 
@@ -167,21 +167,24 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
   it  should "return the correct partition id" taggedAs Fix in {
     val rdd = createRDD()
     val parti = BSPartitioner(rdd, 0.1, 1, pointsOnly = true)
-
     parti.printPartitions("/tmp/idtest_partitions")
-    //    parti.printHistogram(java.nio.file.Paths.get("/tmp/idtest_histo"))
+//
+//    val parts = rdd.map{ case (g,_) =>
+//      val pid = parti.getPartition(g)
+//      println(s"${g.getGeo} --> $pid")
+//        pid
+//    }.collect().toSet
 
+//    parts.size shouldBe 5
 
-    val parts = rdd.map{ case (g,_) => parti.getPartition(g) }.collect().toSet
-
-    parts.size shouldBe 5
-
-
-    //    rdd.collect().foreach{ case (g,id) =>
-    //      val pId = parti.getPartition(g)
-    //
-    //      pId shouldBe partIds(id.toInt)
-    //    }
+    rdd.collect().foreach{ case (so,_) =>
+      withClue(s"$so"){parti.partitions.map(_.range).exists{r =>
+        val c = so.getGeo.getCentroid
+        val p = NPoint(c.getX, c.getY)
+        r.contains(p)
+      } shouldBe true
+      }
+    }
   }
 
 
@@ -376,14 +379,15 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-    val minMax = GridPartitioner.getMinMax(rdd.map(_._1.getGeo.getEnvelopeInternal))
+//    val minMax = GridPartitioner.getMinMax(rdd.map(_._1.getGeo.getEnvelopeInternal))
 
     BSPartitioner.numCellThreshold = -1
-    val parti = BSPartitioner(rdd, 0.1, 100, pointsOnly = false, minMax, sampleFraction = 0) // disable sampling
-
-
+//    val parti = BSPartitioner(rdd, 0.1, 100, pointsOnly = false, minMax, sampleFraction = 0) // disable sampling
+    val pc = BSPStrategy(0.1, 100, pointsOnly = false, sampleFraction = 0)
+    val parti = PartitionerFactory.get(pc,rdd).get
     parti.printPartitions("/tmp/taxipart.wkt")
 
+    parti.minX
 
     //    parti.numPartitions shouldBe 9
 
@@ -397,8 +401,8 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
       } catch {
         case e:IllegalStateException =>
 
-          val xOk = st.getGeo.getCentroid.getX >= minMax._1 && st.getGeo.getCentroid.getX <= minMax._2
-          val yOk = st.getGeo.getCentroid.getY >= minMax._3 && st.getGeo.getCentroid.getY <= minMax._4
+          val xOk = st.getGeo.getCentroid.getX >= parti.minX && st.getGeo.getCentroid.getX <= parti.maxX
+          val yOk = st.getGeo.getCentroid.getY >= parti.minY && st.getGeo.getCentroid.getY <= parti.maxY
 
           parti.partitions.foreach { cell =>
 

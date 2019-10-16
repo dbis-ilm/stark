@@ -34,6 +34,8 @@ case class CellHistogram protected[partitioner](buckets: mutable.Map[Int, (Cell,
   override def isEmpty = buckets.isEmpty
   override def nonEmpty = buckets.nonEmpty
 
+  def totalCost: Int = buckets.valuesIterator.map(_._2).sum
+
   def nonEmptyCells = buckets.values.filter(_._2 > 0)
 
   def length = buckets.size

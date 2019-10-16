@@ -120,7 +120,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should "find the correct nearest neighbors with BSP" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false))
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true))
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -133,7 +133,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should "find the correct nearest neighbors with aggregate with BSP" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false))
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true))
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -146,46 +146,7 @@ class SpatialRDDTestCase extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should "find the correct nearest neighbors with take with BSP" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false))
-
-    // we know that there are 5 duplicates in the data for this point.
-    // Hence, the result should contain the point itself and the 5 duplicates
-    val q: STObject = "POINT (53.483437 -2.2040706)"
-    val foundGeoms = rdd.knnTake(q, 6, Distance.seuclid).collect()
-
-    foundGeoms.length shouldBe 6
-    foundGeoms.foreach{ case (g,_) => g shouldBe q}
-
-  }
-
-  it should "find the correct nearest neighbors with BSP parallel" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true))
-
-    // we know that there are 5 duplicates in the data for this point.
-    // Hence, the result should contain the point itself and the 5 duplicates
-    val q: STObject = "POINT (53.483437 -2.2040706)"
-    val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
-
-    foundGeoms.length shouldBe 6
-    foundGeoms.foreach{ case (g,_) => g shouldBe q}
-
-  }
-
-  it should "find the correct nearest neighbors with aggregate with BSP parallel" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true))
-
-    // we know that there are 5 duplicates in the data for this point.
-    // Hence, the result should contain the point itself and the 5 duplicates
-    val q: STObject = "POINT (53.483437 -2.2040706)"
-    val foundGeoms = rdd.knnAgg(q, 6, Distance.seuclid).collect()
-
-    foundGeoms.length shouldBe 6
-    foundGeoms.foreach{ case (g,_) => g shouldBe q}
-
-  }
-
-  it should "find the correct nearest neighbors with take with BSP parallel" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true))
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true))
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates

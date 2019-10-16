@@ -16,11 +16,11 @@ object BSPartitioner {
     _maxX: Double,
     _minY: Double,
     _maxY: Double,
-    _sampleFraction: Int = 0, parallel: Boolean = false): BSPartitioner[G] = {
+    _sampleFraction: Int = 0): BSPartitioner[G] = {
     
     val _sideLength = math.min(math.abs(_maxX - _minX), math.abs(_maxY - _minY)) / _gridPPD
     
-    BSPartitioner(rdd, _sideLength, _maxCostPerPartition, withExtent, (_minX, _maxX, _minY, _maxY), _sampleFraction, parallel)
+    BSPartitioner(rdd, _sideLength, _maxCostPerPartition, withExtent, (_minX, _maxX, _minY, _maxY), _sampleFraction)
     
   }
   
@@ -31,10 +31,7 @@ object BSPartitioner {
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
            minMax: (Double, Double, Double, Double),
-           sampleFraction: Double,
-           parallel: Boolean):BSPartitioner[G] = {
-
-
+           sampleFraction: Double):BSPartitioner[G] = {
 
     val theRDD = {
       val sampled = if(sampleFraction > 0) rdd.sample(withReplacement = false, fraction = sampleFraction) else rdd
@@ -68,11 +65,8 @@ object BSPartitioner {
 
       val start = NRectRange(NPoint(minX, minY), NPoint(maxX, maxY))
 
-      val bsp = if (parallel)
-        new BSP2(start, histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
+      val bsp = new BSP2(start, histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
 //        new BSP3(start, histogram, sideLength, numXCells, maxCostPerPartition.toInt, pointsOnly, BSPartitioner.numCellThreshold)
-      else
-        new BSP(start, histogram, sideLength, numXCells, maxCostPerPartition, pointsOnly, BSPartitioner.numCellThreshold)
 
       bsp.partitions
     }
@@ -84,9 +78,8 @@ object BSPartitioner {
            sideLength: Double,
            maxCostPerPartition: Double,
            pointsOnly: Boolean,
-           sampleFraction: Double = 0,
-           parallel: Boolean = true):BSPartitioner[G] = {
-    BSPartitioner(rdd, sideLength, maxCostPerPartition, pointsOnly, GridPartitioner.getMinMax(rdd.map(_._1.getEnvelopeInternal)), sampleFraction,parallel)
+           sampleFraction: Double = 0):BSPartitioner[G] = {
+    BSPartitioner(rdd, sideLength, maxCostPerPartition, pointsOnly, GridPartitioner.getMinMax(rdd.map(_._1.getEnvelopeInternal)), sampleFraction)
   }
 
 }

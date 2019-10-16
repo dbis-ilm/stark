@@ -5,7 +5,7 @@ import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
 
 import scala.collection.mutable
 
-class BSPBinaryAsyncTest extends FlatSpec with Matchers with BeforeAndAfter {
+class GridPartitionerTest extends FlatSpec with Matchers with BeforeAndAfter {
 
 
   def makeHisto(x: Int, y: Int) = {
@@ -63,7 +63,7 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers with BeforeAndAfter {
 
     val theRange = NRectRange(NPoint(2, 1),NPoint(4,3))
 
-    val extent = BSP.extentForRange(theRange,sideLength ,numXCells ,histo,startRange)
+    val extent = CostBasedPartitioner.extentForRange(theRange,sideLength ,startRange,numXCells ,histo)
 
     extent shouldBe theRange
 
@@ -80,12 +80,12 @@ class BSPBinaryAsyncTest extends FlatSpec with Matchers with BeforeAndAfter {
 //      sideLength, maxCostPerPartition = 3, pointsOnly = false )
 
     histo.buckets.foreach{ case (_,(cell,_)) =>
-      BSP.costEstimation(cell.range,sideLength, startRange,4,histo) shouldBe 1
+      CostBasedPartitioner.costEstimation(cell.range,sideLength, startRange,4,histo) shouldBe 1
     }
 
-    BSP.costEstimation(startRange,sideLength,startRange,4,histo) shouldBe 16
+    CostBasedPartitioner.costEstimation(startRange,sideLength,startRange,4,histo) shouldBe 16
 
-    BSP.costEstimation(NRectRange(NPoint(0.5, 0.5), NPoint(1,1)),sideLength,startRange,4,histo) shouldBe 1
+    CostBasedPartitioner.costEstimation(NRectRange(NPoint(0.5, 0.5), NPoint(1,1)),sideLength,startRange,4,histo) shouldBe 1
 
   }
 

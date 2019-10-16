@@ -123,7 +123,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   }
 
   it should "find the correct nearest neighbors with BSP" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false)).liveIndex(RTreeConfig(order = 5))
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true)).liveIndex(RTreeConfig(order = 5))
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -136,7 +136,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   }
 
   it should "find the correct nearest neighbors with aggregate with BSP" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false)).liveIndex(RTreeConfig(order = 5))
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true)).liveIndex(RTreeConfig(order = 5))
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -149,7 +149,7 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
   }
 
   it should "find the correct nearest neighbors with take with BSP" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = false)).liveIndex(RTreeConfig(order = 5))
+    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true)).liveIndex(RTreeConfig(order = 5))
 
     // we know that there are 5 duplicates in the data for this point.
     // Hence, the result should contain the point itself and the 5 duplicates
@@ -161,44 +161,6 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
 
   }
 
-  it should "find the correct nearest neighbors with BSP parallel" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true)).liveIndex(RTreeConfig(order = 5))
-
-    // we know that there are 5 duplicates in the data for this point.
-    // Hence, the result should contain the point itself and the 5 duplicates
-    val q: STObject = "POINT (53.483437 -2.2040706)"
-    val foundGeoms = rdd.kNN(q, 6, Distance.seuclid).collect()
-
-    foundGeoms.length shouldBe 6
-    foundGeoms.foreach{ case (g,_) => g shouldBe q}
-
-  }
-
-  it should "find the correct nearest neighbors with aggregate with BSP parallel" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true)).liveIndex(RTreeConfig(order = 7))
-
-    // we know that there are 5 duplicates in the data for this point.
-    // Hence, the result should contain the point itself and the 5 duplicates
-    val q: STObject = "POINT (53.483437 -2.2040706)"
-    val foundGeoms = rdd.knnAgg(q, 6, Distance.seuclid).collect()
-
-    foundGeoms.length shouldBe 6
-    foundGeoms.foreach{ case (g,_) => g shouldBe q}
-
-  }
-
-  it should "find the correct nearest neighbors with take with BSP parallel" in {
-    val rdd = StarkTestUtils.createRDD(sc).partitionBy(BSPStrategy(cellSize = 1,maxCost = 100,pointsOnly = true,parallel = true)).liveIndex(RTreeConfig(order = 7))
-
-    // we know that there are 5 duplicates in the data for this point.
-    // Hence, the result should contain the point itself and the 5 duplicates
-    val q: STObject = "POINT (53.483437 -2.2040706)"
-    val foundGeoms = rdd.knnTake(q, 6, Distance.seuclid).collect()
-
-    foundGeoms.length shouldBe 6
-    foundGeoms.foreach{ case (g,_) => g shouldBe q}
-
-  }
 
   it should "find the correct within distance filter result" in {
     val rdd = StarkTestUtils.createRDD(sc).liveIndex(order = 3)
@@ -237,7 +199,6 @@ class SpatialRDDLiveIndexedTestCase extends FlatSpec with Matchers with BeforeAn
     foundGeoms.length shouldBe 6
     foundGeoms.foreach{ case (g,_) => g shouldBe q}
   }
-
 
   it should "find correct self-join result for points with intersect with grid partitioning" in {
     

@@ -1,11 +1,15 @@
 package dbis.stark.spatial.partitioner
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{ConcurrentLinkedQueue, ExecutorService, Executors, Future}
+import java.util.concurrent.{ConcurrentLinkedQueue, Executors, Future}
 
 import dbis.stark.spatial.{Cell, NRectRange}
 
 import scala.collection.JavaConversions._
+
+object BSP2 {
+  val DEFAULT_PARTITION_BUFF_SIZE = 100
+}
 
 /**
   * A binary space partitioning algorithm implementation based on
@@ -50,7 +54,8 @@ class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogra
       val mutex = new Object()
 
       val ex = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
-      val baseTask = new SplitTaskR(universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly, running, result,ex,mutex,active)
+      val baseTask = new SplitTaskR(universe,universe,sideLength,cellHistogram,maxCostPerPartition,pointsOnly,
+        numXCells, running, result,ex,mutex,active)
       val f = ex.submit(baseTask)
       active.add(f)
 
@@ -72,46 +77,5 @@ class BSP2(private val _universe: NRectRange, protected[stark] val _cellHistogra
       cell.id = idx
       cell
     }.toArray
-  }
-}
-
-class SplitTaskR(range: NRectRange, sideLength: Double, cellHistogram: CellHistogram,maxCostPerPartition: Double, pointsOnly: Boolean, running: AtomicInteger, result: ConcurrentLinkedQueue[Cell], ex: ExecutorService, mutex: Object, active:ConcurrentLinkedQueue[Future[_]]) extends Runnable {
-  override def run(): Unit = {
-    try {
-      running.incrementAndGet()
-
-      val numCells = GridPartitioner.cellsPerDimension(range, sideLength)
-      val numXCells = numCells(0)
-      /*
-       if the partition to split does not exceed the maximum cost or is a single cell,
-       return this as result partition
-       Note: it may happen that the cost == 0, i.e. we think the partition is empty. However, when we are sampling,
-       the partition might be empty only for the sample. To avoid expensive calculations to assign a point to its
-       closest partition, we add empty partitions here too.
-       */
-      val currCost = BSP.costEstimation(range, sideLength, range, numXCells, cellHistogram)
-      if (( currCost <= maxCostPerPartition) || !numCells.exists(_ > 1)) {
-        if (pointsOnly) {
-          result.add(Cell(range))
-        }
-        else {
-          result.add(Cell(range, BSP.extentForRange(range, sideLength, numXCells, cellHistogram, range)))
-        }
-      } else { // need to compute the split
-
-        // find the best split and ...
-        val (s1, s2) = SplitTask.findBestSplit(range, sideLength, range, numXCells, cellHistogram, maxCostPerPartition)
-
-        Iterator(s1, s2).flatten.foreach { case (r, _) =>
-          val f = ex.submit(new SplitTaskR(r, sideLength, cellHistogram,maxCostPerPartition,pointsOnly,running,result,ex, mutex,active))
-          active.add(f)
-        }
-      }
-    } finally {
-      running.decrementAndGet()
-
-      mutex.synchronized(mutex.notify())
-    }
-
   }
 }

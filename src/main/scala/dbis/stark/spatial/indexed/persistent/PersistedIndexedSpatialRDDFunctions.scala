@@ -278,13 +278,12 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     val right = other.flatMap{ case (so, v) =>
       val mbr = StarkUtils.fromGeo(so.getGeo)
       val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
-      intersecting.iterator.map(idx => (idx, (so,v)))
+      intersecting.map(idx => (idx, (so,v)))
     }.partitionBy(partitioner)
       .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
 
 
     self.zipPartitions(right, preservesPartitioning = true){ (leftIter,rightIter) =>
-
       if(!leftIter.hasNext)
         Iterator.empty
       else {

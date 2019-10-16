@@ -1,6 +1,6 @@
 package dbis.stark.dbscan
 
-import dbis.stark.spatial.partitioner.BSP
+import dbis.stark.spatial.partitioner.BSP2
 import dbis.stark.spatial.{Cell, NPoint, NRectRange}
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
@@ -67,7 +67,7 @@ class BSPartitioner extends Partitioner with java.io.Serializable {
     val start = NRectRange(NPoint(mbb.minVec.toArray), NPoint(mbb.maxVec.toArray))
     val a = cellHistogram.zipWithIndex.map{ case ((r,cnt),idx) => idx -> (Cell(r),cnt)}
 
-    val bsp = new BSP(start, dbis.stark.spatial.partitioner.CellHistogram(a), cellSize, _pointsOnly = true, maxPoints.toDouble, None)
+    val bsp = new BSP2(start, dbis.stark.spatial.partitioner.CellHistogram(a), cellSize, _pointsOnly = true, maxPoints.toDouble, None)
 
     bsp.partitions.map{ rrange => MBB(rrange.range.ll, rrange.range.ur) }.toList
   }

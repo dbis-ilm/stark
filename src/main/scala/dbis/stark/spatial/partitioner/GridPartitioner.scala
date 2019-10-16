@@ -67,12 +67,12 @@ object GridPartitioner {
     * @param r The range
     * @return Returns the list of Cell IDs
     */
-  def getCellsIn(r: NRectRange, sideLength: Double, global: NRectRange, numXCells:Int): IndexedSeq[Int] = {
+  def getCellsIn(r: NRectRange, sideLength: Double, universe: NRectRange, numXCells:Int): IndexedSeq[Int] = {
     val numCells = GridPartitioner.cellsPerDimension(r, sideLength)
 
     // the cellId of the lower left point of the given range
-    val llCellId = GridPartitioner.getCellId(r.ll(0), r.ll(1), global.ll(0), global.ll(1), global.ur(0),
-      global.ur(1), sideLength, sideLength, numXCells)
+    val llCellId = GridPartitioner.getCellId(r.ll(0), r.ll(1), universe.ll(0), universe.ll(1), universe.ur(0),
+      universe.ur(1), sideLength, sideLength, numXCells)
 
     (0 until numCells(1)).flatMap { i =>
       llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells

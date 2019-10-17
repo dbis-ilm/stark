@@ -58,6 +58,19 @@ case class NPoint(c: Array[Double]) extends Cloneable with WKT {
     NPoint(newC)
   }
 
+  /**
+    * Compare two [[NPoint]]s inexactly.
+    * We round each coordinate value to [[NPoint.ROUND_SCALE]] decimal places and compare them
+    * @param o The other point
+    * @return True if all coordinate values are equal up to [[NPoint.ROUND_SCALE]] decimals. Otherwise false
+    */
+  def ~=(o: NPoint): Boolean =
+    c.zip(o.c).forall{ case (l,r) =>
+      val lbd = BigDecimal(l).setScale(NPoint.ROUND_SCALE, BigDecimal.RoundingMode.HALF_UP)
+      val rbd = BigDecimal(r).setScale(NPoint.ROUND_SCALE, BigDecimal.RoundingMode.HALF_UP)
+      lbd.equals(rbd)
+    }
+
   /*
 	 * Override this because we need to compare "deep", i.e.
 	 * all values instead of just the reference, which may be
@@ -79,6 +92,9 @@ case class NPoint(c: Array[Double]) extends Cloneable with WKT {
 }
 
 object NPoint {
+
+  var ROUND_SCALE = 5
+
 	def apply(x: Double, y: Double): NPoint = {
     require(x != Double.NaN, "x value must not be NaN")
     require(y != Double.NaN, "y value must not be NaN")

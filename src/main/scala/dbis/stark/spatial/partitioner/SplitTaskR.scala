@@ -10,26 +10,26 @@ object SplitTaskR {
   /*
    * Find the best split for in a given dimension
    * @param dim The dimension
-   * @param part the partition (candidate) to process
+   * @param range the partition (candidate) to process
    * @return Returns the two created partitions along with their cost difference
    */
-  private def bestSplitInDimension(dim: Int, part: NRectRange, sideLength: Double, universe: NRectRange, numXCells: Int,
+  private def bestSplitInDimension(dim: Int, range: NRectRange, rangeCost: Int, sideLength: Double, universe: NRectRange, numXCells: Int,
                                    cellHistogram: CellHistogram, maxCostPerPartition: Double): (Option[(NRectRange, Int)], Option[(NRectRange,Int)], Int) = {
 
-    val numCells = GridPartitioner.cellsPerDimension(part, sideLength)(dim)
+    val numCells = GridPartitioner.cellsPerDimension(range, sideLength)(dim)
 
     // there are fewer than 2 cells in the requested dimension (i.e. 0 or 1) -- we cannot further split this!
-    val cost = CostBasedPartitioner.costEstimation(part,sideLength,universe,numXCells,cellHistogram)
+//    val cost = CostBasedPartitioner.costEstimation(range,sideLength,universe,numXCells,cellHistogram)
     if(numCells < 2) {
-      return (Some(part, cost), None, cost)
+      return (Some(range, rangeCost), None, rangeCost)
     }
 
     // will store the two partitions with the minimal costDiff
     var r1,r2: Option[(NRectRange,Int)] = None
     var minDiff = Int.MaxValue
 
-    var low = part.ll(dim)
-    var up = part.ur(dim)
+    var low = range.ll(dim)
+    var up = range.ur(dim)
 
     var diff = 1.0
 //    var prevCostDiff:Option[Int] = None
@@ -41,16 +41,18 @@ object SplitTaskR {
         val splitPos = low + diff * sideLength
 
         // create the two resulting partitions
-        val rect1 = NRectRange(part.ll, part.ur.withValue(dim, splitPos))
-        val rect2 = NRectRange(part.ll.withValue(dim, splitPos), part.ur)
+        val rect1 = NRectRange(range.ll, range.ur.withValue(dim, splitPos))
+        val rect2 = NRectRange(range.ll.withValue(dim, splitPos), range.ur)
 
-        require(rect1.extend(rect2) == part, "rects must extend to part")
+//        require(rect1.extend(rect2) == range, "rects must extend to range")
 
         // compute costs for each partitions
         val cost1 = CostBasedPartitioner.costEstimation(rect1, sideLength, universe, numXCells, cellHistogram)
         val cost2 = CostBasedPartitioner.costEstimation(rect2, sideLength, universe, numXCells, cellHistogram)
 
-        require(cost1+cost2 == cost, s"cost do not match up: $cost1 + $cost2 != $cost")
+
+
+//        require(cost1+cost2 == rangeCost, s"cost do not match up: $cost1 + $cost2 != $rangeCost")
 
         val costDiff = cost1 - cost2
         val absCostDiff = math.abs(costDiff)
@@ -82,8 +84,8 @@ object SplitTaskR {
 //    }
 
     if(r1.isEmpty && r2.isEmpty) {
-      r1 = Some((part,cost))
-      minDiff = cost
+      r1 = Some((range,rangeCost))
+      minDiff = rangeCost
     }
 
     /*else if(r1.isDefined && r1.get._2 <= 0)
@@ -103,15 +105,15 @@ object SplitTaskR {
     *
     * Will check partitioning in each dimension and take the one with minimal cost difference,
     * i.e. try to create two balanced partitions
-    * @param part The partition to split
+    * @param range The partition to split
     * @return Returns the two resulting partitions with the optimal split
     */
-  def findBestSplit(part: NRectRange, sideLength: Double, range: NRectRange, numXCells: Int,
+  def findBestSplit(range: NRectRange, rangeCost: Int, sideLength: Double, universe: NRectRange, numXCells: Int,
                     cellHistogram: CellHistogram, maxCostPerPartition: Double): (Option[(NRectRange,Int)], Option[(NRectRange,Int)]) = {
 
-    val splitWithMinDiff = (0 until part.dim).iterator
+    val splitWithMinDiff = (0 until range.dim).iterator
       //                              .par // parallel processing of each dimension
-      .map(dim => SplitTaskR.bestSplitInDimension(dim, part,sideLength,range,numXCells,cellHistogram,maxCostPerPartition)) // find best split for that dimension
+      .map(dim => SplitTaskR.bestSplitInDimension(dim, range, rangeCost, sideLength,universe,numXCells,cellHistogram,maxCostPerPartition)) // find best split for that dimension
       // results in one candidate split per dimension
       .minBy(_._3) // take best of all candidate split
 
@@ -119,7 +121,7 @@ object SplitTaskR {
   }
 }
 
-class SplitTaskR(range: NRectRange, rangeCost: Double, universe:NRectRange, sideLength: Double, cellHistogram: CellHistogram,
+class SplitTaskR(range: NRectRange, rangeCost: Int, universe:NRectRange, sideLength: Double, cellHistogram: CellHistogram,
                  maxCostPerPartition: Double, pointsOnly: Boolean, universeNumXCells: Int,
                  running: AtomicInteger, result: ConcurrentLinkedQueue[Cell], ex: ExecutorService, mutex: Object,
                  active:ConcurrentLinkedQueue[Future[_]]/*, todo: mutable.Queue[SplitTaskR]*/) extends Runnable {
@@ -150,7 +152,7 @@ class SplitTaskR(range: NRectRange, rangeCost: Double, universe:NRectRange, side
       } else { // need to cRmpute the split
 
         // find the best split and ...
-        val (s1, s2) = SplitTaskR.findBestSplit(range, sideLength, universe, universeNumXCells, cellHistogram, maxCostPerPartition)
+        val (s1, s2) = SplitTaskR.findBestSplit(range, rangeCost, sideLength, universe, universeNumXCells, cellHistogram, maxCostPerPartition)
 
 
         require(Iterator(s1,s2).flatten.map(_._1).reduce(_.extend(_)) == range, "splits must equal parent region")

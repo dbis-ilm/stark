@@ -13,10 +13,11 @@ object CostBasedPartitioner {
   def costEstimation(part: NRectRange, sideLength: Double, universe: NRectRange, numXCells: Int,
                      cellHistogram: CellHistogram): Int = {
     val cellIds = GridPartitioner.getCellsIn(part,sideLength,universe,numXCells)
+
     var i = 0
 
     var sum = 0
-    while (i < cellIds.size) {
+    while (i < cellIds.length) {
       val id = cellIds(i)
       if (id >= 0 && id < cellHistogram.length) {
         sum += cellHistogram(id)._2

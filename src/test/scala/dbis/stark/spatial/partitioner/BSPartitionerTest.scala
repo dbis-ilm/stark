@@ -374,25 +374,17 @@ class BSPartitionerTest extends TestTimer with Matchers with BeforeAndAfterAll {
   }
 
   it  should "create real partitions correctly for taxi" taggedAs Slow in {
-    val start = System.currentTimeMillis()
+
     val rdd = sc.textFile("src/test/resources/taxi_sample.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
 
-//    val minMax = GridPartitioner.getMinMax(rdd.map(_._1.getGeo.getEnvelopeInternal))
-
     BSPartitioner.numCellThreshold = -1
-//    val parti = BSPartitioner(rdd, 0.1, 100, pointsOnly = false, minMax, sampleFraction = 0) // disable sampling
-    val pc = BSPStrategy(0.1, 100, pointsOnly = false, sampleFraction = 0)
-    val parti = PartitionerFactory.get(pc,rdd).get
+    val pc = BSPStrategy(0.1, 100, pointsOnly = true, sampleFraction = 0)
+    val parti = StarkTestUtils.timing("long taxi version") {
+      PartitionerFactory.get(pc,rdd).get
+    }
     parti.printPartitions("/tmp/taxipart.wkt")
-
-    parti.minX
-
-    //    parti.numPartitions shouldBe 9
-
-    val end = System.currentTimeMillis()
-    println(s"long version: ${end - start} ms")
 
     rdd.collect().foreach { case (st, name) =>
       try {

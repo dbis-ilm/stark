@@ -86,27 +86,30 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 
   "An INDEXED SpatialRDD" should "find the correct intersection result for points" in {
     
-    val rdd = StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+    val rdd = StarkTestUtils.timing("partition (cellsize=10) + index (order=5)") {
+      StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
+    }
 
-    val start = System.currentTimeMillis()
-    val foundPoints = rdd.intersects(qry).collect()
-    val end = System.currentTimeMillis()
-    println(s"intersect + flatten: ${end - start} ms")
-    
+
+    val foundPoints = StarkTestUtils.timing("intersects + collect") {
+      rdd.intersects(qry).collect()
+    }
+
     withClue("wrong number of intersected points") { foundPoints.length shouldBe 36 } // manually counted
     
     foundPoints.foreach{ case (p, _) => qry.intersects(p) shouldBe true }
     
   }
   
-  it should "find all elements contained by a query" in { 
-    val rdd = StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-    
-    val start = System.currentTimeMillis()
-    val foundPoints = rdd.containedby(qry).collect()
-    val end = System.currentTimeMillis()
-    println(s"contaiedby + flatten: ${end - start} ms")
-    
+  it should "find all elements contained by a query" in {
+    val rdd = StarkTestUtils.timing("partition (cellsize=0.10) + index (order=5)") {
+      StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 0.10, order = 5)
+    }
+
+    val foundPoints = StarkTestUtils.timing("containedby + collect") {
+      rdd.containedby(qry).collect()
+    }
+
     withClue("wrong number of points contained by query object") { foundPoints.length shouldBe 36 } // manually counted
   }
   

@@ -4,14 +4,14 @@ import java.io.File
 import java.nio.file.{Files, Path}
 import java.time.LocalDate
 
-import scala.collection.JavaConverters._
-
-import dbis.stark.spatial.partitioner.BSPartitioner
+import dbis.stark.spatial.partitioner.{BSPStrategy, PartitionerFactory}
 import org.apache.spark.SpatialRDD._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.Tag
+
+import scala.collection.JavaConverters._
 
 object Fix extends Tag("dbis.stark.Fix")
 
@@ -141,7 +141,9 @@ object StarkTestUtils {
       order: Int = 10) = {
     
     val rdd = StarkTestUtils.createRDD(sc, file, sep, numParts, distinct)
-    rdd.index(BSPartitioner(rdd, cellSize, cost, pointsOnly = true), order)
+    val pc = BSPStrategy(cellSize,cost,pointsOnly = true)
+    val parti = PartitionerFactory.get(pc, rdd).get
+    rdd.index(parti, order)
   }
 
   def timing[R](name: String)(block: => R) = {

@@ -66,6 +66,24 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
     res
   }
 
+  /**
+    * Tests if the two ranges intersect by checking if one range contains at
+    * least one corner point of the other one
+    *
+    * WARN: Currently, there is a special case that is not treated, because it was not needed
+    *
+    *      +----+
+    *      |    |
+    *  +-------------+
+    *  |             |
+    *  +-------------+
+    *     |    |
+    *    +----+
+    *
+    *
+    * @param r The other range to check for intersection with
+    * @return Returns true if both intersect
+    */
   def intersects(r: NRectRange): Boolean = /*this.contains(r) || r.contains(this) ||*/
     points.exists { p => r.contains(p) } || r.points.exists(p => this.contains(p))
 
@@ -132,7 +150,18 @@ case class NRectRange(ll: NPoint, ur: NPoint) extends Cloneable with WKT {
    * The volume (area, in 2D) of the geometry. Lazily evaluated
    */
   lazy val volume: Double = lengths.product
-  
+
+  /**
+    * Compare two [[NRectRange]]s - but only inexact to account for rounding errors in Double
+    *
+    * See [[NPoint.~=]]
+    * @param r The other range
+    * @return True when almost equal. Otherwise false
+    */
+  def ~=(r: NRectRange): Boolean =
+    (ll ~= r.ll) && (ur ~= r.ur)
+
+
   /**
    * Check if this NRechtRange is equal to some other object.
    * <br><br>

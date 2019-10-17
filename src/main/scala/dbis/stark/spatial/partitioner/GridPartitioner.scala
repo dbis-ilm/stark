@@ -67,16 +67,49 @@ object GridPartitioner {
     * @param r The range
     * @return Returns the list of Cell IDs
     */
-  def getCellsIn(r: NRectRange, sideLength: Double, universe: NRectRange, numXCells:Int): IndexedSeq[Int] = {
-    val numCells = GridPartitioner.cellsPerDimension(r, sideLength)
+  def getCellsIn(r: NRectRange, sideLength: Double, universe: NRectRange, numXCells:Int): Array[Int] = {
+//    require(r.ur(0) <= universe.ur(0), s"search rect must be smaller than universe in dimension 0! r=${r.ur(0)} vs u=${universe.ur(0)}")
+//    require(r.ur(1) <= universe.ur(1), s"search rect must be smaller than universe in dimension 1! r=${r.ur(1)} vs u=${universe.ur(1)}")
+
+    val numCellsPerDimension = GridPartitioner.cellsPerDimension(r, sideLength)
+
+    val numCells = numCellsPerDimension.product
 
     // the cellId of the lower left point of the given range
-    val llCellId = GridPartitioner.getCellId(r.ll(0), r.ll(1), universe.ll(0), universe.ll(1), universe.ur(0),
-      universe.ur(1), sideLength, sideLength, numXCells)
+    val llCellId = GridPartitioner.getCellId(r.ll, universe, sideLength, sideLength, numXCells)
 
-    (0 until numCells(1)).flatMap { i =>
-      llCellId + i * numXCells until llCellId + numCells(0) + i * numXCells
+//    val result = new Array[Int](numCells)
+//    var y = 0
+//    var pos = 0
+//    while(y < numCellsPerDimension(1)) {
+//
+//      var x = 0
+//      while(x < numCellsPerDimension(0)) {
+//
+//        val cellId = llCellId + y*numXCells + x
+//
+//        result(pos) = cellId
+//        pos += 1
+//
+//        x += 1
+//      }
+//      y += 1
+//    }
+
+
+    val result = (0 until numCellsPerDimension(1)).flatMap { i =>
+      val row = llCellId / numXCells + i
+      val maxPossibleCellIdInLine = (row+1)*numXCells -1
+      val calculatedEnd = llCellId + numCellsPerDimension(0)-1 + i * numXCells
+
+      val maxCellIdForRange = math.min(calculatedEnd, maxPossibleCellIdInLine) + 1
+
+      val start = llCellId + i * numXCells
+
+      start until maxCellIdForRange
     }
+
+    result.toArray
   }
 
   /**
@@ -148,6 +181,8 @@ object GridPartitioner {
 //    (minX, maxX + EPS, minY, maxY + EPS)
   }
 
+  protected[stark] def getCellId(p: NPoint, universe: NRectRange, xLength: Double, yLength:Double, numXCells: Int): Int =
+    getCellId(p(0), p(1), universe.ll(0), universe.ll(1), universe.ur(0), universe.ur(1), xLength, yLength, numXCells)
 
   protected[stark] def getCellId(_x: Double, _y: Double, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double, numXCells: Int): Int = {
     require(_x >= minX && _x <= maxX && _y >= minY && _y <= maxY, s"(${_x},${_y}) out of range!")

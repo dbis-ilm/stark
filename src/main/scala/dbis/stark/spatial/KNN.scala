@@ -142,9 +142,13 @@ object KNN {
     * @param partialResults kNN results from partition-local execution
     * @param k The number of nearest neighbors to find
     **/
-  def merge[G <: STObject, V](partialResults: Array[Array[((G,V),Distance)]], k: Int): Iterator[(G,(Distance,V))] = {
+  def merge[G <: STObject, V](_partialResults: Array[Array[((G,V),Distance)]], k: Int): Iterator[(G,(Distance,V))] = {
+
+    if(_partialResults.isEmpty)
+      return Iterator.empty
 
     val result = ListBuffer.empty[(G,(Distance,V))]
+    val partialResults = _partialResults.filter(_.nonEmpty)
     val ptrs = partialResults.map(_ => 0)
 
     // as long as we don't have enough result elements and there is one local result with more elements
@@ -155,19 +159,18 @@ object KNN {
       var minDist: Distance = null
       var minDistIdx = -1
       var i = 0
-      var first = true
-
 
       // iterate over every single local result
       while(i < partialResults.length) {
 
+        val ptr = ptrs(i)
+        val partialResultLength = partialResults(i).length
+
         // check if the current position for that local result is smaller than current min value
-        if((first && ptrs(i) < partialResults(i).length) || partialResults(i)(ptrs(i))._2 < minDist) {
-          minDist = partialResults(i)(ptrs(i))._2
+        if((i == 0 && ptr < partialResultLength) || (ptr < partialResultLength) && (partialResults(i)(ptr)._2 < minDist)) {
+          minDist = partialResults(i)(ptr)._2
           minDistIdx = i
         }
-
-        first = false
 
         i += 1
       }

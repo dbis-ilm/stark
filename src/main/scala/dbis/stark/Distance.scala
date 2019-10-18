@@ -126,7 +126,7 @@ object Distance {
 
   def seuclid(l: GeoType, r: GeoType): ScalarDistance = l.getCentroid.distance(r.getCentroid)
   def seuclid(l: STObject, r: STObject): ScalarDistance = seuclid(l.getGeo, r.getGeo)
-  def teuclid(l: STObject, r: STObject): ScalarDistance = l.getTemp.get.center.get - r.getTemp.get.center.get
+  def teuclid(l: STObject, r: STObject): ScalarDistance = l.getTemp.get.start - r.getTemp.get.start
 
   def euclid(l: STObject, r: STObject): (ScalarDistance, ScalarDistance) = (seuclid(l,r), teuclid(l,r))
 

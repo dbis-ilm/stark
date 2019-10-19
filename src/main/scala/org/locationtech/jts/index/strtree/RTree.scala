@@ -46,8 +46,13 @@ class RTree[D: ClassTag ](
   def oldQuery(box: STObject): Iterator[D] =
     super.query(box.getGeo.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[D]].data)
 
+  def queryL(box: STObject): Array[D] =
+    super.query(box.getGeo.getEnvelopeInternal).asScala.map(_.asInstanceOf[Data[D]].data).toArray
+
   override def query(box: STObject): Iterator[D] =
     super.iteratorQuery(box.getGeo.getEnvelopeInternal).asScala.map(_.data)
+
+
 
   def iQuery(mbr: MBR): Iterator[D] =
     super.iteratorQuery(mbr).asScala.map(_.data)

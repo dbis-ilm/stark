@@ -2,10 +2,11 @@ package dbis.stark.spatial.indexed.persistent
 
 import dbis.stark.STObject.{fromWKT, getInternal, makeSTObject}
 import dbis.stark._
-import dbis.stark.spatial.indexed.RTreeConfig
+import dbis.stark.spatial.indexed.{Index, RTreeConfig}
 import dbis.stark.spatial.partitioner.{BSPStrategy, BSPartitioner, GridStrategy, SpatialGridPartitioner}
 import dbis.stark.spatial.{PredicatesFunctions, SpatialRDDTestCase}
 import org.apache.spark.SpatialRDD._
+import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.{SparkConf, SparkContext}
@@ -16,13 +17,18 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   import SpatialRDDTestCase._
   
   private var sc: SparkContext = _
-  
+  private var indexedRDD: RDD[Index[(STObject, (String,Long, String, STObject))]] = _
   override def beforeAll() {
     val conf = new SparkConf().setMaster("local").setAppName("indexedspatialrddtestcase").set("spark.ui.showConsoleProgress", "false")
     conf.set("spark.serializer", classOf[KryoSerializer].getName)
     conf.set("spark.kryo.registrator", classOf[StarkKryoRegistrator].getName)
     sc = new SparkContext(conf)
 //    sc = new STSparkContext(conf)
+
+    indexedRDD = StarkTestUtils.timing("partition (cellsize=10) + index (order=5)") {
+      StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5).cache()
+    }
+    println(indexedRDD.count())
   }
   
   override def afterAll() {
@@ -85,14 +91,11 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
 //  }
 
   "An INDEXED SpatialRDD" should "find the correct intersection result for points" in {
-    
-    val rdd = StarkTestUtils.timing("partition (cellsize=10) + index (order=5)") {
-      StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-    }
+
 
 
     val foundPoints = StarkTestUtils.timing("intersects + collect") {
-      rdd.intersects(qry).collect()
+      indexedRDD.intersects(qry).collect()
     }
 
     withClue("wrong number of intersected points") { foundPoints.length shouldBe 36 } // manually counted
@@ -102,24 +105,23 @@ class SpatialRDDIndexedTestCase extends FlatSpec with Matchers with BeforeAndAft
   }
   
   it should "find all elements contained by a query" in {
-    val rdd = StarkTestUtils.timing("partition (cellsize=0.10) + index (order=5)") {
-      StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 0.10, order = 5)
-    }
+//    val rdd = StarkTestUtils.timing("partition (cellsize=0.10) + index (order=5)") {
+//      StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 0.10, order = 5)
+//    }
 
     val foundPoints = StarkTestUtils.timing("containedby + collect") {
-      rdd.containedby(qry).collect()
+      indexedRDD.containedby(qry).collect()
     }
 
     withClue("wrong number of points contained by query object") { foundPoints.length shouldBe 36 } // manually counted
   }
   
   it should "find all elements that contain a given point" in { 
-	  val rdd = StarkTestUtils.createIndexedRDD(sc, cost = 100, cellSize = 10, order = 5)
-	  
+
 	  // we look for all elements that contain a given point. 
 	  // thus, the result should be all points in the RDD with the same coordinates
 	  val q = STObject("POINT (53.483437 -2.2040706)")
-	  val foundGeoms = rdd.contains(q).collect()
+	  val foundGeoms = indexedRDD.contains(q).collect()
 	  
 	  foundGeoms.length shouldBe 6
 	  foundGeoms.foreach{ case (g,_) => g shouldBe q}

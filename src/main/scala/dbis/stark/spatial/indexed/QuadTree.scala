@@ -37,9 +37,14 @@ class QuadTree[D: ClassTag](
     super.insert(mbr.getEnvelopeInternal, new Data(data, mbr))
 
   override def query(box: STObject): Iterator[D] =
-    super.query(box.getGeo.getEnvelopeInternal).iterator().asScala.map(_.asInstanceOf[Data[D]].data)
+    super.query(box.getGeo.getEnvelopeInternal).asScala.iterator.map(_.asInstanceOf[Data[D]].data)
+
+  override def queryL(q: STObject): Array[D] =
+    super.query(q.getGeo.getEnvelopeInternal).toArray.map(_.asInstanceOf[Data[D]].data)
 
   override def build(): Unit = {}
 
   override def items = super.queryAll().iterator().asScala.map(_.asInstanceOf[Data[D]].data)
+
+
 }

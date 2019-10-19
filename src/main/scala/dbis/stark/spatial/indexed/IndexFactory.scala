@@ -36,6 +36,7 @@ trait Index[V] {
     *         index implementation
     */
   def query(q: STObject): Iterator[V]
+  def queryL(q: STObject): Array[V]
 
   /**
     * An accessor method to get the root node of the index tree.

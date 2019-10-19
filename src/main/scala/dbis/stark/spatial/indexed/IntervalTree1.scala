@@ -36,12 +36,17 @@ class IntervalTree1[D: ClassTag ]() extends SortedPackedIntervalRTree with Index
     * @param geom The geometry to compute intersection for
     **/
   def query(geom: STObject) : Iterator[D]= {
-
     val visitor: InvertavlTreeVisitor = new InvertavlTreeVisitor()
     super.query(geom.time.get.start.value, geom.time.get.end.get.value, visitor)
 
     visitor.getVisitedItems.map(_.asInstanceOf[Data[D]].data).iterator
+  }
 
+  override def queryL(geom: STObject): Array[D] = {
+    val visitor: InvertavlTreeVisitor = new InvertavlTreeVisitor()
+    super.query(geom.time.get.start.value, geom.time.get.end.get.value, visitor)
+
+    visitor.getVisitedItems.map(_.asInstanceOf[Data[D]].data).toArray
   }
 
   override def build(): Unit = {}
@@ -53,6 +58,7 @@ class IntervalTree1[D: ClassTag ]() extends SortedPackedIntervalRTree with Index
     this.query(Double.MinValue, Double.MaxValue, visitor)
     visitor.getVisitedItems.map(_.asInstanceOf[Data[D]].data).iterator
   }
+
 
 }
 

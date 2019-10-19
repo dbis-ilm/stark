@@ -11,6 +11,7 @@ import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{HashPartitioner, SpatialRDD, TaskContext}
 
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
@@ -25,8 +26,24 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   override def contains(qry: G) = //self.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } }
     new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINS )
 
-  override def containedby(qry: G) = //self.flatMap{ tree => tree.query(qry).filter{ c => c._1.containedBy(qry)} }
-    new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINEDBY )
+  override def containedby(qry: G) = {
+    self.mapPartitions({ iter =>
+
+      val res = ListBuffer.empty[(G,V)]
+
+      iter.foreach { tree =>
+        val candidates = tree.queryL(qry)
+        var i = 0
+        while(i < candidates.length) {
+          if(candidates(i)._1.containedBySpatial(qry))
+            res += candidates(i)
+          i += 1
+        }
+      }
+      res.iterator
+    }, preservesPartitioning = true)
+//        new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINEDBY )
+  }
 
   override def intersects(qry: G) =
     new SpatialIndexedRDD(self, qry, JoinPredicate.INTERSECTS )

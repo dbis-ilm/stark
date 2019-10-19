@@ -619,8 +619,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   def index(indexConfig: IndexConfig,config: Option[PartitionerConfig]): RDD[Index[(G,V)]] = config match {
     case None =>
-      val noIdx: Option[SpatialPartitioner] = None
-      index(noIdx, indexConfig)
+      val noParti: Option[SpatialPartitioner] = None
+      index(noParti, indexConfig)
     case Some(c) => index(c, indexConfig)
   }
 

@@ -174,7 +174,13 @@ class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
 
   override def equals(obj: scala.Any) = obj match {
     case sp: BSPartitioner[G] =>
-      sp.partitions sameElements partitions
+//      sp.partitions sameElements partitions
+      sp.partitions.length == partitions.length && {
+        partitions.forall{ case Cell(_,_,extent) =>
+          sp.partitions.exists{ case Cell(_,_,otherExtent) => extent == otherExtent}
+        }
+      }
     case _ => false
+
   }
 }

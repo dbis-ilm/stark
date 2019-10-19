@@ -24,6 +24,8 @@ class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
     this(left, right, JoinPredicate.predicateFunction(predicate), checkParties = true, oneToMany = oneToMany)
 
   override protected def computeWithOneToOnePartition(partition: OneToOnePartition, context: TaskContext) = {
+    val rightArray =right.iterator(partition.rightPartition, context).toArray
+
     left.iterator(partition.leftPartition, context).flatMap{ tree =>
       /*
        * Returns:
@@ -33,7 +35,7 @@ class PersistentIndexedSpatialJoinRDD[G <: STObject : ClassTag, V: ClassTag, V2:
        * http://www.atetric.com/atetric/javadoc/com.vividsolutions/jts-core/1.14.0/com/vividsolutions/jts/index/strtree/Boundable.html#getBounds--
        */
 
-      right.iterator(partition.rightPartition, context).flatMap { case (rg,rv) =>
+      rightArray.flatMap { case (rg,rv) =>
         tree.query(rg)
           .filter { case (lg,_) => predicateFunction(lg,rg)}
           .map{ case (_,lv) => (lv,rv) }

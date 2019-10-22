@@ -20,13 +20,13 @@ object RTreePartitioner {
 //    val tree = new RTree[Byte](capacity)
     // use STRtreePlus since it does not add geometry to payload data
     val tree = new STRtreePlus[Byte](capacity)
-
     var i = 0
     while(i < samples.length) {
       val g = samples(i)
       tree.insert(g, dummy)
       i += 1
     }
+    tree.build()
 
     val children = tree.queryBoundary() // is a Java ArrayList!
 

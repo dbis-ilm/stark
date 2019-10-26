@@ -197,6 +197,7 @@ class RTreeSerializer extends Serializer[RTree[Any]] {
   }
 
   override def write(kryo: Kryo, output: Output, tree: RTree[Any]): Unit = {
+//    println("kryo write tree")
     output.writeInt(tree.getNodeCapacity, true)
     val empty = tree.isEmpty
     output.writeBoolean(empty)
@@ -210,7 +211,7 @@ class RTreeSerializer extends Serializer[RTree[Any]] {
     }
   }
 
-  def readTree(kryo: Kryo, input: Input,tree: RTree[Any]): AbstractNode = {
+  private def readNode(kryo: Kryo, input: Input, tree: RTree[Any]): AbstractNode = {
     val level = input.readInt(true)
     val numChildren = input.readInt(true)
 
@@ -222,7 +223,7 @@ class RTreeSerializer extends Serializer[RTree[Any]] {
       // recursively read every child node
       var i = 0
       while(i < numChildren) {
-        val child = readTree(kryo, input, tree)
+        val child = readNode(kryo, input, tree)
         n.addChildBoundable(child)
         i += 1
       }
@@ -242,15 +243,15 @@ class RTreeSerializer extends Serializer[RTree[Any]] {
   }
 
   override def read(kryo: Kryo, input: Input, clazz: Class[RTree[Any]]): RTree[Any] = {
+//    println("kryo read tree")
     val capacity = input.readInt(true)
     val empty = input.readBoolean()
     val tree = new RTree[Any](capacity)
-    if(empty) {
-      tree
-    } else {
-      val root = readTree(kryo, input, tree)
+    if(!empty) {
+      val root = readNode(kryo, input, tree)
       tree.setRoot(root)
     }
+    tree.build()
     tree
   }
 }

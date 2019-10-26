@@ -93,7 +93,7 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
 
     if(!checkParties || leftPartitioner.isEmpty || rightPartitioner.isEmpty) {
       // cross product needed
-
+//      println(s"cross product $checkParties $leftPartitioner $rightPartitioner")
       if(oneToMany) {
         var i = 0
         val rightIDs = right.partitions.indices
@@ -115,6 +115,7 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
         }
       }
     } else if (leftPartitioner == rightPartitioner) {
+//      println(s"zipping $leftPartitioner $rightPartitioner")
       left.partitions.iterator.zip(right.partitions.iterator).foreach { case (l, r) =>
         if (oneToMany)
           parts += OneToManyPartition(l.index, left, right, l.index, Seq(r.index))
@@ -123,7 +124,7 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
       }
 
     } else {
-
+//      println(s"find partitions")
       val tree = new RTree[Int](10)
 //      val (toInsert, insertPartitioner, insertRDD, toProbe, probePartitioner, probeRDD) = if(left.getNumPartitions > right.getNumPartitions)
 //        (left.partitions, leftPartitioner.get, left, right.partitions, rightPartitioner.get, right)
@@ -201,6 +202,7 @@ abstract class JoinRDD[L,R, RES:ClassTag](var left: RDD[L], var right: RDD[R], o
       }
     }
 
+//    println(s"created #${parts.size} with oneToMany=$oneToMany avg matches: ")
     parts.toArray
   }
 

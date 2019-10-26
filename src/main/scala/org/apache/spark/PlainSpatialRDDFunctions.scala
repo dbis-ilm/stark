@@ -180,7 +180,8 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       // make a box around ref point and get all intersecting partitions
       val qryPoint = qry.getGeo.getCentroid.getCoordinate
       val mbr = new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist)
-      val intersectinPartitions = p.getIntersectingPartitionIds(StarkUtils.fromEnvelope(mbr))
+      val geoMBR = StarkUtils.makeGeo(mbr)
+      val intersectinPartitions = p.getIntersectingPartitionIds(geoMBR)
 
       if(knnsInPart.size == k && intersectinPartitions.length == 1) {
         knnsInPart.iterator.map { case (d,(g,v)) => (g,(d,v))}
@@ -202,8 +203,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
           val result: Iterator[(G,(Distance,V))] = if(numCandidates < k) {
             // we still havn't found enough...
-            val env = StarkUtils.makeGeo(mbr)
-            val knns = this.containedby(STObject(env).asInstanceOf[G])
+            val knns = this.containedby(STObject(geoMBR).asInstanceOf[G])
               .map { case (g, v) => (g, (distFunc(qry, g), v)) }
               .takeOrdered(k)(o.reverse)
 
@@ -307,15 +307,15 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     val partitioner = new HashPartitioner(parti.numPartitions)
 
     val left = self.flatMap{ case (so, v) =>
-      val mbr = StarkUtils.fromGeo(so)
-      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+//      val mbr = StarkUtils.fromGeo(so)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(so)
       intersecting.iterator.map(idx => (idx, (so,v)))
     }.partitionBy(partitioner)
       .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
 
     val right = other.flatMap{ case (so, v) =>
       val mbr = StarkUtils.fromGeo(so.getGeo)
-      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
+      val intersecting = partiBc.value.getIntersectingPartitionIds(so)
       intersecting.iterator.map(idx => (idx, (so,v)))
     }.partitionBy(partitioner)
       .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)

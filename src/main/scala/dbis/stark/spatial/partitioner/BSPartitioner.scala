@@ -71,7 +71,11 @@ object BSPartitioner {
       bsp.partitions
     }
 
-    new BSPartitioner(partitions, pointsOnly, minX, maxX, minY, maxY)
+    // val tree = new RTree[Cell](10)
+    // partitions.foreach(p => tree.insert(StarkUtils.toEnvelope(p.extent), p))
+    // tree.build()
+
+    new BSPartitioner(partitions/*,tree*/, pointsOnly, minX, maxX, minY, maxY)
   }
 
   def apply[G <: STObject : ClassTag, V: ClassTag](rdd: RDD[(G,V)],
@@ -96,13 +100,13 @@ object BSPartitioner {
   * @param _maxY Maximum y value
   * @tparam G Geometry type
   */
-class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
-      _partitions: Array[Cell],
-      val pointsOnly: Boolean,
-      private val _minX: Double,
-      private val _maxX: Double,
-      private val _minY: Double,
-      private val _maxY: Double) extends GridPartitioner(_partitions, _minX, _maxX, _minY, _maxY) {
+class BSPartitioner[G <: STObject : ClassTag] private[partitioner](_partitions: Array[Cell],
+                                                                  //  val indexedPartitions: RTree[Cell],
+                                                                   val pointsOnly: Boolean,
+                                                                   private val _minX: Double,
+                                                                   private val _maxX: Double,
+                                                                   private val _minY: Double,
+                                                                   private val _maxY: Double) extends GridPartitioner(_partitions, _minX, _maxX, _minY, _maxY) {
 
   override def partitionBounds(idx: Int): Cell = partitions(idx)
   override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
@@ -113,7 +117,13 @@ class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
   }
 
   override def numPartitions: Int = partitions.length
-  
+
+  override def getIntersectingPartitionIds(o: STObject): Array[Int] = {
+    // indexedPartitions.queryL(o).map(_.id)
+    val mbr = StarkUtils.fromGeo(o)
+    partitions.iterator.filter(_.extent intersects mbr).map(_.id).toArray
+  }
+
   override def getPartitionId(key: Any): Int = {
     val g = key.asInstanceOf[G]
 
@@ -125,7 +135,10 @@ class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
 
 
     // find the partitionId where the point is contained in
-    val part = partitions.find(_.range.contains(pc))
+   val part = partitions.find(_.range.contains(pc))
+
+    // val pIds = indexedPartitions.query(g)
+    // val part = pIds.find(_.range.contains(pc))
 
     /*
      * If the given point was not within any partition, calculate the distances to all other partitions
@@ -160,14 +173,14 @@ class BSPartitioner[G <: STObject : ClassTag]private[partitioner](
 //      bsp.partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
 //    }
 
-    if(outside) {
-      partitions(partitionId).range = partitions(partitionId).range.extend(pc)
-
-      //      if(!pointsOnly)
-      partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
-    } else if(!pointsOnly) {
-      partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
-    }
+//    if(outside) {
+//      partitions(partitionId).range = partitions(partitionId).range.extend(pc)
+//
+//      //      if(!pointsOnly)
+//      partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
+//    } else if(!pointsOnly) {
+//      partitions(partitionId).extendBy(StarkUtils.fromGeo(g.getGeo))
+//    }
 
     partitionId
   }

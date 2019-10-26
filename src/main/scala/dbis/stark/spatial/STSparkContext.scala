@@ -236,6 +236,8 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
 
       }
     }
+
+//    this.objectFile[Tile[U]](file, query, partitions)
   }
 
   /**
@@ -335,7 +337,10 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     val infoFile = p.resolve(STSparkContext.PARTITIONINFO_FILE).toString
 
     val isDir = dfs.isDirectory(new Path(path))
-    val partitionsToLoad = if (qry.isDefined && isDir && dfs.exists(new Path(infoFile))) {
+    val infoFileExists = dfs.exists(new Path(infoFile))
+//    println(s"${new Path(path)} is dir? $isDir")
+//    println(s"$infoFile exists? $infoFileExists")
+    val partitionsToLoad = if (qry.isDefined && isDir && infoFileExists) {
       val query = qry.get
       metaInfo(infoFile)
         .intersects(query) // find relevant partitions

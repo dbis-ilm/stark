@@ -85,9 +85,19 @@ class RasterRDD[U : ClassTag](@transient private val _parent: RDD[Tile[U]],
 
 
   override def saveAsTextFile(path: String) = {
-    this.map{ t =>
-      s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}${t.sma.map(","+_.toString).getOrElse("")}"
-    }.saveAsTextFile(path)
+//    this.map{ t =>
+//      s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}${t.sma.map(","+_.toString).getOrElse("")}"
+//    }.saveAsTextFile(path)
+    val parti = GridStrategy(this.getNumPartitions, pointsOnly = true, minmax = None, sampleFraction = 0)
+    val mapped = this.map{ t =>
+      val s = s"${t.ulx},${t.uly},${t.width},${t.height},${t.pixelWidth},${t.data.mkString(",")}${t.sma.map(","+_.toString).getOrElse("")}"
+      val so = STObject(RasterUtils.tileToGeo(t))
+
+      (so, s)
+    }
+    val parted = new PlainSpatialRDDFunctions(mapped).partitionBy(parti)
+    new PlainSpatialRDDFunctions(parted).saveAsStarkTextFile(path, t => t._2)
+
   }
 
   def saveAsObjectFile(path: String, partitions: Int, conf: SparkConf): Unit = {

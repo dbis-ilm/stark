@@ -6,10 +6,10 @@ import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
-import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, SpatialGridPartitioner, SpatialPartitioner}
+import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, SpatialGridPartitioner}
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{HashPartitioner, SpatialRDD, TaskContext}
+import org.apache.spark.{SpatialRDD, TaskContext}
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -26,7 +26,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   override def contains(qry: G) = //self.flatMap { tree => tree.query(qry).filter{ c => c._1.contains(qry) } }
     new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINS )
 
-  override def containedby(qry: G) = {
+  override def containedby(qry: G) = {/*
     self.mapPartitions({ iter =>
 
       val res = ListBuffer.empty[(G,V)]
@@ -41,8 +41,8 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
         }
       }
       res.iterator
-    }, preservesPartitioning = true)
-//        new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINEDBY )
+    }, preservesPartitioning = true)*/
+        new SpatialIndexedRDD(self, qry, JoinPredicate.CONTAINEDBY )
   }
 
   override def intersects(qry: G) =
@@ -235,7 +235,8 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       // make a box around ref point and get all intersecting partitions
       val qryPoint = qry.getGeo.getCentroid.getCoordinate
       val mbr = new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist)
-      val intersectinPartitions = p.getIntersectingPartitionIds(StarkUtils.fromEnvelope(mbr))
+      val env = StarkUtils.makeGeo(mbr)
+      val intersectinPartitions = p.getIntersectingPartitionIds(env)
 
       if(knnsInPart.length == k && intersectinPartitions.length == 1) {
         // we found k points in the only partition that overlaps with the box --> final result
@@ -261,7 +262,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
 
           val result: Iterator[(G,(Distance,V))] = if(numCandidates < k) {
             // we still havn't found enough...
-            val env = StarkUtils.makeGeo(mbr)
+
             val knns = this.containedby(STObject(env).asInstanceOf[G])
                             .map { case (g, v) => (g, (distFunc(qry, g), v)) }
                             .takeOrdered(k)(o.reverse)
@@ -286,22 +287,9 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     //    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
     //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
 
-    val parti = self.partitioner.get.asInstanceOf[SpatialPartitioner]
 
-    val partiBc = self.sparkContext.broadcast(parti)
-    val partitioner = new HashPartitioner(parti.numPartitions)
-
-
-    val right = other.flatMap{ case (so, v) =>
-      val mbr = StarkUtils.fromGeo(so.getGeo)
-      val intersecting = partiBc.value.getIntersectingPartitionIds(mbr)
-      intersecting.map(idx => (idx, (so,v)))
-    }.partitionBy(partitioner)
-      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
-
-
-    self.zipPartitions(right, preservesPartitioning = true){ (leftIter,rightIter) =>
-      if(!leftIter.hasNext)
+    self.zipPartitions(other, preservesPartitioning = true){ (leftIter,rightIter) =>
+      if(!leftIter.hasNext || !rightIter.hasNext)
         Iterator.empty
       else {
         val predFunc = JoinPredicate.predicateFunction(pred)

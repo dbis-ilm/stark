@@ -25,7 +25,6 @@ class SpatialIndexedRDD[G <: STObject : ClassTag, V : ClassTag](@transient priva
     }
 
     val inputIter = firstParent[Index[(G,V)]].iterator(thePartition, context)
-
     inputIter.flatMap{ tree =>
       tree.query(qry).filter { case (g, _) => predicateFunc(g, qry) }
     }

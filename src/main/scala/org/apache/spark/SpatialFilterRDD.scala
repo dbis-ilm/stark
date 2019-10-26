@@ -51,7 +51,6 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
     */
   override def getPartitions: Array[Partition] = {
     val parent = firstParent[(G,V)]
-//    println(s"in filterrdd: $partitioner $checkParties")
     partitioner.map{
       // check if this is a spatial partitioner
       case sp: GridPartitioner if checkParties =>
@@ -65,9 +64,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
 
         // loop over all partitions in the parent
         while (parentPartiId < numParentParts) {
-
           val cell = sp.partitionBounds(parentPartiId)
-
           // check if partitions intersect
           if (StarkUtils.toEnvelope(cell.extent).intersects(qryEnv)) {
             // create a new "spatial partition" pointing to the parent partition
@@ -82,9 +79,7 @@ class SpatialFilterRDD[G <: STObject : ClassTag, V : ClassTag] protected[spark] 
 //        spatialParts.foreach(println)
         spatialParts.toArray
       case tp: TemporalPartitioner =>
-
         val spatialParts = ListBuffer.empty[Partition]
-
         //        val qryEnv = qry.getGeo.getEnvelopeInternal
         var i = 0
         var cnt = 0

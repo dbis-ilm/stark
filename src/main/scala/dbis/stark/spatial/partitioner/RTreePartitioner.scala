@@ -20,13 +20,13 @@ object RTreePartitioner {
 //    val tree = new RTree[Byte](capacity)
     // use STRtreePlus since it does not add geometry to payload data
     val tree = new STRtreePlus[Byte](capacity)
-
     var i = 0
     while(i < samples.length) {
       val g = samples(i)
       tree.insert(g, dummy)
       i += 1
     }
+    tree.build()
 
     val children = tree.queryBoundary() // is a Java ArrayList!
 
@@ -49,13 +49,6 @@ class RTreePartitioner private(_partitions: Array[Cell],
                                _minX: Double, _maxX: Double, _minY: Double, _maxY: Double,
                                pointsOnly: Boolean)
   extends GridPartitioner(_partitions, _minX,_maxX,_minY, _maxY) {
-
-//  override def getAllPartitions(key: Any): List[Int] = {
-//    val g = key.asInstanceOf[STObject]
-//    partitions.iterator.filter{ case Cell(_,_,extent) =>
-//      extent.intersects(StarkUtils.fromEnvelope(g.getGeo.getEnvelopeInternal))
-//    }.map(_.id).toList
-//  }
 
   override def partitionBounds(idx: Int) = partitions(idx)
 
@@ -122,15 +115,4 @@ class RTreePartitioner private(_partitions: Array[Cell],
   }
 
 
-//  def canEqual(other: Any): Boolean = other.isInstanceOf[RTreePartitioner]
-
-//  override def equals(other: Any): Boolean = other match {
-//    case that: RTreePartitioner[_,_] => true
-//    case _ => false
-//  }
-//
-//  override def hashCode(): Int = {
-//    val state = Seq(partitions)
-//    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
-//  }
 }

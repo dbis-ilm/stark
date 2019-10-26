@@ -11,6 +11,7 @@ import org.locationtech.jts.geom.Envelope
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 
 
@@ -32,7 +33,7 @@ trait SpatialPartitioner extends Partitioner {
     id
   }
 
-  def getIntersectingPartitionIds(range: NRectRange):Array[Int]
+  def getIntersectingPartitionIds(o: STObject):Array[Int]
 
   def printPartitions(fName: java.nio.file.Path): Unit
 
@@ -43,6 +44,47 @@ trait SpatialPartitioner extends Partitioner {
 
 }
 
+/**
+  * Base class for spatial partitioners
+  * @param minX The min value in x dimension
+  * @param maxX The max value in x dimension
+  * @param minY The min value in y dimension
+  * @param maxY The max value in y dimension
+  */
+abstract class GridPartitioner(val partitions: Array[Cell],
+                               val minX: Double, var maxX: Double, val minY: Double, var maxY: Double
+                              ) extends SpatialPartitioner {
+
+//  private var indexedPartitions: RTree[Cell] = _
+
+  override def getIntersectingPartitionIds(o: STObject):Array[Int] = {
+
+//    if(indexedPartitions == null) {
+//      indexedPartitions = new RTree[Cell](10)
+//      partitions.foreach(c => indexedPartitions.insert(StarkUtils.toEnvelope(c.extent), c) )
+//      indexedPartitions.build()
+//    }
+//
+    val range = StarkUtils.fromGeo(o)
+//    partitions.iterator.filter(_.extent.intersects(range)).map(_.id).toArray
+//
+//    indexedPartitions.queryL(o).map(_.id)
+
+    val buf = new ArrayBuffer[Int](partitions.length / 2)
+    var i = 0
+    while(i < partitions.length) {
+      if(partitions(i).extent intersects range)
+        buf += partitions(i).id
+      i += 1
+    }
+    buf.toArray
+  }
+
+  def partitionBounds(idx: Int): Cell
+  def partitionExtent(idx: Int): NRectRange
+
+
+}
 
 /**
   * Contains convenience functions used in spatial partitioners
@@ -291,23 +333,4 @@ object GridPartitioner {
 
 
 
-/**
-  * Base class for spatial partitioners
-  * @param minX The min value in x dimension
-  * @param maxX The max value in x dimension
-  * @param minY The min value in y dimension
-  * @param maxY The max value in y dimension
-  */
-abstract class GridPartitioner(val partitions: Array[Cell],
-                              val minX: Double, var maxX: Double, val minY: Double, var maxY: Double
-                              ) extends SpatialPartitioner {
 
-  def getIntersectingPartitionIds(range: NRectRange):Array[Int] = {
-    partitions.filter(_.extent.intersects(range)).map(_.id)
-  }
-
-  def partitionBounds(idx: Int): Cell
-  def partitionExtent(idx: Int): NRectRange
-
-
-}

@@ -227,7 +227,6 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       }
 
     case _ =>
-      println("no partitioner set")
       knnAggIter(qry,k,distFunc)
   }
 

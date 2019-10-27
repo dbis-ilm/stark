@@ -11,7 +11,6 @@ import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SpatialRDD, TaskContext}
 
-import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
@@ -243,7 +242,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
         knnsInPart.iterator.map { case ((g,v),d) => (g,(d,v))}
       } else if(knnsInPart.length > k && intersectinPartitions.length == 1) {
         // we found more than k points in the only partition --> get first k ones
-        knnsInPart.toStream.sortBy(_._2.minValue).iterator.map { case ((g,v),d) => (g,(d,v))}
+        knnsInPart.toStream.sortBy(_._2.minValue).take(k).iterator.map { case ((g,v),d) => (g,(d,v))}
       } else {
         /* not enough points in current partition OR box overlaps with more partitions
            If the maxdist is 0 then there are only duplicates of ref and we have to do another search method

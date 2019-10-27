@@ -4,10 +4,11 @@ import java.awt.image.BufferedImage
 import java.nio.file.Paths
 
 import com.esotericsoftware.kryo.io.Input
+import dbis.stark.STObject.MBR
 import dbis.stark.raster.{RasterRDD, RasterUtils, SMA, Tile}
 import dbis.stark.spatial.indexed.IndexConfig
 import dbis.stark.spatial.partitioner.{OneToManyPartition, PartitionerConfig, PartitionerFactory}
-import dbis.stark.{Instant, Interval, STObject}
+import dbis.stark.{Distance, Instant, Interval, STObject}
 import javax.imageio.ImageIO
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SpatialRDD._
@@ -53,6 +54,78 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       this.emptyRDD[String]
     else
       super.textFile(partitionsToLoad/*, minPartitions*/)
+  }
+
+  /**
+    * Push down of kNN operation into loader when meta info is available
+    * @param path The path of the data file
+    * @param qry The kNN reference point
+    * @param k The number of neighbors
+    * @param distFunc Distance function to apply
+    * @param parser Function to convert string into data tuples
+    * @param indexer Optional indexer if desired
+    * @return Returns an RDD with the k nearest neighbors
+    */
+  def knn[G <: STObject: ClassTag, V:ClassTag](path: String, qry: G, k: Int, distFunc: (STObject, STObject) => Distance, parser: String => (G, V), indexer: Option[IndexConfig] = None): Seq[(G,(Distance, V))] = {
+    val partitionsToLoad = getPartitionsToLoad(path, Some(qry))
+
+    val parsed = super.textFile(partitionsToLoad).map(parser)
+    val knnsInPart = indexer match {
+      case Some(idx) => parsed.index(idx).knn2(qry, k, distFunc).toArray
+      case _ => parsed.knn2(qry, k, distFunc).toArray
+    }
+
+
+    val maxDist = if(knnsInPart.isEmpty) 0
+      else if(knnsInPart.length == 1) knnsInPart(0)._2._1.maxValue
+      else knnsInPart.maxBy(_._2._1)._2._1.maxValue
+
+    if(maxDist <= 0.0) {
+      /*
+       * Use getpartitionstoLoad to find all partition files.
+       * We need to use getpartitionstoload to exlcude the meta info file!
+       * That's why we pass None as query region
+       */
+      val allPartitions = getPartitionsToLoad(path,None)
+      val allParsed = super.textFile(allPartitions).map(parser)
+
+      val iter = indexer match {
+        case Some(idx) => allParsed.index(idx).knnAgg2Iter(qry, k, distFunc)
+        case None => allParsed.knn2(qry, k, distFunc)
+      }
+      iter.toSeq
+    }
+
+
+    val qryPoint = qry.getGeo.getCentroid.getCoordinate
+    val mbr = new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist)
+    val env = StarkUtils.makeGeo(mbr)
+    val intersectinPartitions = getPartitionsToLoad(path, Some(STObject(env)))
+    val numIntersectingPartitions = intersectinPartitions.split(",").length
+
+
+    val res = if(knnsInPart.length == k && numIntersectingPartitions == 1) {
+      // we found k points in the only partition that overlaps with the box --> final result
+      knnsInPart.toSeq
+    } else if(knnsInPart.length > k && numIntersectingPartitions == 1) {
+      // we found more than k points in the only partition --> get first k ones
+//      knnsInPart.toStream.sortBy(_._2.minValue).iterator.map { case ((g,v),d) => (g,(d,v))}
+      knnsInPart.toStream.sortBy(_._2._1.minValue).take(k)
+    } else {
+      /* not enough points in current partition OR box overlaps with more partitions
+         If the maxdist is 0 then there are only duplicates of ref and we have to do another search method
+         without relying on the box
+       */
+      val parsed = super.textFile(intersectinPartitions).map(parser)
+        indexer match {
+          case Some(idx) => parsed.index(idx).knnAgg2Iter(qry,k,distFunc).toSeq
+          case None => parsed.knn2(qry, k, distFunc).toSeq
+        }
+
+    }
+
+
+    res
   }
 
   def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int): RDD[T] =
@@ -333,25 +406,35 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
       } // (STObject, path)
   }
 
-  private[stark] def getPartitionsToLoad(path: String, qry: Option[STObject]): String = {
+  def hasMetaInfo(path: String): (Boolean,Boolean, Option[String]) = {
     val p = Paths.get(path)
-    // the path to the info file
     val infoFile = p.resolve(STSparkContext.PARTITIONINFO_FILE).toString
-
     val isDir = dfs.isDirectory(new Path(path))
     val infoFileExists = dfs.exists(new Path(infoFile))
+
+    val infoFilePath = if(infoFileExists) Some(infoFile) else None
+
+    (isDir, infoFileExists, infoFilePath)
+  }
+
+  private[stark] def getPartitionsToLoad(path: String, qry: Option[STObject]): String = {
+
+    val (isDir, infoFileExists, infoFilePath) = hasMetaInfo(path)
+
+
+
 //    println(s"${new Path(path)} is dir? $isDir")
 //    println(s"$infoFile exists? $infoFileExists")
     val partitionsToLoad = if (qry.isDefined && isDir && infoFileExists) {
       val query = qry.get
-      metaInfo(infoFile)
+      metaInfo(infoFilePath.get)
         .intersects(query) // find relevant partitions
         .map { case (_, file) => Paths.get(path, file).toString } // only path
         .collect() // fetch into single array
         .mkString(",") // make comma separated string for SparkContext#textFile
 
     } else if(isDir){
-      p.resolve("part-*").toString
+      Paths.get(path).resolve("part-*").toString
     } else // if it's not possible to load info file, load everything under this path
       path
 

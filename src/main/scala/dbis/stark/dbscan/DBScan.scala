@@ -132,7 +132,7 @@ class DBScan[K, T : ClassTag](var eps: Double = 0.1, var minPts: Int = 10) exten
      * step 3: in each partition we perform DBSCAN
      */
     //logInfo("step 3: start local DBSCAN")
-    val clusterSets = mappedPoints.groupBy(k => k._1)
+    val clusterSets = mappedPoints.groupBy(k => k._1) //FIXME reduceByKey?
     // TODO: try .repartition(partitionMBBs.length)
     val clusterResults = clusterSets.mapPartitions(iter => applyLocalDBScan(iter, broadcastMBBs.value), preservesPartitioning = true)
     val clusteredData = clusterResults.flatMap{case (_, x) => x}

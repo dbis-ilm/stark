@@ -47,11 +47,12 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     */
   def textFile(path: String, qry: STObject, minPartitions: Int): RDD[String] = {
     val partitionsToLoad: String = getPartitionsToLoad(path, Some(qry))
+    //partitionsToLoad.split(",").foreach(println)
 
     if(partitionsToLoad.isEmpty)
       this.emptyRDD[String]
     else
-      super.textFile(partitionsToLoad, minPartitions)
+      super.textFile(partitionsToLoad/*, minPartitions*/)
   }
 
   def objectFile[T : ClassTag](path: String, qry: STObject, minPartitions: Int): RDD[T] =
@@ -60,11 +61,12 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
   def objectFile[T : ClassTag](path: String, qry: Option[STObject], minPartitions: Int): RDD[T] = {
 
     val partitionstoLoad = getPartitionsToLoad(path, qry)
+    //partitionstoLoad.split(",").foreach(println)
 
     if(partitionstoLoad.isEmpty)
       emptyRDD[T]
     else
-      super.objectFile[T](partitionstoLoad, minPartitions)
+      super.objectFile[T](partitionstoLoad/*, minPartitions*/)
   }
 
   def jointextFiles[V1 : ClassTag, V2: ClassTag](leftPath: String, rightPath: String, qry:Option[STObject],

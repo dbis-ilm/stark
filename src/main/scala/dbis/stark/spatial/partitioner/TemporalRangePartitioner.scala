@@ -64,6 +64,7 @@ object TemporalRangePartitioner {
     val range = maxT - minT
     val dist = Math.round(range / numPartitions)
 
+    // FIXME is 0 here always correct? better Long.MIN_VALUE?
     arr(0) = 0
 
     var i = 1

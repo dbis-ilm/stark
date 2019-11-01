@@ -7,7 +7,7 @@ import scala.reflect.ClassTag
 
 object PartitionStrategy extends Enumeration {
   type PartitionStrategy = Value
-  val NONE, GRID, BSP, RTREE = Value
+  val NONE, GRID, BSP, RTREE, ST = Value
 }
 import PartitionStrategy._
 
@@ -35,6 +35,9 @@ case class RTreeStrategy(order: Int, pointsOnly: Boolean = false,
                          minmax: Option[(Double, Double, Double, Double)] = None,
                          sampleFraction: Double = 0) extends PartitionerConfig(PartitionStrategy.RTREE, pointsOnly, minmax,sampleFraction)
 
+case class SpatioTempStrategy(cellSize: Double, maxCost: Double, pointsOnly: Boolean= false)
+  extends PartitionerConfig(PartitionStrategy.ST, pointsOnly,None,0)
+
 case class NoPartitionerStrategy() extends PartitionerConfig(PartitionStrategy.NONE,true,None,0)
 
 
@@ -59,6 +62,9 @@ object PartitionerFactory {
         case None => Some(RTreePartitioner(sample, order, pointsOnly))
         case Some(mm) => Some(RTreePartitioner(sample, order, mm, pointsOnly))
       }
+
+    case SpatioTempStrategy(cellSize, maxCost, pointsOnly) =>
+      Some(SpatioTempPartitioner(rdd, pointsOnly, cellSize, maxCost))
 
     case NoPartitionerStrategy() => None
   }

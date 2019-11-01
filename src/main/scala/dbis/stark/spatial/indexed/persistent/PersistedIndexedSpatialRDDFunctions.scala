@@ -278,7 +278,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       }
 
     case _ =>
-      println("no partitioner set")
+      //println("no partitioner set")
       knnAgg2Iter(qry,k,distFunc)
   }
 

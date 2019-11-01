@@ -227,7 +227,7 @@ object GridPartitioner {
     getCellId(p(0), p(1), universe.ll(0), universe.ll(1), universe.ur(0), universe.ur(1), xLength, yLength, numXCells)
 
   protected[stark] def getCellId(_x: Double, _y: Double, minX: Double, minY: Double, maxX: Double, maxY: Double, xLength: Double, yLength:Double, numXCells: Int): Int = {
-    require(_x >= minX && _x <= maxX && _y >= minY && _y <= maxY, s"(${_x},${_y}) out of range!")
+    require(_x >= minX && _x <= maxX && _y >= minY && _y <= maxY, s"(${_x},${_y}) out of range: minX=$minX, minY=$minY, maxX=$maxX, maxY=$maxY!")
 
     val x = math.floor(math.abs(_x - minX) / xLength).toInt
     val y = math.floor(math.abs(_y - minY) / yLength).toInt

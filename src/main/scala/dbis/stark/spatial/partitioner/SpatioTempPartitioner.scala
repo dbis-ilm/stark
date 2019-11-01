@@ -2,9 +2,8 @@ package dbis.stark.spatial.partitioner
 
 import java.nio.file.Path
 
-import dbis.stark.STObject.MBR
 import dbis.stark.spatial.{Cell, NPoint, NRectRange, StarkUtils}
-import dbis.stark.{Instant, STObject}
+import dbis.stark.{Instant, Interval, STObject, TemporalExpression}
 import org.apache.spark.rdd.RDD
 import spire.ClassTag
 
@@ -32,51 +31,58 @@ object SpatioTempPartitioner {
   }
 
   def apply[G <: STObject : ClassTag, T : ClassTag](rdd: RDD[(G,T)], minmax: (Double, Double, Double, Double, Long, Long),
-                                                    pointsOnly: Boolean): SpatioTempPartitioner[G] = {
+                                                    pointsOnly: Boolean,cellSize: Double, maxCost: Double): SpatioTempPartitioner[G] = {
 
     val sample = rdd.cache().sample(withReplacement = false, fraction = 0.01).map{case (g,_) => g}.collect()
-    val sampleEnvs: Array[MBR] = sample.map(_.getGeo.getEnvelopeInternal)
     // spatial partitioner
-    val rtreeParti: RTreePartitioner = RTreePartitioner(sampleEnvs, 10000, (minmax._1, minmax._2, minmax._3, minmax._4), pointsOnly)
+//    val spatialPartitioner: RTreePartitioner = RTreePartitioner(sampleEnvs, 10000, (minmax._1, minmax._2, minmax._3, minmax._4), pointsOnly)
 
-    // assign ever element in the sample to a spatial partition and record the min and max temp value for each partition
-    var i = 0
-    val sPartitionsTempMinMax = new Array[(Instant,Instant)](rtreeParti.numPartitions)
-    while(i < sample.length) {
-      val curr = sample(i)
-      val sID = rtreeParti.getPartitionId(curr)
-
-      val currTemp = curr.getTemp.get
-      val currStart = currTemp.start
-      val currEnd = currTemp.end.getOrElse(StarkUtils.MAX_LONG_INSTANT)
-
-      val newStart = if(sPartitionsTempMinMax(sID)._1 > currStart)  currStart else sPartitionsTempMinMax(sID)._1
-      val newEnd = if(sPartitionsTempMinMax(sID)._2 < currEnd)  currEnd else sPartitionsTempMinMax(sID)._2
-
-      sPartitionsTempMinMax(i) = (newStart, newEnd)
-
-      i += 1
-    }
+    val spatialPartitioner = BSPartitioner(rdd,cellSize, maxCost, pointsOnly, (minmax._1, minmax._2, minmax._3, minmax._4), 0)
 
 
-    i = 0
-    val partitions = new Array[(Cell, Array[Long])](sPartitionsTempMinMax.length)
-    while(i < sPartitionsTempMinMax.length) {
-      val (start,end) = sPartitionsTempMinMax(i)
-      val tempPartitions = TemporalRangePartitioner.fixedRange(start.value,end.value, 10)
 
-      val sCell = rtreeParti.partitionBounds(i)
-      partitions(i) = (sCell, tempPartitions)
+    val sPartitionsTempMinMax: Array[(Int, TemporalExpression)] = rdd.map{ case(so,_) =>
+      val pId = spatialPartitioner.getPartitionId(so)
+      (pId, so.time.get)
+    }.reduceByKey{ case (lt,rt) =>
+      val lStart = lt.start.value
+      val lEnd = lt.end.getOrElse(StarkUtils.MAX_LONG_INSTANT).value
 
-      i += 1
+      val rStart = rt.start.value
+      val rEnd = rt.end.getOrElse(StarkUtils.MAX_LONG_INSTANT).value
+
+      val newStart = Iterator(lStart, lEnd, rStart, rEnd).min
+      val newEnd =  Iterator(lStart, lEnd, rStart, rEnd).max
+
+      Interval(newStart, newEnd)
+    }.collect()
+      //.sortBy(_._1).map{ case (_,Interval(start,end)) => (start, end.get)}
+
+//    val partitions = new Array[(Cell, Array[Long])](spatialPartitioner.numPartitions)
+    val partitions = spatialPartitioner.partitions.map(cell => (cell, Array.empty[Long]))
+    sPartitionsTempMinMax.foreach { 
+      case (id, Instant(v)) =>
+        val tempPartitions = TemporalRangePartitioner.fixedRange(v,v, 1)
+        val sCell = spatialPartitioner.partitionBounds(id)
+        partitions(id) = (sCell, tempPartitions)
+
+      case (id, Interval(start, None)) =>
+        val tempPartitions = TemporalRangePartitioner.fixedRange(start.value,StarkUtils.MAX_LONG_INSTANT.value, 1)
+        val sCell = spatialPartitioner.partitionBounds(id)
+        partitions(id) = (sCell, tempPartitions)
+
+      case (id, Interval(start, Some(end))) =>
+        val tempPartitions = TemporalRangePartitioner.fixedRange(start.value,end.value, 10)
+        val sCell = spatialPartitioner.partitionBounds(id)
+        partitions(id) = (sCell, tempPartitions)
     }
 
     new SpatioTempPartitioner[G](partitions, minmax._1, minmax._2, minmax._3, minmax._4, pointsOnly)
   }
 
 
-  def apply[G <: STObject : ClassTag, T : ClassTag](rdd: RDD[(G,T)], pointsOnly: Boolean = true): SpatioTempPartitioner[G] =
-    SpatioTempPartitioner(rdd, SpatioTempPartitioner.getMinMax(rdd), pointsOnly)
+  def apply[G <: STObject : ClassTag, T : ClassTag](rdd: RDD[(G,T)], pointsOnly: Boolean = true, cellSize: Double = 1.0, maxCost:Double = 10000): SpatioTempPartitioner[G] =
+    SpatioTempPartitioner(rdd, SpatioTempPartitioner.getMinMax(rdd), pointsOnly, cellSize, maxCost)
 
 
 }
@@ -86,14 +92,21 @@ class SpatioTempPartitioner[G <: STObject : ClassTag] private(_partitions: Array
                                                               pointsOnly: Boolean)
   extends GridPartitioner(_partitions.map(_._1), _minX, _maxX, _minX, _maxY) {
 
-  private val _numPartitions = {
+  private def _numPartitions = {
     var sum = 0
     var i = 0
-    while(i < partitions.length) {
+    while(i < _partitions.length) {
       sum += _partitions(i)._2.length
       i += 1
     }
     sum
+  }
+
+  def getSTBounds(idx: Int): (NRectRange, Array[Long]) = {
+    require(0 <= idx && idx < _partitions.length, s"wrong index $idx. Not in [0 , ${_partitions.length}]")
+    val (cell, intervals) = _partitions(idx)
+
+    (cell.extent, intervals)
   }
 
   override def partitionBounds(idx: Int): Cell = partitions(idx)
@@ -152,4 +165,5 @@ class SpatioTempPartitioner[G <: STObject : ClassTag] private(_partitions: Array
 
 
   override def numPartitions: Int = _numPartitions
+  def numSpatialPartitions = _partitions.length
 }

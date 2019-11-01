@@ -15,6 +15,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
@@ -31,11 +32,31 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   def saveAsStarkTextFile(path: String, formatter: ((G,V)) => String): Unit =
-    self.partitioner.flatMap{
-      case sp: GridPartitioner => Some(sp)
-      case _ => None
-    } match {
-      case Some(sp) =>
+    self.partitioner.foreach{
+      case sp: SpatioTempPartitioner[G] =>
+        var i = 0
+        var cnt = 0
+        val strings = ListBuffer.empty[String]
+        while(i < sp.numSpatialPartitions) {
+          val (extent, intervals) = sp.getSTBounds(i)
+          var j = 0
+
+          var prevTStart = Long.MinValue
+          while(j < intervals.length) {
+            val partition = Array(extent.wkt, prevTStart.toString, intervals(j),"part-%05d".format(cnt)).mkString(STSparkContext.PARTITIONINFO_DELIM)
+            strings += partition
+            prevTStart = intervals(j)
+            cnt += 1
+            j += 1
+          }
+          i += 1
+        }
+
+        self.map(formatter).saveAsTextFile(path)
+        self.sparkContext.parallelize(strings).saveAsTextFile(Paths.get(path,STSparkContext.PARTITIONINFO_FILE).toString)
+
+
+      case sp: GridPartitioner =>
         val wkts = self.partitions.indices.map{ i =>
           Array(sp.partitionExtent(i).wkt,"","","part-%05d".format(i)).mkString(STSparkContext.PARTITIONINFO_DELIM)
         }
@@ -300,40 +321,25 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
   override def zipJoin[V2: ClassTag](other: RDD[(G,V2)], pred: JoinPredicate.JoinPredicate, partiConf: PartitionerConfig) = {
 
-    val parti = PartitionerFactory.get(partiConf, self).get
-
-    val partiBc = self.sparkContext.broadcast(parti)
-    val partitioner = new HashPartitioner(parti.numPartitions)
-
-    val left = self.flatMap{ case (so, v) =>
-//      val mbr = StarkUtils.fromGeo(so)
-      val intersecting = partiBc.value.getIntersectingPartitionIds(so)
-      intersecting.iterator.map(idx => (idx, (so,v)))
-    }.partitionBy(partitioner)
-      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
-
-    val right = other.flatMap{ case (so, v) =>
-      val mbr = StarkUtils.fromGeo(so.getGeo)
-      val intersecting = partiBc.value.getIntersectingPartitionIds(so)
-      intersecting.iterator.map(idx => (idx, (so,v)))
-    }.partitionBy(partitioner)
-      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
-
     val predFunc = JoinPredicate.predicateFunction(pred)
 
-    // at this point left and right are partitioned into n non-spatial partitions
-    left.zipPartitions(right, preservesPartitioning = true){ (leftIter, rightIter) =>
-      // need to collect one into array
-      val leftArray = leftIter.toArray
+    self.zipPartitions(other, preservesPartitioning = true){ (leftIter,rightIter) =>
 
-      rightIter.flatMap{ case(rg,rv) =>
-        leftArray.iterator
-          .filter { case (lg, _) =>
-            predFunc(lg, rg)
-          }
-          .map{ case (_,lv) =>
-            (lv,rv)
-          }
+      if(!leftIter.hasNext || !rightIter.hasNext) {
+        Iterator.empty
+      } else {
+
+        val leftArray = leftIter.toArray
+
+        rightIter.flatMap{ case(rg,rv) =>
+          leftArray.iterator
+            .filter { case (lg, _) =>
+              predFunc(lg, rg)
+            }
+            .map{ case (_,lv) =>
+              (lv,rv)
+            }
+        }
       }
     }.distinct()
   }

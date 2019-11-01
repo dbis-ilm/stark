@@ -216,7 +216,17 @@ object STObject {
   protected[stark] val NONE: Byte = 0
   protected[stark] val HAS_TIME: Byte = 1
 
-  def apply(wkt: String): STObject = this(new WKTReader().read(wkt))
+  def apply(wkt: String): STObject = {
+    val reader = new WKTReader()
+    try {
+      val g = reader.read(wkt)
+      this(g)
+    } catch {
+      case t: Throwable =>
+        println(s"error parsing $wkt: ${t.getMessage}")
+        throw t
+    }
+  }
   def apply(wkt: String, ts: Long): STObject = STObject(new WKTReader().read(wkt), ts)
   def apply(wkt: String, start: Long, end: Long): STObject = STObject(wkt, Interval(start, end))
   def apply(wkt: String, ts: Instant): STObject = this(new WKTReader().read(wkt), ts)
@@ -228,11 +238,15 @@ object STObject {
   def apply(g: GeoType, start: Long, stop: Long): STObject = this(g, Some(Interval(start, stop)))
 //  def apply(g: GeoType, start: Long, stop: Option[Long]): STObject = this(g, Some(Interval(start, Instant(stop))))
   def apply(e: MBR): STObject = this(StarkUtils.makeGeo(e), None)
+  def apply(e: MBR, i: Long): STObject = this(StarkUtils.makeGeo(e), Instant(i))
+  def apply(m: MBR, s: Long, e: Long): STObject = this(StarkUtils.makeGeo(m), Some(Interval(s,e)))
+  def apply(m: MBR, t: TemporalExpression): STObject = this(StarkUtils.makeGeo(m), Some(t))
 
   def apply(x: Double, y: Double): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)))
   def apply(x: Double, y: Double, ts: Long): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)), ts)
   def apply(x: Double, y: Double, z: Double): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y,z)))
   def apply(x: Double, y: Double, z: Double, ts: Long): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y,z)), ts)
+  def apply(x: Double, y: Double, t: TemporalExpression): STObject = this(new GeometryFactory().createPoint(new Coordinate(x,y)), Some(t))
 
   implicit def getInternal(s: STObject): GeoType = s.g
   implicit def getMBR(s: STObject): MBR = s.getGeo.getEnvelopeInternal

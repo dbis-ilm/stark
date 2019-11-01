@@ -93,7 +93,7 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
         case Some(idx) => allParsed.index(idx).knnAgg2Iter(qry, k, distFunc)
         case None => allParsed.knn2(qry, k, distFunc)
       }
-      iter.toSeq
+      return iter.toSeq
     }
 
 
@@ -421,17 +421,50 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
 
     val (isDir, infoFileExists, infoFilePath) = hasMetaInfo(path)
 
-
-
 //    println(s"${new Path(path)} is dir? $isDir")
 //    println(s"$infoFile exists? $infoFileExists")
     val partitionsToLoad = if (qry.isDefined && isDir && infoFileExists) {
+//      val query = STObject(qry.get.getGeo)
       val query = qry.get
-      metaInfo(infoFilePath.get)
-        .intersects(query) // find relevant partitions
-        .map { case (_, file) => Paths.get(path, file).toString } // only path
-        .collect() // fetch into single array
-        .mkString(",") // make comma separated string for SparkContext#textFile
+      val partitions = metaInfo(infoFilePath.get).collect()
+
+      val partitionsString = StringBuilder.newBuilder
+
+      if(partitions(0)._1.time.isDefined && query.time.isDefined) {
+        var i = 0
+        var first = true
+        while(i < partitions.length) {
+          val obj = partitions(i)
+          if(obj._1.intersects(query)) {
+            if(!first) {
+              partitionsString ++= ","
+            }
+            partitionsString ++= Paths.get(path, obj._2).toString
+
+            first = false
+          }
+          i += 1
+        }
+      } else {
+        var i = 0
+        var first = true
+        while(i < partitions.length) {
+          val obj = partitions(i)
+          if(obj._1.intersectsSpatial(query)) {
+            if(!first) {
+              partitionsString ++= ","
+            }
+            partitionsString ++= Paths.get(path, obj._2).toString
+
+            first = false
+          }
+          i += 1
+        }
+      }
+
+//      intersecting.map { case (_, file) =>  } // only path
+//        .mkString(",") // make comma separated string for SparkContext#textFile
+    partitionsString.toString()
 
     } else if(isDir){
       Paths.get(path).resolve("part-*").toString

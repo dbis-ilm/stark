@@ -1,20 +1,21 @@
 package dbis.stark.spatial
 
 import java.awt.image.BufferedImage
+import java.nio.file
 import java.nio.file.Paths
 
 import com.esotericsoftware.kryo.io.Input
 import dbis.stark.STObject.MBR
 import dbis.stark.raster.{RasterRDD, RasterUtils, SMA, Tile}
-import dbis.stark.spatial.indexed.IndexConfig
-import dbis.stark.spatial.partitioner.{OneToManyPartition, PartitionerConfig, PartitionerFactory}
+import dbis.stark.spatial.indexed.{Index, IndexConfig}
+import dbis.stark.spatial.partitioner.{GridPartitioner, OneToManyPartition, PartitionerConfig, PartitionerFactory}
 import dbis.stark.{Distance, Instant, Interval, STObject}
 import javax.imageio.ImageIO
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SpatialRDD._
+import org.apache.spark._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-import org.apache.spark.{Partition, SparkConf, SparkContext}
 import org.locationtech.jts.index.strtree.RTree
 
 import scala.collection.mutable
@@ -46,14 +47,68 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     * @param qry The query object used to decide which partition to load
     * @return Returns the [[org.apache.spark.rdd.RDD]]
     */
-  def textFile(path: String, qry: STObject, minPartitions: Int): RDD[String] = {
-    val partitionsToLoad: String = getPartitionsToLoad(path, Some(qry))
+  def textFile(path: String, qry: STObject, minPartitions: Int): RDD[String] =
+    textFile(path, Some(qry),minPartitions)
+
+  def textFile(path: String, qry: Option[STObject], minPartitions: Int): RDD[String] = {
+    val partitionsToLoad: String = getPartitionsToLoad(path, qry)
     //partitionsToLoad.split(",").foreach(println)
 
     if(partitionsToLoad.isEmpty)
       this.emptyRDD[String]
     else
       super.textFile(partitionsToLoad/*, minPartitions*/)
+  }
+
+  def knnIndexed[G <: STObject: ClassTag, V:ClassTag](path: String, qry: G, k: Int, distFunc: (STObject, STObject) => Distance, parser: String => (G, V), indexer: Option[IndexConfig] = None): Seq[(G,(Distance, V))] = {
+    val partitionsToLoad = getPartitionsToLoad(path, Some(qry))
+
+    val parsed = super.objectFile[Index[(G,V)]](partitionsToLoad)
+//    val parsed = super.textFile(partitionsToLoad).map(parser)
+    val knnsInPart = parsed.knn2(qry, k, distFunc).toArray
+
+
+    val maxDist = if(knnsInPart.isEmpty) 0
+    else if(knnsInPart.length == 1) knnsInPart(0)._2._1.maxValue
+    else knnsInPart.maxBy(_._2._1)._2._1.maxValue
+
+    if(maxDist <= 0.0) {
+      /*
+       * Use getpartitionstoLoad to find all partition files.
+       * We need to use getpartitionstoload to exlcude the meta info file!
+       * That's why we pass None as query region
+       */
+      val allPartitions = getPartitionsToLoad(path, None)
+      val allParsed = super.objectFile[Index[(G, V)]](allPartitions)
+
+      return allParsed.knn2(qry, k, distFunc).toSeq
+    }
+
+    val qryPoint = qry.getGeo.getCentroid.getCoordinate
+    val mbr = new MBR(qryPoint.x - maxDist, qryPoint.x + maxDist, qryPoint.y - maxDist, qryPoint.y + maxDist)
+    val env = StarkUtils.makeGeo(mbr)
+    val intersectinPartitions = getPartitionsToLoad(path, Some(STObject(env)))
+    val numIntersectingPartitions = intersectinPartitions.split(",").length
+
+
+    val res = if(knnsInPart.length == k && numIntersectingPartitions == 1) {
+      // we found k points in the only partition that overlaps with the box --> final result
+      knnsInPart.toSeq
+    } else if(knnsInPart.length > k && numIntersectingPartitions == 1) {
+      // we found more than k points in the only partition --> get first k ones
+      //      knnsInPart.toStream.sortBy(_._2.minValue).iterator.map { case ((g,v),d) => (g,(d,v))}
+      knnsInPart.toStream.sortBy(_._2._1.minValue).take(k)
+    } else {
+      /* not enough points in current partition OR box overlaps with more partitions
+         If the maxdist is 0 then there are only duplicates of ref and we have to do another search method
+         without relying on the box
+       */
+      val parsed = super.objectFile[Index[(G,V)]](intersectinPartitions)
+      parsed.knn2(qry, k, distFunc).toSeq
+    }
+
+
+    res
   }
 
   /**
@@ -141,6 +196,188 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     else
       super.objectFile[T](partitionstoLoad/*, minPartitions*/)
   }
+
+  def loadPartitionedObjects[V: ClassTag](path:String):RDD[(STObject,V)] = {
+    val _partitions = metaInfo(Paths.get(path, STSparkContext.PARTITIONINFO_FILE).toString).collect()
+      .toStream
+      .sortBy(_._2).zipWithIndex.map{ case ((so, _),idx) =>
+      val extent = StarkUtils.fromGeo(so.getGeo)
+      Cell(idx, extent)
+    }.toArray
+
+    val partiPartitioner = new GridPartitioner(_partitions, -180, 180.1, -90, 90.1) {
+      override def partitionBounds(idx: Int): Cell = partitions(idx)
+
+      override def partitionExtent(idx: Int): NRectRange = {
+        require(0 <= idx && idx < partitions.length, s"idx must be in [0 , ${partitions.length}")
+        partitions(idx).extent
+      }
+
+      override def getPartitionId(key: Any): Int = {
+        val g = key.asInstanceOf[STObject]
+
+        val c = StarkUtils.getCenter(g.getGeo)
+
+        val pX = c.getX
+        val pY = c.getY
+        val pc = NPoint(pX, pY)
+
+        partitions.find(_.range.contains(pc)).map(_.id).getOrElse(0)
+      }
+
+      override def printPartitions(fName: file.Path): Unit = ???
+
+      override def numPartitions: Int = partitions.length
+    }
+
+    val rdd = this.objectFile[(STObject,V)](path,None,0)
+//      textFile(path, None, 0).map(parser)
+
+    new RDD[(STObject,V)](rdd) {
+
+      override val partitioner: Option[Partitioner] = Some(partiPartitioner)
+
+      override def compute(split: Partition, context: TaskContext): Iterator[(STObject,V)] = firstParent[(STObject,V)].iterator(split, context)
+
+      // TODO: it might happen that when loading the data, Spark creates more partitions than the part- files are present
+      //  because they're too big. For text records Spark can happily reassign records to partitions...
+      // this results in partitioner.length < firstparent.partitions.length and IndexOutOfBounds in getPartitionExtent above
+      override protected def getPartitions: Array[Partition] = {
+        val parentParties = firstParent[(STObject, V)].partitions
+        println(s"#parent parties: ${parentParties.length}")
+        parentParties
+      }
+    }
+
+  }
+
+  def loadPartitioned[V: ClassTag](path:String,parser: (String) => (STObject, V)):RDD[(STObject,V)] = {
+    val _partitions = metaInfo(Paths.get(path, STSparkContext.PARTITIONINFO_FILE).toString).collect()
+      .toStream
+      .sortBy(_._2).zipWithIndex.map{ case ((so, _),idx) =>
+      val extent = StarkUtils.fromGeo(so.getGeo)
+      Cell(idx, extent)
+    }.toArray
+
+    val partiPartitioner = new GridPartitioner(_partitions, -180, 180.1, -90, 90.1) {
+      override def partitionBounds(idx: Int): Cell = partitions(idx)
+
+      override def partitionExtent(idx: Int): NRectRange = {
+        require(0 <= idx && idx < partitions.length, s"idx must be in [0 , ${partitions.length}")
+        partitions(idx).extent
+      }
+
+      override def getPartitionId(key: Any): Int = {
+        val g = key.asInstanceOf[STObject]
+
+        val c = StarkUtils.getCenter(g.getGeo)
+
+        val pX = c.getX
+        val pY = c.getY
+        val pc = NPoint(pX, pY)
+
+        partitions.find(_.range.contains(pc)).map(_.id).getOrElse(0)
+      }
+
+      override def printPartitions(fName: file.Path): Unit = ???
+
+      override def numPartitions: Int = partitions.length
+    }
+
+    val rdd = this.textFile(path, None, 0).map(parser)
+
+    new RDD[(STObject,V)](rdd) {
+
+      override val partitioner: Option[Partitioner] = Some(partiPartitioner)
+
+      override def compute(split: Partition, context: TaskContext): Iterator[(STObject,V)] = firstParent[(STObject,V)].iterator(split, context)
+
+      // TODO: it might happen that when loading the data, Spark creates more partitions than the part- files are present
+      //  because they're too big. For text records Spark can happily reassign records to partitions...
+      // this results in partitioner.length < firstparent.partitions.length and IndexOutOfBounds in getPartitionExtent above
+      override protected def getPartitions: Array[Partition] = {
+        val parentParties = firstParent[(STObject, V)].partitions
+        println(s"#parent parties: ${parentParties.length}")
+        parentParties
+      }
+    }
+
+  }
+
+  def loadIndexed[T <: Index[_] : ClassTag](path: String): RDD[T] = {
+
+    val partitions = metaInfo(Paths.get(path, STSparkContext.PARTITIONINFO_FILE).toString).collect()
+      .toStream
+      .sortBy(_._2).zipWithIndex.map{ case ((so, _),idx) =>
+        val extent = StarkUtils.fromGeo(so.getGeo)
+        Cell(idx, extent)
+    }.toArray
+
+    val partiPartitioner = new GridPartitioner(partitions, -180, 180.1, -90, 90.1) {
+      override def partitionBounds(idx: Int): Cell = partitions(idx)
+
+      override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
+
+      override def getPartitionId(key: Any): Int = {
+        val g = key.asInstanceOf[STObject]
+
+        val c = StarkUtils.getCenter(g.getGeo)
+
+        val pX = c.getX
+        val pY = c.getY
+        val pc = NPoint(pX, pY)
+
+        partitions.find(_.range.contains(pc)).map(_.id).getOrElse(0)
+      }
+
+      override def printPartitions(fName: file.Path): Unit = ???
+
+      override def numPartitions: Int = partitions.length
+    }
+
+
+    val rdd = this.objectFile[T](path, None, 0)
+
+    new RDD[T](rdd) {
+
+      override val partitioner: Option[Partitioner] = Some(partiPartitioner)
+
+      override def compute(split: Partition, context: TaskContext): Iterator[T] = firstParent[T].iterator(split, context)
+
+      override protected def getPartitions: Array[Partition] = firstParent.partitions
+    }
+
+//    val rdd = this.objectFile[T](path, None, 0)
+//
+//    val _partitions = rdd.map{ idx =>
+//      val mbr = idx.asInstanceOf[RTree[_]].root()
+//      StarkUtils.fromEnvelope(mbr)
+//    }.zipWithIndex().map{ case (r,i) => Cell(i.toInt, r) }.collect()
+//
+//    val parti = new GridPartitioner(_partitions, -180, 180.1, -90, 90.1) {
+//      override def partitionBounds(idx: Int): Cell = partitions(idx)
+//
+//      override def partitionExtent(idx: Int): NRectRange = partitions(idx).extent
+//
+//      override def getPartitionId(key: Any): Int = {
+//        val r = StarkUtils.fromEnvelope(key.asInstanceOf[RTree[_]].root())
+//        partitions.find(_.range == r).head.id
+//      }
+//
+//      override def printPartitions(fName: file.Path): Unit = ???
+//
+//      override def numPartitions: Int = partitions.length
+//    }
+//
+//    rdd.map{idx =>
+//      (parti.getPartitionId(idx), idx)
+//    }
+//    new PersistedIndexedSpatialRDDFunctions[STObject,Int](rdd.asInstanceOf[RDD[Index[(STObject,Int)]]]).partitionBy(parti)
+
+  }
+
+
+
 
   def jointextFiles[V1 : ClassTag, V2: ClassTag](leftPath: String, rightPath: String, qry:Option[STObject],
                                                  pred: JoinPredicate.JoinPredicate,

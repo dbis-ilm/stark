@@ -387,7 +387,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     //    joinResSam should contain theSameElementsAs joinResPlain
   }
 
-  it should "produce same join results with sampling as without with zip join" taggedAs (Sampling,Slow) in {
+  ignore should "produce same join results with sampling as without with zip join" taggedAs (Sampling,Slow) in {
     val rddBlocks = sc.textFile("src/test/resources/blocks.csv", 4)
       .map { line => line.split(";") }
       .map { arr => (STObject(arr(1)), arr(0))}
@@ -407,7 +407,7 @@ class RTreePartitionerTest extends FlatSpec with Matchers with BeforeAndAfterAll
     val bPartedNoSample = rddBlocks.partitionBy(blockPartiNoSample)
 
     val sampleCnt = StarkTestUtils.timing("sampled zip join") {
-      val joinResSam = rddBlocks.liveIndex(order = 5).zipJoin(rddTaxi, JoinPredicate.CONTAINS, partiBlocksSample)
+      val joinResSam = rddBlocks.liveIndex(order = 5).zipJoin(rddTaxi, JoinPredicate.CONTAINS)
       val joinResSamCnt = joinResSam.count()
 
       println(s"sampled zip join size: $joinResSamCnt")

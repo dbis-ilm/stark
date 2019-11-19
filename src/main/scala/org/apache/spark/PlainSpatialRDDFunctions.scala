@@ -319,7 +319,7 @@ class PlainSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     new SpatialKnnJoinRDD(self, other, k, distFunc)
   }
 
-  override def zipJoin[V2: ClassTag](other: RDD[(G,V2)], pred: JoinPredicate.JoinPredicate, partiConf: PartitionerConfig) = {
+  override def zipJoin[V2: ClassTag](other: RDD[(G,V2)], pred: JoinPredicate.JoinPredicate) = {
 
     val predFunc = JoinPredicate.predicateFunction(pred)
 

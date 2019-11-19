@@ -3,7 +3,7 @@ package dbis.stark.spatial.indexed.live
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed._
-import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig}
+import dbis.stark.spatial.partitioner.GridPartitioner
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.SpatialFilterRDD
 import org.apache.spark.rdd.RDD
@@ -56,11 +56,6 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
 
 
   override def kNN(qry: G, k: Int, distFunc: (STObject, STObject) => Distance): RDD[(G,(Distance,V))] = {
-
-//    implicit val ord = new Ordering[((G,V),Distance)] {
-//      override def compare(x: ((G,V),Distance), y: ((G,V),Distance)) = if(x._2 < y._2) -1 else if(x._2 > y._2) 1 else 0
-//    }
-
     val r = self.mapPartitionsWithIndex({ (_, iter) =>
 
       val tree = IndexFactory.get[(G,V)](indexConfig)
@@ -74,11 +69,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       idxTree.build()
       idxTree.kNN(qry, k, distFunc)
 
-//      println("found:")
-//      println(found.mkString("\n"))
-//      println("-------")
     }).map{ case ((g,v),d) =>
-//      println(s"$g --> $d")
       (g,(d,v))
     }
       .takeOrdered(k)(o)
@@ -99,7 +90,6 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
       idxTree.build()
 
       val knnIter = idxTree.kNN(qry, k, distFunc)
-//                            .map{ case (g,v) => (distFunc(g,qry),(g,v))}
                             .map(_.swap)
                             .toArray
 
@@ -148,37 +138,14 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
    * @return Returns an RDD containing the Join result
    */
   override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, partitioner: Option[GridPartitioner] = None, oneToMany: Boolean = false) = {
-//    if(SpatialRDD.isSpatialParti(self.partitioner) && self.partitioner == other.partitioner) {
-//      self.zipPartitions(other){ case (leftIter, rightIter) =>
-//
-//        if(leftIter.isEmpty || rightIter.isEmpty)
-//          Seq.empty[(V,V2)].iterator
-//        else {
-//          val predicateFunction = JoinPredicate.predicateFunction(pred)
-//
-//          val index = IndexFactory.get[G,V](indexConfig)
-//          leftIter.foreach{ case (g,v) => index.insert(g,v)}
-//
-//          rightIter.flatMap { case (rg, rv) =>
-//            index.query(rg)
-//              .filter { case (lg, _) => predicateFunction(lg, rg) }
-//              .map { case (_, lv) => (lv, rv) }
-//          }
-//        }
-//      }
-//    } else {
       new SpatialJoinRDD(
         if (partitioner.isDefined) self.partitionBy(partitioner.get) else self,
         if (partitioner.isDefined) other.partitionBy(partitioner.get) else other,
         pred,
         Some(indexConfig), oneToMany = oneToMany)
-//    }
   }
 
-
-  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate, partiConf: PartitionerConfig): RDD[(V, V2)] = {
-//    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
-//    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
+  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
 
     self.zipPartitions(other, preservesPartitioning = true){ (leftIter,rightIter) =>
 
@@ -197,7 +164,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
             .map { case (_, lv) => (lv, rv) }
         }
       }
-    }
+    }.distinct()
   }
 
 

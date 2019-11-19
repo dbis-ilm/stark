@@ -1,15 +1,14 @@
 package org.apache.spark
 
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
-import dbis.stark.spatial.{JoinPredicate, PredicatesFunctions, Skyline}
-import dbis.stark.spatial.indexed.{Index, IndexConfig}
 import dbis.stark.spatial.indexed.persistent.PersistedIndexedSpatialRDDFunctions
-import dbis.stark.spatial.partitioner.{PartitionerConfig, PartitionerFactory, SpatialPartitioner}
+import dbis.stark.spatial.indexed.{Index, IndexConfig}
+import dbis.stark.spatial.partitioner.SpatialPartitioner
+import dbis.stark.spatial.{JoinPredicate, PredicatesFunctions, Skyline}
 import dbis.stark.{Distance, STObject}
-import org.apache.spark.rdd.{CartesianRDD, RDD}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.util.collection.ExternalAppendOnlyMap
 
-import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 
@@ -134,7 +133,36 @@ object SpatialRDD {
     new ExternalAppendOnlyMap[Int, (STObject, ValuePair), Combiner](createCombiner, mergeValue, mergeCombiners)
 
   }
-  
+
+
+  def prepareForZipJoin[G <: STObject: ClassTag, V: ClassTag, V2: ClassTag](leftRDD: RDD[(G,V)], rightRDD: RDD[(G,V2)],
+                                                                            partitioner: SpatialPartitioner) = {
+
+    val hashPartitioner = new org.apache.spark.HashPartitioner(partitioner.numPartitions)
+    val sc = leftRDD.sparkContext
+
+    val partiBc = sc.broadcast(partitioner)
+
+    val leftPrepared = leftRDD.mapPartitions({iter =>
+      val theParti = partiBc.value
+      iter.flatMap { case (so, v) =>
+        theParti.getIntersectingPartitionIds(so).map(idx => (idx, (so,v)))
+      }
+    }, preservesPartitioning = true)
+      .partitionBy(hashPartitioner)
+      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
+
+    val rightPrepared = rightRDD.mapPartitions({iter =>
+      val theParti = partiBc.value
+      iter.flatMap { case (so, v) =>
+        theParti.getIntersectingPartitionIds(so).map(idx => (idx, (so,v)))
+      }
+    }, preservesPartitioning = true)
+      .partitionBy(hashPartitioner)
+      .mapPartitions({ iter => iter.map{ case (_,t) => t}}, preservesPartitioning = true)
+
+    (leftPrepared, rightPrepared)
+  }
   
   /**
    * Convert an RDD to a "plain" spatial RDD which uses no indexing.

@@ -33,11 +33,11 @@ object SpatioTempPartitioner {
   def apply[G <: STObject : ClassTag, T : ClassTag](rdd: RDD[(G,T)], minmax: (Double, Double, Double, Double, Long, Long),
                                                     pointsOnly: Boolean,cellSize: Double, maxCost: Double): SpatioTempPartitioner[G] = {
 
-    val sample = rdd.cache().sample(withReplacement = false, fraction = 0.01).map{case (g,_) => g}.collect()
+//    val sample = rdd.cache().sample(withReplacement = false, fraction = 0.01).map{case (g,_) => g}.collect()
     // spatial partitioner
 //    val spatialPartitioner: RTreePartitioner = RTreePartitioner(sampleEnvs, 10000, (minmax._1, minmax._2, minmax._3, minmax._4), pointsOnly)
 
-    val spatialPartitioner = BSPartitioner(rdd,cellSize, maxCost, pointsOnly, (minmax._1, minmax._2, minmax._3, minmax._4), 0)
+    val spatialPartitioner = BSPartitioner(rdd,cellSize, maxCost, pointsOnly, (minmax._1, minmax._2, minmax._3, minmax._4))
 
 
 
@@ -60,7 +60,7 @@ object SpatioTempPartitioner {
 
 //    val partitions = new Array[(Cell, Array[Long])](spatialPartitioner.numPartitions)
     val partitions = spatialPartitioner.partitions.map(cell => (cell, Array.empty[Long]))
-    sPartitionsTempMinMax.foreach { 
+    sPartitionsTempMinMax.foreach {
       case (id, Instant(v)) =>
         val tempPartitions = TemporalRangePartitioner.fixedRange(v,v, 1)
         val sCell = spatialPartitioner.partitionBounds(id)

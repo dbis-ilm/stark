@@ -6,7 +6,7 @@ import dbis.stark.STObject.MBR
 import dbis.stark.spatial.JoinPredicate.JoinPredicate
 import dbis.stark.spatial._
 import dbis.stark.spatial.indexed.{Index, KnnIndex, WithinDistanceIndex}
-import dbis.stark.spatial.partitioner.{GridPartitioner, PartitionerConfig, SpatialGridPartitioner}
+import dbis.stark.spatial.partitioner.GridPartitioner
 import dbis.stark.{Distance, STObject}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SpatialRDD, TaskContext}
@@ -54,6 +54,9 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
   override def join[V2 : ClassTag](other: RDD[(G, V2)], pred: (G,G) => Boolean, oneToMany: Boolean) =
     new PersistentIndexedSpatialJoinRDD(self, other, pred, oneToMany)
 
+  def joinT[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate, oneToMany: Boolean) =
+    new PersistentIndexedSpatialJoinRDD(self, other, pred, oneToMany)
+
   /**
     * Performs a broadcast join. The relation "other" is broadcasted to all partitions of this RDD and thus, "other"
     * should be the smaller one and fit into memory!
@@ -79,28 +82,28 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     }
   }
 
-  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
-    println(self.partitioner)
-    println(other.partitioner)
-
-    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
-    //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
-
-    println("zip join")
-
-    self.zipPartitions(other, preservesPartitioning = true){ (left,right) =>
-
-      val predFunc = JoinPredicate.predicateFunction(pred)
-
-      left.flatMap { tree =>
-        right.flatMap { case (rg, rv) =>
-          tree.query(rg)
-            .filter { case (lg, _) => predFunc(lg, rg) }
-            .map { case (_, lv) => (lv, rv) }
-        }
-      }
-    }
-  }
+//  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+//    println(self.partitioner)
+//    println(other.partitioner)
+//
+//    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
+//    //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
+//
+//    println("zip join")
+//
+//    self.zipPartitions(other, preservesPartitioning = true){ (left,right) =>
+//
+//      val predFunc = JoinPredicate.predicateFunction(pred)
+//
+//      left.flatMap { tree =>
+//        right.flatMap { case (rg, rv) =>
+//          tree.query(rg)
+//            .filter { case (lg, _) => predFunc(lg, rg) }
+//            .map { case (_, lv) => (lv, rv) }
+//        }
+//      }
+//    }
+//  }
 
 
   def broadcastJoinWithIndex[V2 : ClassTag](other: RDD[Index[(G,V2)]], pred: JoinPredicate): RDD[(V, V2)] = ???
@@ -282,7 +285,7 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
       knnAgg2Iter(qry,k,distFunc)
   }
 
-  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate, partiConf: PartitionerConfig): RDD[(V, V2)] = {
+  override def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
     //    require(self.partitioner.isDefined && self.partitioner.get.isInstanceOf[SpatialGridPartitioner[G]],"zip join only for spatial grid partitioners")
     //    require(self.partitioner == other.partitioner, "zip join only works for same spatial partitioners")
 
@@ -341,5 +344,4 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     case _ =>
       self.saveAsObjectFile(path)
   }
-
 }

@@ -1,5 +1,6 @@
 package dbis.stark.sql
 
+import dbis.stark.spatial.STSparkContext
 import org.apache.spark.sql.SparkSession
 
 /**
@@ -58,6 +59,9 @@ object STARKSession {
     builder.enableSTARKSupport()
     builder
   }
+
+  def fromContext(ctx: STSparkContext): SparkSession =
+    SparkSession.builder.config(ctx.getConf).getOrCreate()
 
 //  /**
 //    * (implicit) conversion of a traiditonal SparkSession builder into a STARK Session builder

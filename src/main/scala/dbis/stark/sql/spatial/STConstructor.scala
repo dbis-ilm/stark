@@ -63,7 +63,7 @@ case class STGeomFromTile(exprs: Seq[Expression]) extends Expression
 
 
 
-case class STPoint(private val exprs: Seq[Expression]) extends STConstructor(exprs) {
+case class STPoint(private val exprs: Seq[Expression]) extends Expression with CodegenFallback  { //STConstructor(exprs)
   require(exprs.length == 2 || exprs.length == 3, s"Exactly two or three expressions allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
@@ -77,4 +77,10 @@ case class STPoint(private val exprs: Seq[Expression]) extends STConstructor(exp
 //    new GenericArrayData(STObjectUDT.serialize(theObject).toByteArray())
     STObjectUDT.serialize(theObject)
   }
+
+  override def nullable: Boolean = true
+
+  override def dataType: DataType = STObjectUDT
+
+  override def children: Seq[Expression] = exprs
 }

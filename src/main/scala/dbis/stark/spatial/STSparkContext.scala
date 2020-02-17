@@ -492,9 +492,9 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
         // we have SMA
         val min = f(arr(i))
         val max = f(arr(i+1))
-        val avg = arr(i+2).toDouble
+        val median = f(arr(i+2))
 
-        Some(SMA(min, max, avg))
+        Some(SMA(min, max, median))
       } else
         None
 
@@ -592,8 +592,9 @@ class STSparkContext(conf: SparkConf) extends SparkContext(conf) {
     //        val pixelDeltaZ = nameEncodedData(8)
 
             val flatData = data.flatten
+            val median = flatData(flatData.length / 2)
 
-            val sma = SMA(flatData(0), flatData(0), 0.0)
+            val sma = SMA(flatData(0), flatData(0), median)
             var i = 1
 
             val byteData = new Array[Int](flatData.length)

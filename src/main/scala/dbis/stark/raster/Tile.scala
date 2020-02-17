@@ -4,8 +4,8 @@ import scala.reflect.{ClassTag, _}
 
 case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
                                                              var max: U,
-                                                             var avg: Double) {
-  override def toString = s"$min,$max,$avg"
+                                                             var median: U) {
+  override def toString = s"$min,$max,$median"
 }
 
 /**
@@ -52,7 +52,9 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
       i += 1
     }
 
-    sma = Some(SMA(min, max, 0))
+    val median = data(data.length / 2)
+
+    this.sma = Some(SMA(min, max, median))
     this
   }
 
@@ -68,7 +70,7 @@ case class SMA[@specialized(Int, Double, Byte) U : ClassTag](var min: U,
   }
 
   //Used in RasterUtils.calcByteRasterMinMax
-  def getSMA = sma;
+  def getSMA = sma
 
   lazy val center = (ulx + (width*pixelWidth)/2 , uly - (height*pixelWidth)/2)
 

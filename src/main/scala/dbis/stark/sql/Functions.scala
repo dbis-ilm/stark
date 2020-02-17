@@ -16,7 +16,7 @@ object Functions {
   def register(implicit spark: SparkSession): Unit = {
 
 
-    spark.sessionState.functionRegistry.createOrReplaceTempFunction("asString", STAsString)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_wkt", STAsWKT)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_geomfromwkt", STGeomFromWKT)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_geomfromtile", STGeomFromTile)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_point", STPoint)
@@ -33,6 +33,11 @@ object Functions {
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("width", GetWidth)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("height", GetHeight)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("data", GetData)
+
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("r_max", TileMax)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("r_min", TileMin)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("r_median", TileMedian)
+
 
     //Raster-Functions
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("histogram", CalcTileHistogram)

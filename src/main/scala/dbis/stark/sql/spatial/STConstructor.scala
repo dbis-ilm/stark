@@ -1,5 +1,7 @@
 package dbis.stark.sql.spatial
 
+import java.time.{LocalDate, ZoneId}
+
 import dbis.stark.STObject
 import dbis.stark.raster.RasterUtils
 import org.apache.spark.sql.catalyst.InternalRow
@@ -83,4 +85,54 @@ case class STPoint(private val exprs: Seq[Expression]) extends Expression with C
   override def dataType: DataType = STObjectUDT
 
   override def children: Seq[Expression] = exprs
+}
+
+case class MakeSTObject(private val exprs: Seq[Expression]) extends Expression with CodegenFallback { //STConstructor(exprs)
+  override def nullable: Boolean = false
+  override def dataType: DataType = STObjectUDT
+  override def children: Seq[Expression] = exprs
+
+  override def eval(input: InternalRow): Any = {
+    val wkt = exprs.head.eval(input)
+
+    if(wkt == null) {
+      sys.error(s"shit. ${input.getClass.getCanonicalName}${input.toString}  expr: ${exprs.mkString(";")}  ${exprs.head.prettyName}  cols: ${input.numFields} ")
+    }
+
+    val wktString = wkt.asInstanceOf[UTF8String].toString
+
+    val date: Option[Long] = if(exprs.length == 2) {
+      val dateEvaled = exprs.last.eval(input)
+      if(dateEvaled == null) {
+        sys.error(s"dunno.... date is null: ${input.getClass.getCanonicalName}${input.toString}  expr: ${exprs.mkString(";")}  ${exprs.head.prettyName}  cols: ${input.numFields} ")
+      }
+
+      val daysSinceEpoch = dateEvaled.asInstanceOf[java.lang.Integer]
+      Some(LocalDate.ofEpochDay(daysSinceEpoch.longValue()).atStartOfDay(ZoneId.of("UTC")).toEpochSecond)
+    } else if (exprs.length == 4) {
+
+
+      def convert(i: Int): Integer = {
+        val evaled = exprs(i).eval(input)
+        evaled match {
+          case i: java.lang.Integer => i
+          case s: UTF8String => s.toString.toInt
+        }
+      }
+
+      val year = convert(1)
+      val month = convert(2)
+      val day = convert(3)
+
+      Some(LocalDate.of(year, month, day).atStartOfDay(ZoneId.of("UTC")).toEpochSecond)
+    } else
+      None
+
+    val theObject = date match {
+      case None => STObject(wktString)
+      case Some(l) => STObject(wktString, l)
+    }
+
+    STObjectUDT.serialize(theObject)
+  }
 }

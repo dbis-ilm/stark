@@ -20,6 +20,8 @@ object Functions {
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_geomfromwkt", STGeomFromWKT)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_geomfromtile", STGeomFromTile)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_point", STPoint)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_sto", MakeSTObject)
+
 
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_contains", STContains)
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("st_containedby", STContainedBy)

@@ -39,8 +39,11 @@ object Functions {
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("r_median", TileMedian)
 
 
-    //Raster-Functions
+    // Histogram functions
     spark.sessionState.functionRegistry.createOrReplaceTempFunction("histogram", CalcTileHistogram)
     spark.udf.register("rasterHistogram", new CalcRasterHistogram)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("h_value", HistogramValue)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("h_lower", HistogramLowerBounds)
+    spark.sessionState.functionRegistry.createOrReplaceTempFunction("h_upper", HistogramUpperBounds)
   }
 }

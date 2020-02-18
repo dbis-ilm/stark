@@ -3,10 +3,10 @@ package dbis.stark.sql.spatial
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 import org.apache.spark.sql.raster.TileUDT
 import org.apache.spark.sql.spatial.STObjectUDT
 import org.apache.spark.sql.types.{DataType, DoubleType, StringType}
+import org.apache.spark.unsafe.types.UTF8String
 
 abstract class STFunction(exprs: Seq[Expression])
   extends Expression
@@ -29,8 +29,9 @@ case class STAsWKT(exprs: Seq[Expression]) extends Expression
   def first = exprs.head
 
   override def eval(input: InternalRow) = {
-    val bytes = first.eval(input).asInstanceOf[ArrayData]
-    new GenericArrayData(STObjectUDT.deserialize(bytes).toString)
+    val so = STObjectUDT.deserialize(first.eval(input))
+    UTF8String.fromString(so.wkt)
+//    new GenericArrayData(STObjectUDT.deserialize(bytes).toString)
   }
 
   override def dataType = StringType

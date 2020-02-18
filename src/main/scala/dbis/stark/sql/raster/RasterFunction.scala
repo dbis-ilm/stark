@@ -9,9 +9,6 @@ import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.expressions.{MutableAggregationBuffer, UserDefinedAggregateFunction}
 import org.apache.spark.sql.raster._
 import org.apache.spark.sql.types._
-import org.apache.spark.unsafe.types.UTF8String
-
-import scala.collection.mutable.ListBuffer
 
 abstract class RasterFunction extends Expression
   with CodegenFallback{
@@ -23,7 +20,7 @@ case class CalcTileHistogram(exprs: Seq[Expression]) extends RasterFunction {
   require(exprs.length == 1 || exprs.length == 2, s"One or two expressions allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
-    val tile = TileUDT.deserialize(children(0).eval(input))
+    val tile = TileUDT.deserialize(children.head.eval(input))
     var bucketCount = 0
     if(children.length > 1) {
       bucketCount = children(1).eval(input).asInstanceOf[Int]
@@ -77,5 +74,36 @@ case class CalcRasterHistogram() extends UserDefinedAggregateFunction {
   // This is where you output the final value, given the final value of your bufferSchema.
   override def evaluate(buffer: Row): Any = {
     buffer.getAs[Seq[BucketUDT]](0)
+  }
+}
+
+case class HistogramValue(exprs: Seq[Expression]) extends RasterFunction {
+  override def eval(input: InternalRow): Int = {
+    val bucket = BucketUDT.deserialize(exprs.head.eval(input))
+    bucket.values
+  }
+
+  override def dataType: DataType = IntegerType
+
+  override def children: Seq[Expression] = exprs
+}
+
+case class HistogramLowerBounds(exprs: Seq[Expression]) extends  RasterFunction {
+  override def dataType: DataType = DoubleType
+  override def children: Seq[Expression] = exprs
+
+  override def eval(input: InternalRow): Double = {
+    val bucket = BucketUDT.deserialize(exprs.head.eval(input))
+    bucket.lowerBucketBound
+  }
+}
+
+case class HistogramUpperBounds(exprs: Seq[Expression]) extends  RasterFunction {
+  override def dataType: DataType = DoubleType
+  override def children: Seq[Expression] = exprs
+
+  override def eval(input: InternalRow): Double = {
+    val bucket = BucketUDT.deserialize(exprs.head.eval(input))
+    bucket.upperBucketBound
   }
 }

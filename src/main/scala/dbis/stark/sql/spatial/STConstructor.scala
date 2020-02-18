@@ -69,6 +69,14 @@ case class STPoint(private val exprs: Seq[Expression]) extends Expression with C
   require(exprs.length == 2 || exprs.length == 3, s"Exactly two or three expressions allowed for ${this.getClass.getSimpleName}, but got ${exprs.length}")
 
   override def eval(input: InternalRow) = {
+    if(exprs == null)
+      sys.error("expression is null")
+
+    if(exprs.head == null)
+      sys.error("expr.head is null")
+
+    if(exprs.head.eval(input) == null)
+      sys.error(s"evaled value is null for ${exprs.head}")
     val x = exprs.head.eval(input).asInstanceOf[Decimal].toDouble
     val y = exprs(1).eval(input).asInstanceOf[Decimal].toDouble
 
@@ -98,6 +106,8 @@ case class MakeSTObject(private val exprs: Seq[Expression]) extends Expression w
     if(wkt == null) {
       sys.error(s"shit. ${input.getClass.getCanonicalName}${input.toString}  expr: ${exprs.mkString(";")}  ${exprs.head.prettyName}  cols: ${input.numFields} ")
     }
+
+
 
     val wktString = wkt.asInstanceOf[UTF8String].toString
 

@@ -176,13 +176,13 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     * @tparam V2 Payload type in second relation
     * @return Returns an RDD with payload values from left and right
     */
-  override def broadcastJoin[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+  override def broadcastJoinL[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
     val otherArray = other.collect()
     val otherBC = self.sparkContext.broadcast(otherArray)
 
     self.mapPartitions{iter =>
       val predFunc = JoinPredicate.predicateFunction(pred)
-      val tree = IndexFactory.get[(G,V2)](indexConfig)
+      val tree = IndexFactory.get[(G,V)](indexConfig)
 
       iter.foreach{ case (g,v) => tree.insert(g, (g,v))}
       tree.build()
@@ -203,7 +203,7 @@ class LiveIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag](
     * @tparam V2 Payload type in second relation
     * @return Returns an RDD with payload values from left and right
     */
-  override def broadcastJoinR[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
+  override def broadcastJoin[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = {
     val otherArray = other.collect()
     val otherBC = self.sparkContext.broadcast(otherArray)
 

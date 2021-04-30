@@ -82,6 +82,9 @@ class PersistedIndexedSpatialRDDFunctions[G <: STObject : ClassTag, V: ClassTag]
     }
   }
 
+  override def broadcastJoinL[V2 : ClassTag](other: RDD[(G, V2)], pred: JoinPredicate): RDD[(V, V2)] = 
+    broadcastJoin(other, pred)
+
 //  def zipJoin[V2 : ClassTag](other: RDD[(G,V2)], pred: JoinPredicate): RDD[(V, V2)] = {
 //    println(self.partitioner)
 //    println(other.partitioner)
